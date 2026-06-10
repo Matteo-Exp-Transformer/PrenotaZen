@@ -46,7 +46,3 @@ docs/
 
 # Script Playwright usa-e-getta
 pw-*.mjs
-
-# Pagine HTML salvate dal browser
-/*.html
-/*_files/

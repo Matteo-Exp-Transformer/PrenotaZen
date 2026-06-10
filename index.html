@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="it" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/icons/favicon-v2.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-v2.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sistema di prenotazioni per ristoranti" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Booking SaaS — Sistema Prenotazioni</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- Splash mostrata solo durante lo swap del service worker all'avvio (display:none di default) -->
+    <div id="sw-update-splash" style="display:none;position:fixed;inset:0;z-index:99999;background:#faf7f1;align-items:center;justify-content:center;flex-direction:column;gap:12px;font-family:Inter,sans-serif;color:#6b5e4c;">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><style>@keyframes spin{to{transform:rotate(360deg)}}</style></svg>
+      <span style="font-size:15px;font-weight:500;">Caricamento nuova versione…</span>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
