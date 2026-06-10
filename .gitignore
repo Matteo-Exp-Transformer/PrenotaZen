@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files (NEVER commit these)
+.env.local
+.env.local.test
+.env.*.local
+
+# Editor / OS
+.DS_Store
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test results
+test-results/
+playwright-report/
+.playwright-mcp/
+
+# Vite cache
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Deploy / tooling locale
+.vercel/
+
+# Materiale interno di sviluppo — non appartiene alla repo pubblica
+.cursor/
+.claude/
+agenti-locali/
+_skill-system-v0/
+AGENTS.md
+docs/
+
+# Script Playwright usa-e-getta
+pw-*.mjs
+
+# Pagine HTML salvate dal browser
+/*.html
+/*_files/

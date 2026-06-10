@@ -1,0 +1,2057 @@
+/* Google Fonts: intestazione Prenota + altri UI. Mistral: solo font di sistema (non su Google). */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script&family=DM+Serif+Display&family=Great+Vibes&family=Libre+Baskerville:wght@400;700&family=Lobster&family=Lora:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Montserrat:wght@500;600;700&family=Pacifico&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@500;600;700&family=Raleway:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────
+   Tailwind v4 @theme — token custom (primary, status, booking, warm)
+   Sostituisce tailwind.config.js che v4 non legge automaticamente.
+   Tema navy / blu: primary #1E3A5F, secondary mid #4F7CAC, accent #7CC6FE.
+   ────────────────────────────────────────────── */
+@theme {
+  --color-primary-50:  #EEF6FC;
+  --color-primary-100: #D6ECFE;
+  --color-primary-200: #B8DEFD;
+  --color-primary-300: #7CC6FE;
+  --color-primary-400: #4F7CAC;
+  --color-primary-500: #386891;
+  --color-primary-600: #1E3A5F;
+  --color-primary-700: #183049;
+  --color-primary-800: #122538;
+  --color-primary-900: #18324A;
+
+  --color-status-pending:  #F59E0B;
+  --color-status-accepted: #10B981;
+  --color-status-rejected: #EF4444;
+  --color-status-deleted:  #6B7280;
+
+  --color-booking-cena:      #1E3A5F;
+  --color-booking-aperitivo: #F59E0B;
+  --color-booking-evento:    #8B5CF6;
+  --color-booking-laurea:    #10B981;
+
+  --color-warm-wood:      #6b4226;
+  --color-warm-wood-dark: #4a2d19;
+  --color-warm-orange:    #f97316;
+  --color-warm-beige:     #fef3c7;
+  --color-warm-stone:     #d4c4b0;
+
+  --color-terracotta: #c2410c;
+  --color-muted:      #EDF2F7;
+  /** Pagina bianca; superfici contenuto = --color-surface (stesso valore di :root) */
+  --color-background: #ffffff;
+  --color-surface:      #f6f8fb;
+
+  --color-al-ritrovo-primary:      #1E3A5F;
+  --color-al-ritrovo-primary-dark: #183049;
+
+  --font-family-sans:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-display: 'Poppins', sans-serif;
+
+  --shadow-soft:   0 2px 15px -3px rgba(0,0,0,0.07), 0 10px 20px -2px rgba(0,0,0,0.04);
+  --shadow-medium: 0 4px 25px -5px rgba(0,0,0,0.10), 0 10px 10px -5px rgba(0,0,0,0.04);
+
+}
+
+/* ──────────────────────────────────────────────
+   CSS Variables — Tema Blu/Indaco Professionale
+   ────────────────────────────────────────────── */
+:root {
+  /* Palette primaria */
+  --color-primary:       #1E3A5F;
+  --color-primary-light: #4F7CAC;
+  --color-primary-dark:  #122538;
+  --color-primary-bg:    #EEF6FC;
+
+  /* Pagina (#FFFFFF); superfici card / tab inattive / blocchi chiari (#F6F8FB) */
+  --color-bg:            #ffffff;
+  --color-surface:       #f6f8fb;
+  --color-surface-2:     #EDF2F7;
+
+  /* Bordi */
+  --color-border:        #D8E1EA;
+  --color-border-strong: #B9C9DA;
+  /** Fascia liste menu + shell `BookingRequestCard` — stesso bordo warm, spessore leggermente sopra 1px. */
+  --admin-warm-wrap-border: #D8E1EA;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  /** Superficie warm (nav tab, stat card header) — vedi docs/STYLING_AGENT_CONTEXT.md */
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(255 237 213) 0%,
+    rgb(255 247 237) 42%,
+    rgb(254 249 195) 100%
+  );
+
+  /** Tab dashboard attivo + bordo filtri accent */
+  --admin-nav-tab-active-border: #1E3A5F;
+  --color-accent-selected: #7CC6FE;
+
+  /* Testo */
+  --color-text:          #18324A;
+  --color-text-muted:    #5A6F84;
+  --color-text-light:    #8899AA;
+
+  /* Feedback */
+  --color-success:       #10B981;
+  --color-warning:       #F59E0B;
+  --color-danger:        #EF4444;
+  --color-info:          #4F7CAC;
+
+  /* Shadows */
+  --shadow-sm:   0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl:   0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+
+  /* Tema admin nav */
+  --theme-surface-nav-active:   #EEF6FC;
+  --theme-border-nav-active:    #1E3A5F;
+  --theme-text-nav-active:      #18324A;
+  --theme-surface-nav-inactive: #f6f8fb;
+  --theme-border-nav-inactive:  #D8E1EA;
+  --theme-text-nav-inactive:    #475569;
+  --theme-surface-hover:        #EDF2F7;
+  --theme-border-strong:        #B9C9DA;
+  --theme-text-secondary:       #5A6F84;
+  --theme-accent-primary:       #1E3A5F;
+  --theme-shadow-sm:            0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  /* Alone pulsante: solo tab header «Prenotazioni» con badge (il footer non usa --header-ring) */
+  --admin-nav-pulse-ring-a:     rgb(79 124 172 / 0.42);
+  --admin-nav-pulse-ring-b:     rgb(79 124 172 / 0.14);
+  --admin-new-booking-trigger-bg:    #4f7cac;
+  --admin-new-booking-trigger-hover: #4576a8;
+
+  /* Digest calendario admin — intestazioni fasce Mattina / Pomeriggio / Sera (+ card compatte) */
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #10b981;
+  --booking-digest-slot-morning-border: #059669;
+  --booking-digest-slot-afternoon-bg: #f59e0b;
+  --booking-digest-slot-afternoon-border: #d97706;
+  --booking-digest-slot-evening-bg: #4f7cac;
+  --booking-digest-slot-evening-border: #386891;
+}
+
+/*
+ * Dashboard — Theme 4 «Terracotta & Sand»: token @theme (+ :root semantics) così Tailwind usa la scala corretta.
+ */
+:root[data-admin-theme='theme-2'] {
+  --color-primary-50:  #FFF8F4;
+  --color-primary-100: #F5E8DC;
+  --color-primary-200: #EBC9A6;
+  --color-primary-300: #DC9D75;
+  --color-primary-400: #D1845B;
+  --color-primary-500: #B86447;
+  --color-primary-600: #A8573B;
+  --color-primary-700: #8F4A32;
+  --color-primary-800: #6D371F;
+  --color-primary-900: #3F2D24;
+
+  --color-status-pending:  #D9A441;
+  --color-status-accepted: #5A9E76;
+  --color-status-rejected: #C85F57;
+  --color-status-deleted:  #887569;
+
+  --color-booking-cena:      #A8573B;
+  --color-booking-aperitivo: #D9A441;
+  --color-booking-evento:    #8B5CF6;
+  --color-booking-laurea:    #5A9E76;
+
+  --color-muted:      #EDE4DC;
+  --color-background: #FAF5F0;
+  --color-surface:    #FFFDF9;
+
+  --color-al-ritrovo-primary:      #A8573B;
+  --color-al-ritrovo-primary-dark: #6D371F;
+
+  /* Allinea `warm-*` (form admin/booking ancora wired a questi token) alla palette sabbiata */
+  --color-warm-wood:      #6D371F;
+  --color-warm-wood-dark: #3F2D24;
+  --color-warm-orange:    #D1845B;
+  --color-warm-beige:     #EBC9A6;
+  --color-warm-stone:     #D4BFAD;
+  --color-terracotta:     #A8573B;
+
+  --color-primary:       #A8573B;
+  --color-primary-light: #D1845B;
+  --color-primary-dark:  #6D371F;
+  --color-primary-bg:    #F5E8DC;
+
+  --color-bg:        #FAF5F0;
+  --color-surface:   #FFFDF9;
+  --color-surface-2: #F5EDE4;
+
+  --color-border:        #E6D5C5;
+  --color-border-strong: #D4BEA8;
+  --admin-warm-wrap-border: #E6D5C5;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(253 246 239) 0%,
+    rgb(255 252 247) 50%,
+    rgb(247 237 229) 100%
+  );
+
+  --admin-nav-tab-active-border: #A8573B;
+  --color-accent-selected:       #EBC9A6;
+
+  --color-text:       #3F2D24;
+  --color-text-muted: #6B5A4F;
+  --color-text-light: #8A7B70;
+
+  --color-success: #5A9E76;
+  --color-warning: #D9A441;
+  --color-danger:  #C85F57;
+  --color-info:    #D1845B;
+
+  --theme-surface-nav-active:   #F5E8DC;
+  --theme-border-nav-active:    #A8573B;
+  --theme-text-nav-active:      #3F2D24;
+  --theme-surface-nav-inactive: #FFFDF9;
+  --theme-border-nav-inactive:  #E6D5C5;
+  --theme-text-nav-inactive:    #5C4A3E;
+  --theme-surface-hover:        #F5EDE4;
+  --theme-border-strong:        #D4BEA8;
+  --theme-text-secondary:       #6B5A4F;
+  --theme-accent-primary:       #A8573B;
+
+  --admin-nav-pulse-ring-a:     rgb(209 132 91 / 0.42);
+  --admin-nav-pulse-ring-b:     rgb(209 132 91 / 0.14);
+  --admin-new-booking-trigger-bg:    #D1845B;
+  --admin-new-booking-trigger-hover: #C46F48;
+
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #5a9e76;
+  --booking-digest-slot-morning-border: #3f7355;
+  --booking-digest-slot-afternoon-bg: #d9a441;
+  --booking-digest-slot-afternoon-border: #b8892e;
+  --booking-digest-slot-evening-bg: #a8573b;
+  --booking-digest-slot-evening-border: #7a3f2a;
+}
+
+/*
+ * Midnight Blue (`midnight-blue` salvato): stessa specificità di theme-2 / theme-3.
+ */
+:root[data-admin-theme='midnight-blue'] {
+  --color-primary-50:  #EEF6FC;
+  --color-primary-100: #D6ECFE;
+  --color-primary-200: #B8DEFD;
+  --color-primary-300: #7CC6FE;
+  --color-primary-400: #4F7CAC;
+  --color-primary-500: #386891;
+  --color-primary-600: #1E3A5F;
+  --color-primary-700: #183049;
+  --color-primary-800: #122538;
+  --color-primary-900: #18324A;
+
+  --color-status-pending:  #F59E0B;
+  --color-status-accepted: #10B981;
+  --color-status-rejected: #EF4444;
+  --color-status-deleted:  #6B7280;
+
+  --color-booking-cena:      #1E3A5F;
+  --color-booking-aperitivo: #F59E0B;
+  --color-booking-evento:    #8B5CF6;
+  --color-booking-laurea:    #10B981;
+
+  --color-warm-wood:      #6b4226;
+  --color-warm-wood-dark: #4a2d19;
+  --color-warm-orange:    #f97316;
+  --color-warm-beige:     #fef3c7;
+  --color-warm-stone:     #d4c4b0;
+
+  --color-terracotta: #c2410c;
+  --color-muted:      #EDF2F7;
+  --color-background: #ffffff;
+  --color-surface:    #f6f8fb;
+
+  --color-al-ritrovo-primary:      #1E3A5F;
+  --color-al-ritrovo-primary-dark: #183049;
+
+  --color-primary:       #1E3A5F;
+  --color-primary-light: #4F7CAC;
+  --color-primary-dark:  #122538;
+  --color-primary-bg:    #EEF6FC;
+
+  --color-bg:        #ffffff;
+  --color-surface:     #f6f8fb;
+  --color-surface-2:   #EDF2F7;
+
+  --color-border:        #D8E1EA;
+  --color-border-strong: #B9C9DA;
+  --admin-warm-wrap-border: #D8E1EA;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(255 237 213) 0%,
+    rgb(255 247 237) 42%,
+    rgb(254 249 195) 100%
+  );
+
+  --admin-nav-tab-active-border: #1E3A5F;
+  --color-accent-selected:       #7CC6FE;
+
+  --color-text:       #18324A;
+  --color-text-muted: #5A6F84;
+  --color-text-light: #8899AA;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger:  #EF4444;
+  --color-info:    #4F7CAC;
+
+  --shadow-sm:   0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl:   0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+
+  --theme-surface-nav-active:   #EEF6FC;
+  --theme-border-nav-active:    #1E3A5F;
+  --theme-text-nav-active:      #18324A;
+  --theme-surface-nav-inactive: #f6f8fb;
+  --theme-border-nav-inactive:  #D8E1EA;
+  --theme-text-nav-inactive:    #475569;
+  --theme-surface-hover:        #EDF2F7;
+  --theme-border-strong:        #B9C9DA;
+  --theme-text-secondary:       #5A6F84;
+  --theme-accent-primary:       #1E3A5F;
+  --theme-shadow-sm:            0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  --admin-nav-pulse-ring-a:     rgb(79 124 172 / 0.42);
+  --admin-nav-pulse-ring-b:     rgb(79 124 172 / 0.14);
+  --admin-new-booking-trigger-bg:    #4f7cac;
+  --admin-new-booking-trigger-hover: #4576a8;
+
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #10b981;
+  --booking-digest-slot-morning-border: #059669;
+  --booking-digest-slot-afternoon-bg: #f59e0b;
+  --booking-digest-slot-afternoon-border: #d97706;
+  --booking-digest-slot-evening-bg: #4f7cac;
+  --booking-digest-slot-evening-border: #386891;
+}
+
+/*
+ * Theme 3 — «Sage & Stone»: verde salvia calmato + crema/pietra (mockup prodotto).
+ */
+:root[data-admin-theme='theme-3'] {
+  --color-primary-50:  #F1F5F0;
+  --color-primary-100: #DEE8D4;
+  --color-primary-200: #C9DBB6;
+  --color-primary-300: #ACBEA3;
+  --color-primary-400: #8FA88F;
+  --color-primary-500: #6F8F74;
+  --color-primary-600: #5D7A63;
+  --color-primary-700: #4F6854;
+  --color-primary-800: #3F5448;
+  --color-primary-900: #2F3A33;
+
+  --color-status-pending:  #D5A94C;
+  --color-status-accepted: #4FA36C;
+  --color-status-rejected: #C86665;
+  --color-status-deleted:  #6F7B72;
+
+  --color-booking-cena:      #5D7A63;
+  --color-booking-aperitivo: #D5A94C;
+  --color-booking-evento:    #7C73A8;
+  --color-booking-laurea:    #4FA36C;
+
+  --color-muted:      #EDEAE2;
+  --color-background: #F7F5EF;
+  --color-surface:    #FFFDF8;
+
+  --color-al-ritrovo-primary:      #5D7A63;
+  --color-al-ritrovo-primary-dark: #3F5448;
+
+  --color-warm-wood:      #3F5448;
+  --color-warm-wood-dark: #2F3A33;
+  --color-warm-orange:    #D5A94C;
+  --color-warm-beige:     #DDD7C8;
+  --color-warm-stone:     #C9C2B3;
+  --color-terracotta:     #8FA88F;
+
+  --color-primary:       #5D7A63;
+  --color-primary-light: #8FA88F;
+  --color-primary-dark:  #3F5448;
+  --color-primary-bg:    #E8EDE5;
+
+  --color-bg:        #F7F5EF;
+  --color-surface:   #FFFDF8;
+  --color-surface-2: #F0EDE6;
+
+  --color-border:        #DDD7C8;
+  --color-border-strong: #C9C1B4;
+  --admin-warm-wrap-border: #DDD7C8;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(247 245 239) 0%,
+    rgb(255 253 248) 50%,
+    rgb(239 237 229) 100%
+  );
+
+  --admin-nav-tab-active-border: #5D7A63;
+  --color-accent-selected:       #C9DBB6;
+
+  --color-text:       #2F3A33;
+  --color-text-muted: #5A6760;
+  --color-text-light: #7A867E;
+
+  --color-success: #4FA36C;
+  --color-warning: #D5A94C;
+  --color-danger:  #C86665;
+  --color-info:    #8FA88F;
+
+  --shadow-sm:   0 1px 2px 0 rgb(47 58 51 / 0.06);
+  --shadow-md:   0 4px 6px -1px rgb(47 58 51 / 0.08), 0 2px 4px -2px rgb(47 58 51 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(47 58 51 / 0.09), 0 4px 6px -4px rgb(47 58 51 / 0.05);
+  --shadow-xl:   0 20px 25px -5px rgb(47 58 51 / 0.1), 0 8px 10px -6px rgb(47 58 51 / 0.05);
+
+  --theme-surface-nav-active:   #E8EDE5;
+  --theme-border-nav-active:    #5D7A63;
+  --theme-text-nav-active:      #2F3A33;
+  --theme-surface-nav-inactive: #FFFDF8;
+  --theme-border-nav-inactive:  #DDD7C8;
+  --theme-text-nav-inactive:    #4A574F;
+  --theme-surface-hover:        #F0EDE6;
+  --theme-border-strong:        #C9C1B4;
+  --theme-text-secondary:       #5A6760;
+  --theme-accent-primary:       #5D7A63;
+  --theme-shadow-sm:            0 1px 2px 0 rgb(47 58 51 / 0.06);
+
+  --admin-nav-pulse-ring-a:     rgb(143 168 143 / 0.45);
+  --admin-nav-pulse-ring-b:     rgb(143 168 143 / 0.14);
+  --admin-new-booking-trigger-bg:    #8FA88F;
+  --admin-new-booking-trigger-hover: #7F9A80;
+
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #4fa36c;
+  --booking-digest-slot-morning-border: #3a7a50;
+  --booking-digest-slot-afternoon-bg: #d5a94c;
+  --booking-digest-slot-afternoon-border: #a88438;
+  --booking-digest-slot-evening-bg: #6b6199;
+  --booking-digest-slot-evening-border: #4f4775;
+}
+
+/*
+ * Theme 4 — «Soft Graphite & Mint»: mint premium + grafite (mockup prodotto).
+ */
+:root[data-admin-theme='soft-graphite-mint'] {
+  --color-primary-50:  #ECFDF5;
+  --color-primary-100: #D1FAE5;
+  --color-primary-200: #A7F3D0;
+  --color-primary-300: #6EE7B7;
+  --color-primary-400: #2DD4BF;
+  --color-primary-500: #34D399;
+  --color-primary-600: #10B981;
+  --color-primary-700: #059669;
+  --color-primary-800: #1F2937;
+  --color-primary-900: #111827;
+
+  --color-status-pending:  #D97706;
+  --color-status-accepted: #059669;
+  --color-status-rejected: #DC2626;
+  --color-status-deleted:  #6B7280;
+
+  --color-booking-cena:      #1F2937;
+  --color-booking-aperitivo: #D97706;
+  --color-booking-evento:    #7C3AED;
+  --color-booking-laurea:    #059669;
+
+  --color-muted:      #E5E7EB;
+  --color-background: #F1F5F4;
+  --color-surface:    #FFFFFF;
+
+  --color-al-ritrovo-primary:      #10B981;
+  --color-al-ritrovo-primary-dark: #059669;
+
+  --color-warm-wood:      #1F2937;
+  --color-warm-wood-dark: #111827;
+  --color-warm-orange:    #34D399;
+  --color-warm-beige:     #D1FAE5;
+  --color-warm-stone:     #E5E7EB;
+  --color-terracotta:     #059669;
+
+  --color-primary:       #10B981;
+  --color-primary-light: #34D399;
+  --color-primary-dark:  #059669;
+  --color-primary-bg:    #ECFDF5;
+
+  --color-bg:        #F1F5F4;
+  --color-surface:   #FFFFFF;
+  --color-surface-2: #ECFDF5;
+
+  --color-border:        #E5E7EB;
+  --color-border-strong: #D1D5DB;
+  --admin-warm-wrap-border: #E5E7EB;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(241 245 244) 0%,
+    rgb(255 255 255) 48%,
+    rgb(236 253 245) 100%
+  );
+
+  --admin-nav-tab-active-border: #34D399;
+  --color-accent-selected:       #D1FAE5;
+
+  --color-text:       #1F2937;
+  --color-text-muted: #4B5563;
+  --color-text-light: #9CA3AF;
+
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-danger:  #DC2626;
+  --color-info:    #34D399;
+
+  --shadow-sm:   0 1px 2px 0 rgb(31 41 55 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(31 41 55 / 0.07), 0 2px 4px -2px rgb(31 41 55 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(31 41 55 / 0.08), 0 4px 6px -4px rgb(31 41 55 / 0.05);
+  --shadow-xl:   0 20px 25px -5px rgb(31 41 55 / 0.1), 0 8px 10px -6px rgb(31 41 55 / 0.05);
+
+  --theme-surface-nav-active:   #ECFDF5;
+  --theme-border-nav-active:    #34D399;
+  --theme-text-nav-active:      #1F2937;
+  --theme-surface-nav-inactive: #FFFFFF;
+  --theme-border-nav-inactive:  #E5E7EB;
+  --theme-text-nav-inactive:    #4B5563;
+  --theme-surface-hover:        #ECFDF5;
+  --theme-border-strong:        #D1D5DB;
+  --theme-text-secondary:       #4B5563;
+  --theme-accent-primary:       #10B981;
+  --theme-shadow-sm:            0 1px 2px 0 rgb(31 41 55 / 0.05);
+
+  --admin-nav-pulse-ring-a:     rgb(52 211 153 / 0.42);
+  --admin-nav-pulse-ring-b:     rgb(52 211 153 / 0.14);
+  --admin-new-booking-trigger-bg:    #10B981;
+  --admin-new-booking-trigger-hover: #059669;
+
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #059669;
+  --booking-digest-slot-morning-border: #047857;
+  --booking-digest-slot-afternoon-bg: #d97706;
+  --booking-digest-slot-afternoon-border: #b45309;
+  /* Sfondo sera più chiaro: testo nero su grafite #1f2937 era illeggibile */
+  --booking-digest-slot-evening-bg: #e5e7eb;
+  --booking-digest-slot-evening-border: #4b5563;
+}
+
+/*
+ * Theme 5 — «Pearl Blue Minimal»: blu affidabile su fondo perla (mockup prodotto).
+ */
+:root[data-admin-theme='pearl-blue-minimal'] {
+  --color-primary-50:  #EFF6FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-300: #93C5FD;
+  --color-primary-400: #60A5FA;
+  --color-primary-500: #3B82F6;
+  --color-primary-600: #2563EB;
+  --color-primary-700: #1D4ED8;
+  --color-primary-800: #1E40AF;
+  --color-primary-900: #0F172A;
+
+  --color-status-pending:  #F59E0B;
+  --color-status-accepted: #10B981;
+  --color-status-rejected: #EF4444;
+  --color-status-deleted:  #64748B;
+
+  --color-booking-cena:      #2563EB;
+  --color-booking-aperitivo: #F59E0B;
+  --color-booking-evento:    #8B5CF6;
+  --color-booking-laurea:    #10B981;
+
+  --color-muted:      #F1F5F9;
+  --color-background: #F8FAFC;
+  --color-surface:    #FFFFFF;
+
+  --color-al-ritrovo-primary:      #2563EB;
+  --color-al-ritrovo-primary-dark: #1D4ED8;
+
+  --color-warm-wood:      #0F172A;
+  --color-warm-wood-dark: #020617;
+  --color-warm-orange:    #3B82F6;
+  --color-warm-beige:     #DBEAFE;
+  --color-warm-stone:     #E2E8F0;
+  --color-terracotta:     #2563EB;
+
+  --color-primary:       #2563EB;
+  --color-primary-light: #3B82F6;
+  --color-primary-dark:  #1D4ED8;
+  --color-primary-bg:    #EFF6FF;
+
+  --color-bg:        #F8FAFC;
+  --color-surface:   #FFFFFF;
+  --color-surface-2: #EFF6FF;
+
+  --color-border:        #E2E8F0;
+  --color-border-strong: #CBD5E1;
+  --admin-warm-wrap-border: #E2E8F0;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(248 250 252) 0%,
+    rgb(255 255 255) 50%,
+    rgb(239 246 255) 100%
+  );
+
+  --admin-nav-tab-active-border: #2563EB;
+  --color-accent-selected:       #DBEAFE;
+
+  --color-text:       #0F172A;
+  --color-text-muted: #64748B;
+  --color-text-light: #94A3B8;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger:  #EF4444;
+  --color-info:    #3B82F6;
+
+  --shadow-sm:   0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05);
+  --shadow-xl:   0 20px 25px -5px rgb(15 23 42 / 0.1), 0 8px 10px -6px rgb(15 23 42 / 0.05);
+
+  --theme-surface-nav-active:   #EFF6FF;
+  --theme-border-nav-active:    #2563EB;
+  --theme-text-nav-active:      #0F172A;
+  --theme-surface-nav-inactive: #FFFFFF;
+  --theme-border-nav-inactive:  #E2E8F0;
+  --theme-text-nav-inactive:    #64748B;
+  --theme-surface-hover:        #EFF6FF;
+  --theme-border-strong:        #CBD5E1;
+  --theme-text-secondary:       #64748B;
+  --theme-accent-primary:       #2563EB;
+  --theme-shadow-sm:            0 1px 2px 0 rgb(15 23 42 / 0.05);
+
+  --admin-nav-pulse-ring-a:     rgb(59 130 246 / 0.42);
+  --admin-nav-pulse-ring-b:     rgb(59 130 246 / 0.14);
+  --admin-new-booking-trigger-bg:    #2563EB;
+  --admin-new-booking-trigger-hover: #1D4ED8;
+
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #10b981;
+  --booking-digest-slot-morning-border: #059669;
+  --booking-digest-slot-afternoon-bg: #f59e0b;
+  --booking-digest-slot-afternoon-border: #d97706;
+  --booking-digest-slot-evening-bg: #2563eb;
+  --booking-digest-slot-evening-border: #1d4ed8;
+}
+
+/*
+ * Theme 6 — «Warm Sand Pro»: terracotta professionale su crema/sabbia (palette prodotto).
+ */
+:root[data-admin-theme='warm-sand-pro'] {
+  --color-primary-50:  #FFF9F5;
+  --color-primary-100: #F7EDE6;
+  --color-primary-200: #ECD9CB;
+  --color-primary-300: #DEB89F;
+  --color-primary-400: #D08962;
+  --color-primary-500: #C96B43;
+  --color-primary-600: #B95F3C;
+  --color-primary-700: #9E5034;
+  --color-primary-800: #6F3A27;
+  --color-primary-900: #3E332C;
+
+  --color-status-pending:  #D8A24A;
+  --color-status-accepted: #8FA27A;
+  --color-status-rejected: #D97A6C;
+  --color-status-deleted:  #8E827B;
+
+  --color-booking-cena:      #C96B43;
+  --color-booking-aperitivo: #D8A24A;
+  --color-booking-evento:    #8E7A9C;
+  --color-booking-laurea:    #8FA27A;
+
+  --color-muted:      #EFE8E2;
+  --color-background: #FAF5F0;
+  --color-surface:    #FFF8F1;
+
+  --color-al-ritrovo-primary:      #C96B43;
+  --color-al-ritrovo-primary-dark: #6F3A27;
+
+  --color-warm-wood:      #3E332C;
+  --color-warm-wood-dark: #2A231F;
+  --color-warm-orange:    #C96B43;
+  --color-warm-beige:     #EAD8C8;
+  --color-warm-stone:     #D4C4B8;
+  --color-terracotta:     #C96B43;
+
+  --color-primary:       #C96B43;
+  --color-primary-light: #D08962;
+  --color-primary-dark:  #6F3A27;
+  --color-primary-bg:    #F7EDE6;
+
+  --color-bg:        #FAF5F0;
+  --color-surface:   #FFF8F1;
+  --color-surface-2: #F3EBE4;
+
+  --color-border:        #E8DDD2;
+  --color-border-strong: #D9CDC2;
+  --admin-warm-wrap-border: #E8DDD2;
+  --admin-warm-wrap-border-width: 1.5px;
+
+  --admin-warm-gradient: linear-gradient(
+    90deg,
+    rgb(250 245 240) 0%,
+    rgb(255 248 241) 50%,
+    rgb(243 235 228) 100%
+  );
+
+  --admin-nav-tab-active-border: #C96B43;
+  --color-accent-selected:       #EAD8C8;
+
+  --color-text:       #3E332C;
+  --color-text-muted: #8E827B;
+  --color-text-light: #A89E96;
+
+  --color-success: #8FA27A;
+  --color-warning: #D8A24A;
+  --color-danger:  #D97A6C;
+  --color-info:    #D08962;
+
+  --shadow-sm:   0 1px 2px 0 rgb(62 51 44 / 0.06);
+  --shadow-md:   0 4px 6px -1px rgb(62 51 44 / 0.08), 0 2px 4px -2px rgb(62 51 44 / 0.05);
+  --shadow-lg:   0 10px 15px -3px rgb(62 51 44 / 0.09), 0 4px 6px -4px rgb(62 51 44 / 0.05);
+  --shadow-xl:   0 20px 25px -5px rgb(62 51 44 / 0.1), 0 8px 10px -6px rgb(62 51 44 / 0.05);
+
+  --theme-surface-nav-active:   #F7EDE6;
+  --theme-border-nav-active:    #C96B43;
+  --theme-text-nav-active:      #3E332C;
+  --theme-surface-nav-inactive: #FFF8F1;
+  --theme-border-nav-inactive:  #E8DDD2;
+  --theme-text-nav-inactive:    #6B5E56;
+  --theme-surface-hover:        #F3EBE4;
+  --theme-border-strong:        #D9CDC2;
+  --theme-text-secondary:       #8E827B;
+  --theme-accent-primary:       #C96B43;
+  --theme-shadow-sm:            0 1px 2px 0 rgb(62 51 44 / 0.06);
+
+  --admin-nav-pulse-ring-a:     rgb(201 107 67 / 0.42);
+  --admin-nav-pulse-ring-b:     rgb(201 107 67 / 0.14);
+  --admin-new-booking-trigger-bg:    #C96B43;
+  --admin-new-booking-trigger-hover: #B55F3A;
+
+  --booking-digest-slot-heading-text: #000000;
+  --booking-digest-slot-morning-bg: #6f7d5a;
+  --booking-digest-slot-morning-border: #555f47;
+  --booking-digest-slot-afternoon-bg: #c4923a;
+  --booking-digest-slot-afternoon-border: #9a7229;
+  --booking-digest-slot-evening-bg: #b95f3c;
+  --booking-digest-slot-evening-border: #8a4529;
+}
+
+/* Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ──────────────────────────────────────────────
+   Cursore manina su TUTTI gli elementi interattivi (norma globale).
+   Vale per button/link/select/role=button/[onclick] e div-cliccabili
+   marcati con .is-clickable o data-clickable. NON serve aggiungere
+   cursor-pointer a mano nei componenti — vedi docs/per-ui-design-skill.
+   Gli input di testo restano col cursore di scrittura (scelta esplicita).
+   ────────────────────────────────────────────── */
+button:not(:disabled),
+a[href],
+label[for],
+summary,
+select:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not([aria-disabled="true"]),
+[role="menuitem"]:not([aria-disabled="true"]),
+[role="option"]:not([aria-disabled="true"]),
+[role="switch"]:not([aria-disabled="true"]),
+[onclick],
+.is-clickable,
+[data-clickable] {
+  cursor: pointer;
+}
+
+/* Disabilitato vince sempre: niente manina dove non si puo interagire */
+button:disabled,
+select:disabled,
+[aria-disabled="true"],
+[data-disabled="true"],
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+/* Scrollbar personalizzata */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface-2); }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-light); }
+
+/* Scroll orizzontale senza barra (menu QR tab, carosello) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Animazioni */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Fascia luminosa diagonale (form pubblico / pulsanti verdi) — hover desktop + burst al tap senza hover */
+@keyframes booking-cross-shine {
+  0% {
+    transform: translate3d(-135%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(230%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+@media (hover: hover) {
+  .booking-cross-shine-btn:hover:not(:disabled) > .booking-cross-shine-mount > .booking-cross-shine-beam-desktop {
+    animation: booking-cross-shine 0.72s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+}
+
+.booking-cross-shine-touch-burst.booking-cross-shine-beam {
+  animation: booking-cross-shine 0.72s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.booking-cross-shine-beam-desktop {
+  opacity: 0;
+}
+
+.booking-cross-shine-beam {
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: -40%;
+  width: 52%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 32%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(255, 255, 255, 0.08) 68%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 12px rgba(255, 255, 255, 0.45),
+    0 0 28px rgba(187, 247, 208, 0.35);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/*
+  Shiny sweep (tab Prenotazioni + badge): translateX(%) è relativo al beam, non al pulsante — la scia
+  si fermava a metà. Qui si anima `left` (rispetto al genitore) e si lascia lunga pausa tra un passaggio e l’altro.
+*/
+/* Un passaggio ogni 2s (--notify-shiny-period); la scia attraversa ~28% del ciclo (~0,56s), poi pausa fino al giro dopo */
+/* Percorsi percentuali sul genitore `.admin-nav-notify-shiny-fill`: restano dentro il pulsante grazie a overflow-hidden */
+@keyframes admin-nav-notify-shiny-sweep {
+  0%,
+  100% {
+    left: -48%;
+    opacity: 0;
+  }
+  2% {
+    opacity: 0.97;
+  }
+  30% {
+    left: 108%;
+    opacity: 0.97;
+  }
+  33%,
+  99.9% {
+    left: 108%;
+    opacity: 0;
+  }
+}
+
+/* Shiny solo tab Prenotazioni con badge > 0 */
+.admin-nav-notify-shiny-fill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -65%;
+  width: 44%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.25) 22%,
+    rgba(255, 255, 255, 0.98) 50%,
+    rgba(255, 255, 255, 0.28) 78%,
+    transparent 100%
+  );
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.42);
+  filter: blur(0.1px);
+  animation: admin-nav-notify-shiny-sweep var(--notify-shiny-period, 2s) linear infinite;
+}
+
+.admin-nav-notify-shiny-edge {
+  padding: 1px;
+  background:
+    linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.9) 42%,
+      rgba(255, 255, 255, 0.32) 100%
+    );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/*
+ * Tab header «Prenotazioni» inattivo + badge: tocco primary leggero (meno denso del bianco pieno su surface).
+ */
+.admin-nav-item.admin-nav-notify-shiny-on-inactive .admin-nav-notify-shiny-fill::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-primary-600) 12%, transparent) 20%,
+    color-mix(in srgb, var(--color-primary-400) 18%, white 82%) 50%,
+    color-mix(in srgb, var(--color-primary-600) 12%, transparent) 80%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 7px color-mix(in srgb, var(--color-primary-500) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--color-primary-200) 22%, transparent);
+  filter: blur(0.1px);
+}
+
+.admin-nav-item.admin-nav-notify-shiny-on-inactive .admin-nav-notify-shiny-edge {
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--color-primary-600) 10%, transparent) 0%,
+    color-mix(in srgb, var(--color-primary-300) 20%, white 80%) 42%,
+    color-mix(in srgb, var(--color-primary-600) 9%, transparent) 100%
+  );
+}
+
+/*
+ * Footer quick-nav «Prenotazioni» con badge: stesso principio — sweep soft su superficie chiara.
+ */
+.footer-nav-notify-btn.footer-nav-notify-shiny-on-light .admin-nav-notify-shiny-fill::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-primary-600) 12%, transparent) 20%,
+    color-mix(in srgb, var(--color-primary-400) 18%, white 82%) 50%,
+    color-mix(in srgb, var(--color-primary-600) 12%, transparent) 80%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 7px color-mix(in srgb, var(--color-primary-500) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--color-primary-200) 22%, transparent);
+  filter: blur(0.1px);
+}
+
+.footer-nav-notify-btn.footer-nav-notify-shiny-on-light .admin-nav-notify-shiny-edge {
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--color-primary-600) 10%, transparent) 0%,
+    color-mix(in srgb, var(--color-primary-300) 20%, white 80%) 42%,
+    color-mix(in srgb, var(--color-primary-600) 9%, transparent) 100%
+  );
+}
+
+/*
+ * Wrapper tab/footer «Prenotazioni» con badge: stacking per NotifyNavShinyLayers.
+ * Pulsazione attorno: solo se anche `admin-nav-notify-pulse-wrap--header-ring` (solo NavItem header).
+ */
+.admin-nav-notify-pulse-wrap {
+  position: relative;
+  isolation: isolate;
+  /* Grid default stretch allunga la cella all’altezza della riga: senza align-self:start il wrap si allunga */
+  align-self: start;
+  height: fit-content;
+}
+
+@keyframes admin-nav-notify-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--admin-nav-pulse-ring-a);
+  }
+  55% {
+    box-shadow: 0 0 0 5px var(--admin-nav-pulse-ring-b);
+  }
+}
+
+.admin-nav-notify-pulse-wrap.admin-nav-notify-pulse-wrap--header-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+  animation: admin-nav-notify-pulse-ring 1.45s ease-out infinite;
+}
+
+.admin-nav-notify-pulse-wrap > button.admin-nav-item,
+.admin-nav-notify-pulse-wrap > button.footer-nav-notify-btn {
+  position: relative;
+  z-index: 1;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Admin — CTA “Nuova prenotazione” (secondary brand; variabile per tema) */
+.admin-new-booking-collapse-trigger {
+  background-image: none;
+  background-color: var(--admin-new-booking-trigger-bg);
+}
+.admin-new-booking-collapse-trigger:hover {
+  background-color: var(--admin-new-booking-trigger-hover);
+}
+
+/*
+ * Superfici secondarie admin (card footer, pannelli form, etichette filtri).
+ * Nome storico `admin-warm-surface`: ora tinta neutra sul background app, non gradient arancio.
+ */
+.admin-warm-surface {
+  background-color: var(--color-surface-2);
+  background-image: none;
+  border-color: var(--color-border);
+}
+
+/* Digest header liste prenotazioni: alone basato sul verde stato / superficie tema */
+.admin-teal-surface {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-success) 28%, transparent) 0%,
+    color-mix(in srgb, var(--color-surface) 88%, white) 50%,
+    rgb(255, 255, 255) 100%
+  );
+}
+
+/* Admin — tab nav: inattivi su --color-surface; attivi primary + testo bianco */
+.admin-nav-item {
+  background-color: var(--color-surface);
+  background-image: none;
+  border-color: var(--color-border);
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.admin-nav-item:hover:not(.admin-nav-tab-active) {
+  background-color: var(--color-surface-2);
+  border-color: var(--color-border-strong);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.9),
+    0 1px 2px color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+
+/* Tab fascia principale selezionata */
+button.admin-nav-item.admin-nav-tab-active:not(.archive-tab-filter-btn) {
+  box-shadow: none;
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  background-image: none;
+  color: #ffffff;
+}
+
+/* Filtri archivio / ordinamento: stato selezionato = accent */
+button.admin-nav-item.admin-nav-tab-active.archive-tab-filter-btn {
+  box-shadow: none;
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--color-primary);
+  background-color: var(--color-accent-selected);
+  background-image: none;
+  color: var(--color-text);
+}
+
+/* Admin dashboard — collapsible headers hover illumination */
+.admin-collapse-header {
+  position: relative;
+  transition:
+    background-color 200ms ease,
+    background-image 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.admin-collapse-header:hover {
+  transform: translateY(-1px);
+}
+
+.admin-collapse-header--green:hover {
+  background-image: linear-gradient(
+    90deg,
+    rgba(220, 252, 231, 0.95) 0%,
+    rgba(187, 247, 208, 0.95) 50%,
+    rgba(134, 239, 172, 0.95) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.92),
+    0 0 0 1px rgba(34, 197, 94, 0.28),
+    0 12px 22px rgba(34, 197, 94, 0.28);
+}
+
+.admin-collapse-header--yellow:hover {
+  background-image: linear-gradient(
+    90deg,
+    rgba(254, 249, 195, 0.96) 0%,
+    rgba(253, 230, 138, 0.96) 50%,
+    rgba(252, 211, 77, 0.96) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.92),
+    0 0 0 1px rgba(234, 179, 8, 0.28),
+    0 12px 22px rgba(234, 179, 8, 0.28);
+}
+
+.admin-collapse-header--blue:hover {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-primary-100) 96%, white) 0%,
+    color-mix(in srgb, var(--color-primary-200) 93%, white) 50%,
+    color-mix(in srgb, var(--color-primary-300) 90%, white) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.92),
+    0 0 0 1px color-mix(in srgb, var(--color-primary-400) 32%, transparent),
+    0 12px 22px color-mix(in srgb, var(--color-primary-600) 24%, transparent);
+}
+
+@keyframes collapsibleContentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes collapsibleContentLeave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.collapsible-content-enter {
+  animation: collapsibleContentEnter 220ms ease-out forwards;
+}
+
+.collapsible-content-leave {
+  animation: collapsibleContentLeave 220ms ease-in forwards;
+}
+
+/* Booking calendar — selected day memory aid (gradient da token tema) */
+.booking-calendar-fc .fc .fc-daygrid-day.calendar-day-today .fc-daygrid-day-frame {
+  background-color: color-mix(in srgb, var(--color-warning) 22%, white);
+  box-shadow: inset 0 0 0 2px var(--color-warning);
+  border-radius: 10px;
+}
+
+.booking-calendar-fc .fc .fc-daygrid-day.calendar-day-selected .fc-daygrid-day-frame {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-bg) 0%,
+    var(--color-primary-200) 45%,
+    var(--color-primary-500) 100%
+  );
+  box-shadow:
+    inset 0 0 0 2px var(--color-primary-600),
+    0 8px 16px color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  border-radius: 10px;
+  transform: translateY(-1px);
+  transition: all 160ms ease;
+}
+
+.booking-calendar-fc .fc .fc-daygrid-day.calendar-day-selected .fc-daygrid-day-number {
+  color: var(--color-primary-900);
+  font-weight: 800;
+}
+
+.booking-calendar-fc .fc .fc-daygrid-day.calendar-day-today.calendar-day-selected .fc-daygrid-day-frame {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary-100) 85%, white) 0%,
+    var(--color-primary-200) 42%,
+    var(--color-primary-400) 100%
+  );
+  box-shadow:
+    inset 0 0 0 2px var(--color-primary-600),
+    0 10px 18px color-mix(in srgb, var(--color-primary-900) 24%, transparent);
+}
+
+/* Card titolo calendario — allineamento e scala (BookingCalendar.tsx) */
+.booking-calendar-title-section .booking-calendar-page-title {
+  width: 100%;
+  text-align: left;
+  line-height: 1.25;
+  font-size: 1.375rem;
+}
+
+/* 400–469px: come sotto 400px */
+@media (min-width: 400px) and (max-width: 469px) {
+  .booking-calendar-title-section .booking-calendar-page-title {
+    font-size: 1.375rem;
+  }
+}
+
+/* 470–639px: come da 640px in su (prima del centrato) */
+@media (min-width: 470px) and (max-width: 639px) {
+  .booking-calendar-title-section .booking-calendar-page-title {
+    font-size: 1.5rem;
+    line-height: 1.375;
+  }
+}
+
+/* ≥640px: centrato */
+@media (min-width: 640px) {
+  .booking-calendar-title-section .booking-calendar-page-title {
+    text-align: center;
+    font-size: 1.5rem;
+    line-height: 1.375;
+  }
+}
+
+@media (min-width: 768px) {
+  .booking-calendar-title-section .booking-calendar-page-title {
+    font-size: 1.875rem;
+  }
+}
+
+/* Vista mese: altezza minima celle (--booking-calendar-day-min-height da BookingCalendar.tsx) */
+.booking-calendar-fc {
+  --booking-calendar-day-min-height: 8rem;
+}
+
+.booking-calendar-fc .fc .fc-dayGridMonth-view td.fc-daygrid-day {
+  height: auto;
+}
+
+.booking-calendar-fc .fc .fc-dayGridMonth-view .fc-daygrid-day .fc-daygrid-day-frame {
+  min-height: var(--booking-calendar-day-min-height);
+  padding-bottom: 0.375rem;
+}
+
+/* Mobile: link «···» — solo i puntini, niente chip/sfondo (override stili FC sul more-link) */
+.booking-calendar-fc .fc .fc-dayGridMonth-view a.booking-calendar-more-dots.fc-daygrid-more-link {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  padding: 0.125rem 0 0.2rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.booking-calendar-fc .fc .fc-dayGridMonth-view a.booking-calendar-more-dots.fc-daygrid-more-link:hover,
+.booking-calendar-fc .fc .fc-dayGridMonth-view a.booking-calendar-more-dots.fc-daygrid-more-link:focus,
+.booking-calendar-fc .fc .fc-dayGridMonth-view a.booking-calendar-more-dots.fc-daygrid-more-link:focus-visible {
+  color: var(--color-text-light);
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
+/* Booking calendar — align FullCalendar title with section heading center */
+.booking-calendar-fc .fc .fc-header-toolbar {
+  position: relative;
+  justify-content: center;
+}
+
+.booking-calendar-fc .fc .fc-header-toolbar .fc-toolbar-chunk:last-child {
+  position: absolute;
+  right: 0;
+}
+
+.booking-calendar-fc .fc .fc-toolbar-title {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.booking-calendar-fc .fc .fc-toolbar .fc-button,
+.booking-calendar-fc .fc .fc-toolbar .fc-button:disabled {
+  color: var(--color-primary-900) !important;
+}
+
+.booking-calendar-fc .fc .fc-toolbar .fc-button .fc-icon,
+.booking-calendar-fc .fc .fc-toolbar .fc-button .fc-icon::before {
+  color: var(--color-primary-900) !important;
+}
+
+/* FullCalendar — token tema (tutti gli id `data-admin-theme` in admin) */
+.booking-calendar-fc .fc {
+  --fc-border-color: var(--color-border);
+  --fc-button-bg-color: var(--color-primary-bg);
+  --fc-button-border-color: var(--color-primary-200);
+  --fc-button-text-color: var(--color-primary-900);
+  --fc-button-hover-bg-color: var(--color-primary-100);
+  --fc-button-hover-text-color: var(--color-primary-900);
+  --fc-button-active-bg-color: var(--color-primary-100);
+  --fc-button-active-text-color: var(--color-primary-900);
+  --fc-today-bg-color: var(--color-primary-bg);
+}
+
+.booking-calendar-fc .fc .fc-prev-button,
+.booking-calendar-fc .fc .fc-next-button,
+.booking-calendar-fc .fc .fc-today-button {
+  color: var(--color-primary-900) !important;
+}
+
+.booking-calendar-fc .fc .fc-prev-button .fc-icon::before,
+.booking-calendar-fc .fc .fc-next-button .fc-icon::before {
+  color: var(--color-primary-900) !important;
+}
+
+/* Booking calendar — viewport stretto: toolbar FullCalendar + nav compatte */
+@media (max-width: 537px) {
+  .booking-calendar-fc .fc .fc-toolbar-title {
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+  }
+
+  .booking-calendar-fc .fc .fc-header-toolbar.fc-toolbar {
+    margin-top: 0.125rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .booking-calendar-fc .fc .fc-toolbar.fc-header-toolbar .fc-button {
+    padding: 0.125rem 0.3rem !important;
+    font-size: 0.65rem !important;
+    min-height: 1.875rem !important;
+    line-height: 1 !important;
+  }
+
+  .booking-calendar-fc .fc .fc-prev-button,
+  .booking-calendar-fc .fc .fc-next-button {
+    width: 1.875rem !important;
+    min-width: 1.875rem !important;
+    height: 1.875rem !important;
+  }
+
+  .booking-calendar-fc .fc .fc-icon {
+    font-size: 0.8em !important;
+  }
+}
+
+/* Vista settimana/giorno: intestazioni colonne compatte su larghezze ridotte */
+@media (max-width: 768px) {
+  .booking-calendar-fc .fc .fc-timegrid th.fc-col-header-cell .fc-col-header-cell-cushion {
+    font-size: 0.7rem !important;
+    line-height: 1.15 !important;
+    font-weight: 600 !important;
+    padding: 0.2rem 0.125rem !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    text-align: center !important;
+  }
+
+  .booking-calendar-fc .fc .fc-timegrid th.fc-col-header-cell {
+    vertical-align: middle !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .booking-calendar-fc .fc .fc-timegrid th.fc-col-header-cell .fc-col-header-cell-cushion {
+    font-size: 0.62rem !important;
+    line-height: 1.1 !important;
+    padding: 0.15rem 0.1rem !important;
+    letter-spacing: -0.02em !important;
+  }
+}
+
+/*
+ * Time grid: NON impostare position su .fc-timegrid-event-harness — FullCalendar usa posizionamento assoluto;
+ * position: relative sul harness rompeva l’allineamento e creava effetto “scala” verso destra.
+ * Con slotEventOverlap disattivato su mobile gli eventi non sono più affiancati; resta z sul .fc-v-event per hover.
+ */
+.booking-calendar-fc .fc .fc-timegrid-event-harness > .fc-timegrid-event.fc-v-event {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.booking-calendar-fc .fc .fc-timegrid-event-harness:hover > .fc-timegrid-event.fc-v-event,
+.booking-calendar-fc .fc .fc-timegrid-event-harness:focus-within > .fc-timegrid-event.fc-v-event {
+  z-index: 20;
+}
+
+.booking-calendar-fc .fc .fc-timegrid-col {
+  min-width: 0;
+}
+
+.booking-calendar-fc .fc .fc-timegrid-col-frame {
+  overflow-x: hidden;
+}
+
+/* Time grid (layout mobile stretto): contenuto centrato in orizzontale nella card */
+.booking-calendar-fc .fc-v-event .fc-event-main:has([data-booking-calendar-timegrid-narrow='true']) {
+  display: flex !important;
+  height: 100%;
+  min-height: 0;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  overflow: hidden;
+}
+
+.booking-calendar-fc .fc-v-event .fc-event-main:has([data-booking-calendar-timegrid-narrow='true']) > * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* BookingRequestCard — shell: lift + ombra (niente filter sul wrapper: altrimenti attenua i colori dei pulsanti dentro) */
+.booking-request-card-shell {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(0);
+  transition:
+    transform 230ms cubic-bezier(0.33, 1, 0.68, 1),
+    box-shadow 230ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/*
+ * Typography card richieste: ~17px. Interlinea compatta sul digest (solo righe singole);
+ * lo spazio verticale si regola con gap tra le div, non con line-height globale.
+ */
+.booking-request-card-shell button.booking-request-digest-trigger {
+  font-size: 1.0625rem;
+  line-height: 1.25;
+}
+
+.booking-request-card-shell .booking-request-expanded-panel {
+  font-size: 1.0625rem;
+}
+
+/* Spazio verticale tra le righe del digest (solo tra le div, non interlinea del testo) */
+.booking-request-card-shell .booking-request-digest-row-stack {
+  display: flex;
+  flex-direction: column;
+  /* Righe digest + fattore 6/7 (−1/7 altezza) */
+  row-gap: calc(1.375rem * 4 / 9 * 0.81 * 6 / 7);
+}
+
+.booking-request-card-shell:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.booking-request-card-shell:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-md);
+  transition-duration: 140ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-request-card-shell,
+  .booking-request-card-shell:hover,
+  .booking-request-card-shell:active {
+    transform: none;
+  }
+
+  .booking-request-card-shell:hover {
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/* Fascia teal collassabile: saturazione più evidente in hover */
+.booking-request-collapse-header-gradient {
+  filter: brightness(1) saturate(1);
+  transition: filter 230ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.booking-request-collapse-header:hover .booking-request-collapse-header-gradient {
+  filter: brightness(1.065) saturate(1.42);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-request-collapse-header-gradient {
+    transition: none;
+  }
+
+  .booking-request-collapse-header:hover .booking-request-collapse-header-gradient {
+    filter: none;
+  }
+}
+
+/* Pagina Prenota — lampeggio attenzione sul primo campo in errore (submit fallito) */
+@keyframes booking-public-field-attention-pulse {
+  0%,
+  100% {
+    border-color: color-mix(in srgb, var(--color-warm-orange) 88%, black);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warm-orange) 50%, transparent);
+    outline-color: var(--color-warm-orange);
+  }
+
+  50% {
+    border-color: var(--color-warm-orange);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-warm-orange) 40%, transparent);
+    outline-color: color-mix(in srgb, var(--color-warm-orange) 75%, white);
+  }
+}
+
+.booking-public-field-attention {
+  border-color: var(--color-warm-orange) !important;
+  border-width: 2px !important;
+  outline: 2px solid var(--color-warm-orange);
+  outline-offset: 2px;
+  animation: booking-public-field-attention-pulse 0.95s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-public-field-attention {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-warm-orange) 42%, transparent);
+    border-color: var(--color-warm-orange) !important;
+    outline: 3px solid var(--color-warm-orange);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * “Rifiuta” su superficie warm/gradient: alcuni browser o layer Tailwind lasciano sfondo grigio/neutro.
+ * Colore pieno qui (nessun background-image) così il rosso resta sempre visibile.
+ */
+button.booking-request-reject-booking-btn {
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  border-style: none;
+  background-image: none !important;
+  background-color: #dc2626;
+  color: #fff;
+}
+
+button.booking-request-reject-booking-btn:hover {
+  background-color: #b91c1c;
+}
+
+button.booking-request-reject-booking-btn:active {
+  background-color: #991b1b;
+}
+
+button.booking-request-reject-booking-btn:focus-visible {
+  outline: 2px solid #f87171;
+  outline-offset: 2px;
+}
+
+/* CollapsibleCard categorie nella panoramica ingredienti (MenuPricesTab) — allineato alle card menu */
+.menu-prices-category-collapsible {
+  border-color: color-mix(in srgb, var(--color-text) 20%, transparent);
+  background-color: color-mix(in srgb, var(--color-surface) 88%, transparent);
+}
+
+.menu-prices-category-collapsible [id$='-header'] {
+  min-height: 4.5rem;
+}
+
+.menu-prices-category-collapsible [id$='-header'] svg {
+  color: var(--color-warm-wood);
+}
+
+.menu-prices-category-collapsible [id$='-content'] {
+  border-top-color: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+/* Fascia liste categorie menu admin — tema ice (layout griglia in MenuPricesTab) */
+.menu-prices-category-list-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1.25rem 1rem 1.5rem;
+  border-radius: 0.875rem;
+  border: var(--admin-warm-wrap-border-width) solid var(--admin-warm-wrap-border);
+  background-color: var(--color-surface);
+  background-image: none;
+}
+
+/* Blocco categoria dentro la griglia — una cella, larghezza piena */
+.menu-prices-category-block {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Overlay «Categorie ingredienti» — card singola (thumb Prenota + titolo + azioni) */
+.menu-prices-category-label-card {
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 5rem;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.menu-prices-category-label-card__thumb {
+  flex: 0 0 4rem;
+  width: 4rem;
+  height: 3rem;
+  min-width: 4rem;
+  min-height: 3rem;
+  align-self: center;
+}
+
+.menu-prices-category-label-card__thumb img {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
+.menu-prices-category-label-card__body {
+  display: flex;
+  min-width: 0;
+  min-height: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.menu-prices-category-label-card__title {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.375rem;
+  text-align: center;
+}
+
+.menu-prices-category-label-card__title > span {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.menu-prices-category-label-card__actions {
+  flex: 0 0 auto;
+  justify-content: center;
+  margin-top: auto;
+  padding-bottom: 0.125rem;
+}
+
+/* Righe prodotto dentro la card: larghezza piena del contenitore, contenuto centrato */
+.menu-prices-item-row {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 12px;
+  padding: 1rem 1.25rem;
+  text-align: left;
+  background-color: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-bg));
+  border-radius: 1.25rem;
+  border: 2px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.menu-prices-item-row:hover {
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--color-text) 16%, transparent);
+}
+
+/* Ingrediente selezionato nei builder di menu. */
+.menu-prices-item-row--selected,
+.menu-prices-item-row[aria-pressed='true'] {
+  border-color: var(--color-primary-600);
+  background-color: color-mix(in srgb, var(--color-primary-50) 92%, var(--color-surface-2));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-primary-400) 55%, transparent),
+    var(--shadow-md);
+}
+
+.menu-prices-item-row--selected:hover,
+.menu-prices-item-row[aria-pressed='true']:hover {
+  border-color: var(--color-primary-700);
+  background-color: color-mix(in srgb, var(--color-primary-100) 85%, var(--color-surface-2));
+}
+
+.menu-prices-item-row .menu-prices-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+
+.menu-prices-item-row .menu-prices-item-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+/* Icon edit / elimina nel menu admin */
+.menu-prices-icon-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3125rem;
+  border-radius: 0.9375rem;
+  border-width: 1px;
+  border-style: solid;
+  background-color: transparent;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.menu-prices-icon-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgb(139 105 20 / 0.35);
+}
+
+.menu-prices-icon-btn--edit {
+  border-color: #8b6914;
+  color: #8b6914;
+}
+
+.menu-prices-icon-btn--edit:hover {
+  background-color: #8b6914;
+  color: #fff;
+}
+
+.menu-prices-icon-btn--delete {
+  border-color: #cc5b45;
+  color: #c2410c;
+}
+
+.menu-prices-icon-btn--delete:focus-visible {
+  box-shadow: 0 0 0 3px rgb(204 91 69 / 0.35);
+}
+
+.menu-prices-icon-btn--delete:hover {
+  background-color: #c2410c;
+  border-color: #c2410c;
+  color: #fff;
+}
+
+.menu-prices-icon-btn--visibility-visible {
+  border-color: var(--color-primary-200);
+  color: var(--color-primary-900);
+  background-color: var(--color-primary-50);
+}
+
+.menu-prices-icon-btn--visibility-visible:hover {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-900);
+}
+
+.menu-prices-icon-btn--visibility-hidden {
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+}
+
+.menu-prices-icon-btn--visibility-hidden:hover {
+  background-color: var(--color-surface-2);
+}
+
+/* Restaurant settings — footer salvataggio: pulsante sempre bianco; messaggio “non salvato” leggibile sul gradient */
+.restaurant-settings-save-footer-msg {
+  color: var(--color-text) !important;
+  -webkit-text-fill-color: var(--color-text) !important;
+}
+
+.restaurant-settings-save-submit {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.restaurant-settings-save-submit svg {
+  color: inherit !important;
+  stroke: currentColor !important;
+}
+
+/*
+ * Archive tab — reset sui button filtro (pairing con `.admin-nav-item` come le tab dashboard).
+ */
+button.archive-tab-filter-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+button.archive-tab-filter-btn:focus-visible {
+  outline: 2px solid var(--admin-nav-tab-active-border);
+  outline-offset: 2px;
+}
+
+button.archive-tab-filter-btn.admin-nav-item.admin-nav-tab-active {
+  border-width: 2px;
+}
+
+button.archive-tab-filter-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (max-width: 595px) {
+  .booking-section-title-mobile.booking-mobile-heading {
+    font-size: 1rem !important;
+    line-height: 1.3 !important;
+    padding: 10px 12px !important;
+  }
+
+  .booking-section-title-mobile.booking-mobile-subheading {
+    font-size: 0.95rem !important;
+    line-height: 1.3 !important;
+    padding: 8px 12px !important;
+  }
+
+  .booking-mobile-heading-meta {
+    font-size: 0.7rem !important;
+  }
+
+  .booking-mobile-counter {
+    font-size: 0.75rem !important;
+  }
+
+  .menu-card-mobile {
+    min-height: 106px !important;
+    height: auto !important;
+  }
+
+  .menu-prices-category-label-card__title {
+    padding-inline: 0.5rem;
+  }
+
+  .booking-mobile-card-title {
+    font-size: 0.95rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .booking-mobile-card-description {
+    font-size: 0.9rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .booking-mobile-price {
+    font-size: 0.82rem !important;
+  }
+}
+
+/* Menu QR pubblico — viewport stabile su Chrome Android */
+html.public-menu-viewport {
+  overflow-x: clip;
+}
+
+html.public-menu-viewport body {
+  overflow-x: clip;
+}
+
+/* Pagina Prenota pubblica — viewport stabile su Chrome Android */
+html.booking-public-viewport {
+  overflow-x: clip;
+}
+
+html.booking-public-viewport body {
+  overflow-x: clip;
+}
+
+/* ───────────────────────────────────────────
+   Stampa briefing turno: nasconde la shell,
+   mostra solo la print-area.
+   ─────────────────────────────────────────── */
+@media print {
+  body > *:not(.print-portal) {
+    display: none !important;
+  }
+
+  .print-area {
+    display: block !important;
+  }
+
+  .print-area table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-area th,
+  .print-area td {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    font-size: 11pt;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Scala tipografica responsive centralizzata
+   Ancorata al gold standard del titolo Calendario (22/24/24/30 px su
+   breakpoint 400/470/640/768). Vedi docs/per-ui-design-skill/
+   BOOKING_CALENDAR_LAYOUT_CONTEXT.md.
+
+   Distinzione: titoli (text-title-*) vs corpo (text-body-* / text-label-*
+   / text-micro-* / text-stat-* / text-button-*).
+
+   Le utility usano breakpoint Tailwind nativi (sm 640, md 768, lg 1024).
+   ────────────────────────────────────────────── */
+
+/* Titoli */
+@utility text-title-page {
+  font-size: 1.375rem; /* 22px */
+  line-height: 1.25;
+}
+@utility text-title-section {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.3;
+}
+@utility text-title-card {
+  font-size: 1.375rem; /* 22px — stesso gold standard */
+  line-height: 1.25;
+}
+@utility text-title-subtitle {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.4;
+}
+@utility text-title-modal {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.3;
+}
+
+/* Corpo */
+@utility text-body {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.5;
+}
+@utility text-label {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.4;
+}
+@utility text-value {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.4;
+}
+@utility text-stat-big {
+  font-size: 1.5rem; /* 24px */
+  line-height: 1.2;
+  font-weight: 700;
+}
+@utility text-micro {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.4;
+}
+@utility text-button-label {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.2;
+}
+
+/* Step up sm ≥640 */
+@media (min-width: 640px) {
+  .text-title-page    { font-size: 1.5rem; }   /* 24 */
+  .text-title-section { font-size: 1.25rem; }  /* 20 */
+  .text-title-card    { font-size: 1.5rem; }   /* 24 */
+  .text-title-modal   { font-size: 1.25rem; }  /* 20 */
+  .text-stat-big      { font-size: 1.75rem; }  /* 28 */
+  .text-value         { font-size: 0.9375rem; }/* 15 */
+}
+
+/* Step up md ≥768 */
+@media (min-width: 768px) {
+  .text-title-page     { font-size: 1.75rem; } /* 28 */
+  .text-title-section  { font-size: 1.375rem; }/* 22 */
+  .text-title-card     { font-size: 1.5rem; }  /* 24 — gold standard fermo qui */
+  .text-title-subtitle { font-size: 0.9375rem; }/* 15 */
+  .text-title-modal    { font-size: 1.375rem; }/* 22 */
+  .text-body           { font-size: 0.9375rem; }/* 15 */
+  .text-label          { font-size: 0.875rem; }/* 14 */
+  .text-value          { font-size: 1rem; }    /* 16 */
+  .text-stat-big       { font-size: 1.875rem; }/* 30 */
+  .text-micro          { font-size: 0.8125rem; }/* 13 */
+}
+
+/* Step up lg ≥1024 */
+@media (min-width: 1024px) {
+  .text-title-page     { font-size: 1.875rem; }/* 30 */
+  .text-title-section  { font-size: 1.5rem; }  /* 24 */
+  .text-title-card     { font-size: 1.875rem; }/* 30 — gold standard top */
+  .text-title-subtitle { font-size: 1rem; }    /* 16 */
+  .text-body           { font-size: 1rem; }    /* 16 */
+}
