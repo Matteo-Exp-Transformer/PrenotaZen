@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BOOKING_MENU_COMPOSE_TEXT_LIMITS,
   BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS,
   BOOKING_PUBLIC_CLIENT_TEXT_LIMITS,
   clampBookingText,
@@ -18,6 +19,25 @@ describe('bookingPrenotaTextLimits', () => {
 
   it('clampBookingText tronca oltre max', () => {
     expect(clampBookingText('abcdef', 4)).toBe('abcd')
+  })
+
+  it('BOOKING_MENU_COMPOSE_TEXT_LIMITS allineato a sottotab (24/24/79)', () => {
+    expect(BOOKING_MENU_COMPOSE_TEXT_LIMITS.categoryLabel).toBe(24)
+    expect(BOOKING_MENU_COMPOSE_TEXT_LIMITS.itemName).toBe(24)
+    expect(BOOKING_MENU_COMPOSE_TEXT_LIMITS.itemDescription).toBe(79)
+    expect(BOOKING_MENU_COMPOSE_TEXT_LIMITS.categoryLabel).toBe(
+      BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabLabel,
+    )
+    expect(BOOKING_MENU_COMPOSE_TEXT_LIMITS.itemDescription).toBe(
+      BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabDescription,
+    )
+  })
+
+  it('clamp compose ingredienti tronca legacy oltre cap', () => {
+    const longName = 'n'.repeat(30)
+    const longDesc = 'd'.repeat(90)
+    expect(clampBookingText(longName, BOOKING_MENU_COMPOSE_TEXT_LIMITS.itemName)).toHaveLength(24)
+    expect(clampBookingText(longDesc, BOOKING_MENU_COMPOSE_TEXT_LIMITS.itemDescription)).toHaveLength(79)
   })
 
   it('isWithinBookingTextLimit', () => {

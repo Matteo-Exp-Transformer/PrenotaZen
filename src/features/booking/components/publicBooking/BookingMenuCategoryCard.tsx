@@ -13,6 +13,12 @@ import {
   selectionStatusLabel,
 } from '../../utils/menuComposeVisibility'
 import { BOOKING_MENU_COMPOSE_COLLAPSE_EVENT } from '../../utils/bookingPublicFormAttention'
+import {
+  BOOKING_MENU_COMPOSE_TEXT_LIMITS,
+  clampBookingText,
+} from '../../constants/bookingPrenotaTextLimits'
+
+const COMPOSE_L = BOOKING_MENU_COMPOSE_TEXT_LIMITS
 
 export interface BookingMenuCategoryCardProps {
   categoryKey: string
@@ -51,7 +57,12 @@ function ComposeMenuItemPanelContent({
   isSelected: boolean
   onToggleItem: (item: ComposeMenuItem) => void
 }) {
-  const hasDesc = Boolean(item.description?.trim())
+  const displayName = clampBookingText(item.name, COMPOSE_L.itemName)
+  const displayDescription = item.description?.trim()
+    ? clampBookingText(item.description, COMPOSE_L.itemDescription)
+    : undefined
+  const hasDesc = Boolean(displayDescription)
+  const showActionRow = !locked || showPrice
   const itemImageSrc = item.image_url?.trim() || undefined
 
   const imageBlock = itemImageSrc ? (
@@ -63,39 +74,41 @@ function ComposeMenuItemPanelContent({
   const textBlock = (
     <div className="flex w-full min-w-0 flex-col gap-1">
       <span className="w-full min-w-0 text-sm font-bold leading-snug text-warm-wood wrap-break-word">
-        {item.name}
+        {displayName}
       </span>
       {hasDesc ? (
         <span className="w-full min-w-0 text-xs leading-snug text-warm-wood-dark/65 wrap-break-word">
-          {item.description}
+          {displayDescription}
         </span>
       ) : null}
-      <div
-        className={cn(
-          'flex min-h-[44px] w-full items-center gap-2',
-          showPrice || !locked ? 'justify-between' : 'justify-start',
-        )}
-      >
-        {!locked ? (
-          <input
-            id={inputId}
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => onToggleItem(item)}
-            className="h-4 w-4 shrink-0 accent-warm-orange"
-          />
-        ) : null}
-        {showPrice ? (
-          <span
-            className={cn(
-              'shrink-0 text-sm font-bold tabular-nums text-warm-wood',
-              locked && 'ml-auto',
-            )}
-          >
-            {formatPrice(item)}
-          </span>
-        ) : null}
-      </div>
+      {showActionRow ? (
+        <div
+          className={cn(
+            'flex min-h-[44px] w-full items-center gap-2',
+            showPrice || !locked ? 'justify-between' : 'justify-start',
+          )}
+        >
+          {!locked ? (
+            <input
+              id={inputId}
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleItem(item)}
+              className="h-4 w-4 shrink-0 accent-warm-orange"
+            />
+          ) : null}
+          {showPrice ? (
+            <span
+              className={cn(
+                'shrink-0 text-sm font-bold tabular-nums text-warm-wood',
+                locked && 'ml-auto',
+              )}
+            >
+              {formatPrice(item)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 
@@ -268,6 +281,7 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
   const lockedOpenSummary = selectedCount > 0 ? 'Incluso nel menù' : 'Menù preselezionato'
   const lockedClosedTeaser = 'Scopri cosa è incluso'
   const closedImageClass = layout === 'stack' ? 'aspect-video sm:aspect-4/3' : 'aspect-4/3'
+  const displayCategoryLabel = clampBookingText(categoryLabel, COMPOSE_L.categoryLabel)
 
   const expandedPanel = (
     <>
@@ -281,7 +295,7 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
       >
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-bold uppercase tracking-wide text-warm-wood sm:text-base">
-            {categoryLabel}
+            {displayCategoryLabel}
           </h3>
           {!locked ? (
             <div className="mt-1">
@@ -349,7 +363,7 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
               <div className={cn('absolute inset-x-0 bottom-0 flex items-end gap-1 text-white', compact ? 'p-1.5' : 'p-4 gap-3')}>
                 <div className="min-w-0 flex-1 overflow-hidden">
                   <h3 className={cn('font-bold uppercase leading-tight', compact ? 'text-[10px] tracking-tight line-clamp-2' : 'text-base tracking-wide sm:text-lg')}>
-                    {categoryLabel}
+                    {displayCategoryLabel}
                   </h3>
                   {!compact && (
                     <p className={cn('mt-1 font-bold text-white/85', locked ? 'text-sm' : 'text-xs')}>

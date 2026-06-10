@@ -59,6 +59,9 @@ import { cn } from '@/lib/utils'
 import { adminBlueCtaSurfaceClass } from '@/lib/adminBlueCtaClass'
 import { CATEGORY_KEY_RENAME_INFO_MESSAGE } from '@/features/booking/services/syncMenuCategoryKeyRename'
 import { CATEGORY_KEY_DELETE_INFO_MESSAGE } from '@/features/booking/services/syncMenuCategoryKeyDelete'
+import { BOOKING_MENU_COMPOSE_TEXT_LIMITS } from '../constants/bookingPrenotaTextLimits'
+
+const COMPOSE_L = BOOKING_MENU_COMPOSE_TEXT_LIMITS
 
 /** Fascia lista categorie: griglia 1 colonna — classi Tailwind qui (STYLING_AGENT_CONTEXT §4). */
 const menuPricesCategoryListWrapClass = cn(
@@ -1213,11 +1216,27 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                       </label>
                       <Input
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            name: e.target.value.slice(0, COMPOSE_L.itemName),
+                          })
+                        }
+                        maxLength={COMPOSE_L.itemName}
                         placeholder="Es. Pizza Margherita"
                         className="h-14 w-full rounded-2xl pl-6"
                         style={{ height: '56px', borderRadius: '18px', paddingLeft: '24px' }}
                       />
+                      <p
+                        className={cn(
+                          'mt-1 text-right text-[11px] tabular-nums',
+                          formData.name.length >= COMPOSE_L.itemName
+                            ? 'text-red-500'
+                            : 'text-gray-500',
+                        )}
+                      >
+                        {formData.name.length}/{COMPOSE_L.itemName}
+                      </p>
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-600">
@@ -1334,11 +1353,27 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                       </label>
                       <Textarea
                         value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            description: e.target.value.slice(0, COMPOSE_L.itemDescription),
+                          })
+                        }
+                        maxLength={COMPOSE_L.itemDescription}
                         placeholder="Es. 2 tranci a persona"
                         rows={3}
                         className="w-full rounded-2xl border-gray-200 px-4 py-3 text-sm"
                       />
+                      <p
+                        className={cn(
+                          'mt-1 text-right text-[11px] tabular-nums',
+                          (formData.description ?? '').length >= COMPOSE_L.itemDescription
+                            ? 'text-red-500'
+                            : 'text-gray-500',
+                        )}
+                      >
+                        {(formData.description ?? '').length}/{COMPOSE_L.itemDescription}
+                      </p>
                       <p className="mt-1 text-xs text-gray-500">
                         Note visibili quando il prodotto compare nella selezione menù.
                       </p>
@@ -1656,11 +1691,24 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                     </label>
                     <Input
                       value={newCategoryLabel}
-                      onChange={(e) => setNewCategoryLabel(e.target.value)}
+                      onChange={(e) =>
+                        setNewCategoryLabel(e.target.value.slice(0, COMPOSE_L.categoryLabel))
+                      }
+                      maxLength={COMPOSE_L.categoryLabel}
                       placeholder="Es. Antipasti"
                       className="h-14 w-full rounded-2xl pl-6"
                       style={{ height: '56px', borderRadius: '18px', paddingLeft: '24px' }}
                     />
+                    <p
+                      className={cn(
+                        'mt-1 text-right text-[11px] tabular-nums',
+                        newCategoryLabel.length >= COMPOSE_L.categoryLabel
+                          ? 'text-red-500'
+                          : 'text-gray-500',
+                      )}
+                    >
+                      {newCategoryLabel.length}/{COMPOSE_L.categoryLabel}
+                    </p>
                     <p className="mt-1 text-xs text-gray-500">
                       Nome usato nel form prenotazione e come base per il menu QR.
                     </p>

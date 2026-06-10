@@ -14,6 +14,12 @@ import { computeMenuTotalsFromItems } from '@/features/booking/utils/buildPreset
 import { cn } from '@/lib/utils'
 import { getModeLabelByType } from '../../utils/bookingModeLabels'
 import { activeSubTabShowsMenu, modeUsesMenu } from '@/features/booking/utils/bookingCapabilities'
+import {
+  BOOKING_MENU_COMPOSE_TEXT_LIMITS,
+  clampBookingText,
+} from '@/features/booking/constants/bookingPrenotaTextLimits'
+
+const COMPOSE_L = BOOKING_MENU_COMPOSE_TEXT_LIMITS
 
 interface BookingSummarySidebarProps {
   formData: {
@@ -228,16 +234,20 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
             <ul className="space-y-1.5">
               {sortedMenuItems.map((item) => {
                 const catLabel = categoryLabelByKey.get(item.category)
+                const displayCatLabel = catLabel
+                  ? clampBookingText(catLabel, COMPOSE_L.categoryLabel)
+                  : undefined
+                const displayItemName = clampBookingText(item.name, COMPOSE_L.itemName)
                 return (
                   <li key={item.id} className="flex items-start justify-between gap-2">
                     <span className="text-sm text-warm-wood font-medium leading-tight min-w-0">
-                      {catLabel ? (
+                      {displayCatLabel ? (
                         <>
-                          <span className="text-warm-wood-dark/55">{catLabel}: </span>
-                          {item.name}
+                          <span className="text-warm-wood-dark/55">{displayCatLabel}: </span>
+                          {displayItemName}
                         </>
                       ) : (
-                        item.name
+                        displayItemName
                       )}
                     </span>
                     {showMenuPrices && showIngredientPrices ? (

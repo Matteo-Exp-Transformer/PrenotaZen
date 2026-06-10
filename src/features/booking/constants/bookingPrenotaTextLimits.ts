@@ -32,6 +32,16 @@ export const BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS = {
   promoMessage: 200,
 } as const
 
+/**
+ * Tab Menu compose (Pagina Prenota) — cap anti-rottura mobile (prova FU-030 Fase 1).
+ * Allineati a sottotab card: label/nome 24, descrizione 79.
+ */
+export const BOOKING_MENU_COMPOSE_TEXT_LIMITS = {
+  categoryLabel: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabLabel,
+  itemName: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabLabel,
+  itemDescription: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabDescription,
+} as const
+
 export const BOOKING_HEADER_FONT_SIZE_MIN = 8
 
 /** Tetto fontSize (px) per target header — descrizione resta sotto titolo/nome. */
