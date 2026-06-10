@@ -40,5 +40,6 @@ module.exports = {
     'tests/**',
     'e2e/**',
     '**/__tests__/**',
+    'agenti-locali/**',
   ],
 }
