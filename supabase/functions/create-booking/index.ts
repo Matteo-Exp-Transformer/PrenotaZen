@@ -18,6 +18,27 @@ const BOOKING_PUBLIC_CLIENT_TEXT_LIMITS = {
 
 const TEXT_TOO_LONG_ERROR = "Testo troppo lungo";
 
+/** Sync con `parseDailyGuestLimitFromDb` in `restaurantSettingRegistry.ts`. */
+const DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE = -1;
+
+function parseDailyGuestLimitFromDb(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || raw <= 0) return null;
+    return raw;
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed === "") return null;
+    const n = parseInt(trimmed, 10);
+    if (!Number.isNaN(n)) {
+      if (n === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || n <= 0) return null;
+      return n;
+    }
+  }
+  return null;
+}
+
 function getDietaryRestrictionsTextLength(
   restrictions: unknown,
 ): number {
@@ -276,12 +297,19 @@ Deno.serve(async (req: Request) => {
         .from("restaurant_settings")
         .select("setting_key, setting_value")
         .eq("tenant_id", orgId)
-        .eq("setting_key", "booking_time_slots_enabled");
+        .in("setting_key", [
+          "booking_time_slots_enabled",
+          "daily_guest_limit",
+          "slot_limit_enabled",
+        ]);
 
       const sMap: Record<string, unknown> = {};
       for (const r of settingsRows ?? []) sMap[r.setting_key] = r.setting_value;
       const timeSlotsEnabled: boolean =
         sMap["booking_time_slots_enabled"] === false ? false : true;
+      // Blocco per-fascia: disattivato di default (decisione Matteo 11-06-26).
+      // Riattivabile impostando restaurant_settings.slot_limit_enabled = true.
+      const slotLimitEnabled: boolean = sMap["slot_limit_enabled"] === true;
 
       // Prenotazioni accettate del giorno
       const dateStart = `${desired_date}T00:00:00`;
@@ -291,11 +319,32 @@ Deno.serve(async (req: Request) => {
         .select("confirmed_start, confirmed_end, num_guests")
         .eq("tenant_id", orgId)
         .eq("status", "accepted")
+        // I no-show liberano il posto: non occupano coperti verso il limite (decisione Matteo 11-06-26).
+        .neq("no_show", true)
         .gte("confirmed_start", dateStart)
         .lte("confirmed_start", dateEnd);
 
-      // Check per-fascia
-      if (timeSlotsEnabled) {
+      // --- Check limite GIORNALIERO coperti (esterno, verso il pubblico) ---
+      // Sentinella DB: -1 = nessun limite. Conta solo le accettate (sopra). Indipendente dal per-fascia.
+      const dailyLimit = parseDailyGuestLimitFromDb(sMap["daily_guest_limit"]);
+      if (dailyLimit != null) {
+        const dayTotal = (dayBookings ?? []).reduce(
+          (acc: number, b: { num_guests: number }) => acc + (b.num_guests ?? 0),
+          0
+        );
+        if (dayTotal + num_guests > dailyLimit) {
+          return new Response(
+            JSON.stringify({
+              error: "Spiacenti, abbiamo raggiunto il numero massimo di coperti per questa data.",
+              code: "DAILY_LIMIT",
+            }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // Check per-fascia — disattivato di default, riattivabile via slot_limit_enabled
+      if (slotLimitEnabled && timeSlotsEnabled) {
         const { data: slotsRows } = await supabaseAdmin
           .from("service_slots")
           .select("id, name, start_time, end_time, max_guests, display_order")

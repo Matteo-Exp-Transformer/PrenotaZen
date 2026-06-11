@@ -37,9 +37,13 @@ export default defineConfig({
     },
   ],
   webServer: {
+    // Autosave OFF in E2E: il guard logout/dirty su anagrafica segue il comportamento prod (FU-004).
     command: 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
+    env: {
+      VITE_SETTINGS_AUTOSAVE: 'false',
+    },
   },
 })

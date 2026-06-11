@@ -38,8 +38,9 @@ test.describe('Login admin', () => {
     await page.fill('#password', 'password-sbagliata')
     await page.locator('button[type="submit"]').click()
 
-    const errorToast = page.locator('[class*="toast"], [class*="Toastify"], [role="alert"]').first()
-    await expect(errorToast).toBeVisible({ timeout: 5000 })
+    await expect(
+      page.getByText(/credenziali non valide|errore imprevisto/i).or(page.locator('.Toastify__toast')),
+    ).toBeVisible({ timeout: 10000 })
   })
 
   test('logout redirige a /login', async ({ page }) => {
@@ -51,7 +52,7 @@ test.describe('Login admin', () => {
     await expect(page).toHaveURL(/\/admin/, { timeout: 10000 })
 
     // Logout — cerca bottone di logout nella dashboard
-    const logoutBtn = page.locator('button:has-text("Esci"), button:has-text("Logout"), button[aria-label*="logout"]').first()
+    const logoutBtn = page.getByRole('button', { name: /log-?out|esci/i }).first()
     await logoutBtn.click()
 
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 })

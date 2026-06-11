@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useFeatures } from '@/hooks/useFeatures'
 import { createPortal } from 'react-dom'
 import { X, Edit, Trash2, Save } from 'lucide-react'
@@ -34,14 +34,24 @@ import {
 import { CapacityWarningModal } from './CapacityWarningModal'
 import { PastStartTimeWarningModal } from './PastStartTimeWarningModal'
 import { BookingDangerActionModal } from './BookingDangerActionModal'
+import { UnsavedNavigationGuardModal } from './settings/SettingsSaveUi'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { adminBlueCtaSurfaceClass } from '@/lib/adminBlueCtaClass'
+
+export type BookingDetailsNavigationGuardHandle = {
+  saveAll: () => Promise<void>
+  discardAll: () => void
+}
 
 interface BookingDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   booking: BookingRequest
+  /** C-U2: segnala modifiche in edit per guard cambio tab admin. */
+  onEditDirtyChange?: (dirty: boolean) => void
+  /** C-U2: Salva/Annulla invocati dal guard navigazione (tab dashboard). */
+  navigationGuardRef?: React.MutableRefObject<BookingDetailsNavigationGuardHandle | null>
 }
 
 type TabId = 'details' | 'menu' | 'dietary'
@@ -87,10 +97,20 @@ const buildFormDataFromBooking = (booking: BookingRequest): DetailsFormData => (
   placement: booking.placement || '',
 })
 
+export const isDetailsFormDirty = (
+  formData: DetailsFormData,
+  booking: BookingRequest,
+): boolean => {
+  const baseline = buildFormDataFromBooking(booking)
+  return JSON.stringify(formData) !== JSON.stringify(baseline)
+}
+
 export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   isOpen,
   onClose,
   booking,
+  onEditDirtyChange,
+  navigationGuardRef,
 }) => {
 
   const [isEditMode, setIsEditMode] = useState(false)
@@ -110,6 +130,29 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     exceededBy: number
   } | null>(null)
   const [showPastStartWarning, setShowPastStartWarning] = useState(false)
+  const [closeGuardOpen, setCloseGuardOpen] = useState(false)
+  const [closeGuardPending, setCloseGuardPending] = useState(false)
+
+  const navigationSaveResolveRef = useRef<(() => void) | null>(null)
+  const navigationSaveRejectRef = useRef<((error: Error) => void) | null>(null)
+
+  const clearNavigationSavePromise = useCallback(() => {
+    navigationSaveResolveRef.current = null
+    navigationSaveRejectRef.current = null
+  }, [])
+
+  const rejectNavigationSave = useCallback(
+    (message = 'Salvataggio annullato') => {
+      navigationSaveRejectRef.current?.(new Error(message))
+      clearNavigationSavePromise()
+    },
+    [clearNavigationSavePromise],
+  )
+
+  const resolveNavigationSave = useCallback(() => {
+    navigationSaveResolveRef.current?.()
+    clearNavigationSavePromise()
+  }, [clearNavigationSavePromise])
 
   // Ref to track previous booking ID to prevent unnecessary recalculations
   const previousBookingIdRef = React.useRef<string>(booking.id)
@@ -172,13 +215,16 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const cancelMutation = useCancelBooking()
   const markNoShowMutation = useMarkNoShow()
 
-  // Visibile se: accepted, non walk-in, confirmed_start nel passato, no_show=false
+  // Visibile se: accepted, non walk-in, orario di INIZIO (a muro, locale) nel passato, no_show=false
   const canMarkNoShow =
     booking.status === 'accepted' &&
     booking.source !== 'walk_in' &&
     !booking.no_show &&
     !!booking.confirmed_start &&
-    new Date(booking.confirmed_start) < new Date()
+    isWallClockStartBeforeNow(
+      extractDateFromISO(booking.confirmed_start),
+      trimTimeToHHmm(getAccurateStartTime(booking)),
+    )
   const {
     data: acceptedBookings = [],
     isSuccess: acceptedBookingsLoaded,
@@ -307,6 +353,23 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   }, [isEditMode, booking.id])
 
   const dangerOverlayOpen = showCancelConfirm || showNoShowConfirm
+
+  const isEditDirty = useMemo(
+    () => isEditMode && isDetailsFormDirty(formData, booking),
+    [isEditMode, formData, booking],
+  )
+
+  useEffect(() => {
+    onEditDirtyChange?.(isEditDirty)
+  }, [isEditDirty, onEditDirtyChange])
+
+  useEffect(() => {
+    if (!isOpen) {
+      onEditDirtyChange?.(false)
+      setCloseGuardOpen(false)
+      setCloseGuardPending(false)
+    }
+  }, [isOpen, onEditDirtyChange])
 
   // Capacita per slot: service_slots.max_guests > override > slot_guest_capacities
   const getSlotCap = (slotId: string, date: string): number | null => {
@@ -523,9 +586,11 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           setEndTimeManuallyModified(false)
           setShowOverbookingConfirm(false)
           setOverbookingSlotInfo(null)
+          resolveNavigationSave()
         },
         onError: (error) => {
           logger.error('❌ [BookingDetailsModal] Save failed:', error)
+          rejectNavigationSave('Salvataggio non riuscito')
         },
       }
     )
@@ -549,32 +614,39 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     performSave()
   }
 
-  const handleSave = () => {
-    if (!booking.confirmed_start) return
+  const handleSave = (fromNavigationGuard = false): boolean => {
+    if (!booking.confirmed_start) {
+      if (fromNavigationGuard) rejectNavigationSave('Prenotazione senza orario confermato')
+      return false
+    }
 
     // Validation
     if (!formData.client_name || formData.client_name.length < 2) {
       toast.error('Il nome deve contenere almeno 2 caratteri')
-      return
+      if (fromNavigationGuard) rejectNavigationSave('Validazione non superata')
+      return false
     }
 
     if (formData.client_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.client_email)) {
       toast.error('Inserisci un indirizzo email valido')
-      return
+      if (fromNavigationGuard) rejectNavigationSave('Validazione non superata')
+      return false
     }
 
     if (formData.numGuests < 1 || formData.numGuests > 110) {
       toast.error('Inserisci un numero valido di ospiti (minimo 1, massimo 110)')
-      return
+      if (fromNavigationGuard) rejectNavigationSave('Validazione non superata')
+      return false
     }
 
     const startNorm = trimTimeToHHmm(formData.startTime)
     if (isWallClockStartBeforeNow(formData.date, startNorm)) {
       setShowPastStartWarning(true)
-      return
+      return true
     }
 
     runCapacityCheckAndSave()
+    return true
   }
 
   const handleCancelBooking = (reason?: string) => {
@@ -603,7 +675,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
   // U2 — Annulla modifica: riporta i campi ai valori originali della prenotazione,
   // non lasciare i valori "annullati" che riapparirebbero al rientro in edit.
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     try {
       setFormData(buildFormDataFromBooking(booking))
     } catch (error) {
@@ -611,18 +683,110 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     }
     setEndTimeManuallyModified(false)
     setIsEditMode(false)
-  }
+    clearNavigationSavePromise()
+  }, [booking, clearNavigationSavePromise])
 
-  // U7 — Chiusura sicura: non chiudere mentre un salvataggio è in corso (perderebbe il
-  // feedback) né scartare silenziosamente modifiche in edit; in edit, l'annulla resetta prima.
-  const handleRequestClose = () => {
-    if (updateMutation.isPending) return
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
+  const handleCancelEditRef = useRef(handleCancelEdit)
+  handleCancelEditRef.current = handleCancelEdit
+
+  useEffect(() => {
+    if (!navigationGuardRef) return
+    navigationGuardRef.current = {
+      saveAll: () =>
+        new Promise<void>((resolve, reject) => {
+          if (!isEditMode || !isDetailsFormDirty(formData, booking)) {
+            resolve()
+            return
+          }
+          navigationSaveResolveRef.current = resolve
+          navigationSaveRejectRef.current = reject
+          handleSaveRef.current(true)
+        }),
+      discardAll: () => handleCancelEditRef.current(),
+    }
+    return () => {
+      navigationGuardRef.current = null
+    }
+  }, [navigationGuardRef, isEditMode, formData, booking])
+
+  const runGuardedSave = useCallback(async (): Promise<void> => {
+    if (navigationGuardRef?.current) {
+      await navigationGuardRef.current.saveAll()
+      return
+    }
+    await new Promise<void>((resolve, reject) => {
+      navigationSaveResolveRef.current = resolve
+      navigationSaveRejectRef.current = reject
+      handleSaveRef.current(true)
+    })
+  }, [navigationGuardRef])
+
+  const handleCloseGuardStay = useCallback(() => {
+    setCloseGuardOpen(false)
+  }, [])
+
+  const handleCloseGuardSave = useCallback(async () => {
+    setCloseGuardPending(true)
+    try {
+      await runGuardedSave()
+      setCloseGuardOpen(false)
+      onClose()
+    } catch {
+      // validazione / annulla avviso: resta nel drawer
+    } finally {
+      setCloseGuardPending(false)
+    }
+  }, [onClose, runGuardedSave])
+
+  const handleCloseGuardDiscard = useCallback(() => {
+    handleCancelEditRef.current()
+    setCloseGuardOpen(false)
+    onClose()
+  }, [onClose])
+
+  // U7 + C-U2: chiusura overlay/X/Escape — con edit dirty chiedi Salva/Annulla/Resta.
+  const handleRequestClose = useCallback(() => {
+    if (updateMutation.isPending || closeGuardPending) return
+    if (dangerOverlayOpen || showPastStartWarning || showOverbookingConfirm) return
+    if (isEditDirty) {
+      setCloseGuardOpen(true)
+      return
+    }
     if (isEditMode) {
-      handleCancelEdit()
+      handleCancelEditRef.current()
       return
     }
     onClose()
-  }
+  }, [
+    closeGuardPending,
+    dangerOverlayOpen,
+    isEditDirty,
+    isEditMode,
+    onClose,
+    showOverbookingConfirm,
+    showPastStartWarning,
+    updateMutation.isPending,
+  ])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (closeGuardOpen || dangerOverlayOpen || showPastStartWarning || showOverbookingConfirm) return
+      handleRequestClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [
+    closeGuardOpen,
+    dangerOverlayOpen,
+    handleRequestClose,
+    isOpen,
+    showOverbookingConfirm,
+    showPastStartWarning,
+  ])
 
   if (!isOpen) {
     return null
@@ -635,8 +799,14 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         variant="edit_booking"
         desiredDate={formData.date}
         startTimeHHmm={trimTimeToHHmm(formData.startTime)}
-        onClose={() => setShowPastStartWarning(false)}
-        onCancel={() => setShowPastStartWarning(false)}
+        onClose={() => {
+          setShowPastStartWarning(false)
+          rejectNavigationSave()
+        }}
+        onCancel={() => {
+          setShowPastStartWarning(false)
+          rejectNavigationSave()
+        }}
         onConfirm={() => {
           setShowPastStartWarning(false)
           runCapacityCheckAndSave()
@@ -648,6 +818,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           onClose={() => {
             setShowOverbookingConfirm(false)
             setOverbookingSlotInfo(null)
+            rejectNavigationSave()
           }}
           onConfirm={() => {
             performSave()
@@ -657,6 +828,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           onCancel={() => {
             setShowOverbookingConfirm(false)
             setOverbookingSlotInfo(null)
+            rejectNavigationSave()
           }}
           exceededBy={overbookingSlotInfo.exceededBy}
           slotName={overbookingSlotInfo.slotName}
@@ -836,7 +1008,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                 {isEditMode ? (
                   <>
                     <button
-                      onClick={handleSave}
+                      onClick={() => handleSave()}
                       className="flex-1 px-2 sm:px-6 py-2.5 sm:py-3 bg-linear-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl border-2 border-emerald-700 transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-emerald-500/35 hover:from-emerald-400 hover:to-emerald-500 hover:border-emerald-600 hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-emerald-500/30 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-md disabled:hover:brightness-100 disabled:hover:from-emerald-500 disabled:hover:to-emerald-600 disabled:hover:border-emerald-700 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-base"
                       disabled={updateMutation.isPending}
                     >
@@ -975,6 +1147,14 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         variant="warning"
         isLoading={markNoShowMutation.isPending}
         zIndex={70}
+      />
+      <UnsavedNavigationGuardModal
+        isOpen={closeGuardOpen}
+        dirtyLabels={['Dettaglio prenotazione']}
+        pending={closeGuardPending}
+        onStay={handleCloseGuardStay}
+        onSaveAndContinue={() => void handleCloseGuardSave()}
+        onDiscardAndContinue={handleCloseGuardDiscard}
       />
     </>
   )

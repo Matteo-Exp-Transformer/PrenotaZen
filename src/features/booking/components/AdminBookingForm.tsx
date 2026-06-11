@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Input, Textarea, TimePicker24h } from '@/components/ui'
 import type { BookingRequestInput, BookingType } from '@/types/booking'
@@ -20,6 +20,7 @@ import {
 } from '../utils/buildPresetMenuSelection'
 import { useAcceptedBookings } from '../hooks/useBookingQueries'
 import { useCapacityCheck } from '../hooks/useCapacityCheck'
+import { sumGuestsByDate } from '../utils/capacityCalculator'
 import { CapacityWarningModal } from './CapacityWarningModal'
 import { PastStartTimeWarningModal } from './PastStartTimeWarningModal'
 import { isWallClockStartBeforeNow, trimTimeToHHmm } from '../utils/dateUtils'
@@ -27,38 +28,96 @@ import { logger } from '@/lib/logger'
 import { useFeatures } from '@/hooks/useFeatures'
 
 
+export type AdminBookingFormNavigationGuardHandle = {
+  saveAll: () => Promise<void>
+  discardAll: () => void
+}
+
+function buildEmptyAdminBookingFormState(initialDate?: string): BookingRequestInput {
+  return {
+    client_name: '',
+    client_email: '',
+    client_phone: '',
+    booking_type: 'tavolo',
+    desired_date: initialDate ?? '',
+    desired_time: '',
+    num_guests: 0,
+    special_requests: '',
+    menu_selection: { items: [] },
+    dietary_restrictions: [],
+    preset_menu: null,
+    placement: '',
+  }
+}
+
+export function isAdminBookingFormDirty(
+  formData: BookingRequestInput,
+  baseline: BookingRequestInput,
+): boolean {
+  return JSON.stringify(formData) !== JSON.stringify(baseline)
+}
+
 interface AdminBookingFormProps {
   onSubmit?: () => void
+  /** Data (YYYY-MM-DD) precompilata, es. dalla scorciatoia "crea da giorno" del calendario. */
+  initialDate?: string
+  /** C-U2: segnala bozza aperta per guard cambio tab admin. */
+  onDirtyChange?: (dirty: boolean) => void
+  /** C-U2: Salva/Annulla invocati dal guard navigazione (tab dashboard). */
+  navigationGuardRef?: React.MutableRefObject<AdminBookingFormNavigationGuardHandle | null>
 }
 
 const ADMIN_FROSTED_TEXT_INPUT_CLASS_NAME =
   '!border-black/20 text-center !text-[18px] sm:!text-[16px] !font-medium text-warm-wood placeholder:text-warm-wood/50 rounded-[12px] focus:!border-warm-wood focus:!ring-2 focus:!ring-warm-wood/40'
 const DEFAULT_PLACEMENT_AREAS = ['Sala A', 'Sala B', 'Deorr'] as const
 
-export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) => {
+export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
+  onSubmit,
+  initialDate,
+  onDirtyChange,
+  navigationGuardRef,
+}) => {
   const features = useFeatures()
-  const [formData, setFormData] = useState<BookingRequestInput>({
-    client_name: '',
-    client_email: '',
-    client_phone: '',
-    booking_type: 'tavolo',
-    desired_date: '',
-    desired_time: '',
-    num_guests: 0,
-    special_requests: '',
-    menu_selection: {
-      items: [],
-    },
-    dietary_restrictions: [],
-    preset_menu: null,
-    placement: ''
-  })
+  const baselineRef = useRef(buildEmptyAdminBookingFormState(initialDate))
+  const [formData, setFormData] = useState<BookingRequestInput>(() => baselineRef.current)
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [selectedPreset, setSelectedPreset] = useState<PresetMenuType>(null)
   const [showCapacityWarning, setShowCapacityWarning] = useState(false)
+  const [capacityWarningOverride, setCapacityWarningOverride] = useState<{
+    exceededBy: number
+    slotName: string
+    totalOccupied: number
+    capacity: number
+  } | null>(null)
   const [showPastStartWarning, setShowPastStartWarning] = useState(false)
   const [touchCrossBurst, setTouchCrossBurst] = useState(0)
+
+  const navigationSaveResolveRef = useRef<(() => void) | null>(null)
+  const navigationSaveRejectRef = useRef<((error: Error) => void) | null>(null)
+  const navigationGuardSaveActiveRef = useRef(false)
+
+  const clearNavigationSavePromise = useCallback(() => {
+    navigationSaveResolveRef.current = null
+    navigationSaveRejectRef.current = null
+  }, [])
+
+  const rejectNavigationSave = useCallback(
+    (message = 'Salvataggio annullato') => {
+      navigationSaveRejectRef.current?.(new Error(message))
+      clearNavigationSavePromise()
+    },
+    [clearNavigationSavePromise],
+  )
+
+  const isDirty = useMemo(
+    () => isAdminBookingFormDirty(formData, baselineRef.current),
+    [formData],
+  )
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
 
   const { mutate, isPending } = useCreateAdminBooking()
   const queryClient = useQueryClient()
@@ -78,6 +137,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
   }, [features.servizio, placementAreasSetting])
 
   const { data: acceptedBookings = [] } = useAcceptedBookings()
+  const { data: dailyGuestLimit = null } = useRestaurantSetting('daily_guest_limit')
 
   // Convert desired_time to startTime and endTime for capacity check
   // Default endTime is startTime + 3 hours (same as AcceptBookingModal)
@@ -259,6 +319,29 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
 
   /** Dopo eventuale OK su orario passato: capienza → eventuale modale → creazione. */
   const continueSubmitAfterPastTimeCheck = () => {
+    setCapacityWarningOverride(null)
+
+    if (
+      dailyGuestLimit != null &&
+      dailyGuestLimit > 0 &&
+      formData.desired_date &&
+      (formData.num_guests || 0) > 0
+    ) {
+      const guestsByDate = sumGuestsByDate(acceptedBookings)
+      const currentGuests = guestsByDate[formData.desired_date] ?? 0
+      const totalOccupied = currentGuests + (formData.num_guests || 0)
+      if (totalOccupied > dailyGuestLimit) {
+        setCapacityWarningOverride({
+          exceededBy: totalOccupied - dailyGuestLimit,
+          slotName: 'giornata',
+          totalOccupied,
+          capacity: dailyGuestLimit,
+        })
+        setShowCapacityWarning(true)
+        return
+      }
+    }
+
     if (!capacityCheck.isAvailable) {
       if (capacityCheck.exceededSlots && capacityCheck.exceededSlots.length > 0) {
         setShowCapacityWarning(true)
@@ -272,6 +355,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
       })
 
       if (affectedSlots.length > 0) {
+        setCapacityWarningOverride(null)
         setShowCapacityWarning(true)
         return
       }
@@ -305,7 +389,17 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
     continueSubmitAfterPastTimeCheck()
   }
 
+  const resetFormState = useCallback(() => {
+    const empty = buildEmptyAdminBookingFormState(initialDate)
+    baselineRef.current = empty
+    setFormData(empty)
+    setSelectedPreset(null)
+    setErrors({})
+    clearNavigationSavePromise()
+  }, [initialDate, clearNavigationSavePromise])
+
   const createBooking = () => {
+    const fromNavigationGuard = navigationGuardSaveActiveRef.current
     const payload: BookingRequestInput = {
       ...(features.servizio ? formData : { ...formData, placement: '' }),
       menu_promo_labels: null,
@@ -313,23 +407,8 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
     mutate(payload, {
       onSuccess: async () => {
         toast.success('Prenotazione creata con successo!')
-        // Reset form
-        setFormData({
-          client_name: '',
-          client_email: '',
-          client_phone: '',
-          booking_type: 'tavolo',
-          desired_date: '',
-          desired_time: '',
-          num_guests: 0,
-          special_requests: '',
-          menu_selection: { items: [] },
-          dietary_restrictions: [],
-          preset_menu: null,
-          placement: ''
-        })
-        setSelectedPreset(null)
-        setErrors({})
+        resetFormState()
+        navigationGuardSaveActiveRef.current = false
 
         // Invalidate and refetch all booking-related queries
         // This will refresh the calendar automatically
@@ -341,14 +420,74 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
           queryClient.invalidateQueries({ queryKey: ['bookings', 'all'], refetchType: 'all' }),
         ])
 
+        navigationSaveResolveRef.current?.()
+        clearNavigationSavePromise()
         onSubmit?.()
       },
       onError: (error) => {
         logger.error('Error creating booking:', error)
         toast.error('Errore nella creazione della prenotazione')
-      }
+        navigationGuardSaveActiveRef.current = false
+        if (fromNavigationGuard) rejectNavigationSave('Creazione non riuscita')
+      },
     })
   }
+
+  const submitFromGuard = (): boolean => {
+    if (!validate()) {
+      navigationGuardSaveActiveRef.current = false
+      rejectNavigationSave('Validazione non superata')
+      return false
+    }
+
+    const startHHmm = trimTimeToHHmm(formData.desired_time || '')
+    if (
+      formData.desired_date &&
+      startHHmm &&
+      isWallClockStartBeforeNow(formData.desired_date, startHHmm)
+    ) {
+      setShowPastStartWarning(true)
+      return true
+    }
+
+    continueSubmitAfterPastTimeCheck()
+    return true
+  }
+
+  const submitFromGuardRef = useRef(submitFromGuard)
+  submitFromGuardRef.current = submitFromGuard
+  const resetFormStateRef = useRef(resetFormState)
+  resetFormStateRef.current = resetFormState
+
+  const cancelNavigationGuardSave = useCallback(() => {
+    if (!navigationGuardSaveActiveRef.current) return
+    navigationGuardSaveActiveRef.current = false
+    rejectNavigationSave()
+  }, [rejectNavigationSave])
+
+  useEffect(() => {
+    if (!navigationGuardRef) return
+    navigationGuardRef.current = {
+      saveAll: () =>
+        new Promise<void>((resolve, reject) => {
+          if (!isAdminBookingFormDirty(formData, baselineRef.current)) {
+            resolve()
+            return
+          }
+          navigationGuardSaveActiveRef.current = true
+          navigationSaveResolveRef.current = resolve
+          navigationSaveRejectRef.current = reject
+          submitFromGuardRef.current()
+        }),
+      discardAll: () => {
+        navigationGuardSaveActiveRef.current = false
+        resetFormStateRef.current()
+      },
+    }
+    return () => {
+      navigationGuardRef.current = null
+    }
+  }, [navigationGuardRef, formData])
 
   return (
     <>
@@ -737,8 +876,14 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
       variant="new_booking"
       desiredDate={formData.desired_date}
       startTimeHHmm={trimTimeToHHmm(formData.desired_time || '')}
-      onClose={() => setShowPastStartWarning(false)}
-      onCancel={() => setShowPastStartWarning(false)}
+      onClose={() => {
+        setShowPastStartWarning(false)
+        cancelNavigationGuardSave()
+      }}
+      onCancel={() => {
+        setShowPastStartWarning(false)
+        cancelNavigationGuardSave()
+      }}
       onConfirm={() => {
         setShowPastStartWarning(false)
         continueSubmitAfterPastTimeCheck()
@@ -751,6 +896,33 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
         return null
       }
 
+
+      if (capacityWarningOverride) {
+        return (
+          <CapacityWarningModal
+            isOpen={showCapacityWarning}
+            onClose={() => {
+              setShowCapacityWarning(false)
+              setCapacityWarningOverride(null)
+              cancelNavigationGuardSave()
+            }}
+            onConfirm={() => {
+              setShowCapacityWarning(false)
+              setCapacityWarningOverride(null)
+              createBooking()
+            }}
+            onCancel={() => {
+              setShowCapacityWarning(false)
+              setCapacityWarningOverride(null)
+              cancelNavigationGuardSave()
+            }}
+            exceededBy={capacityWarningOverride.exceededBy}
+            slotName={capacityWarningOverride.slotName}
+            totalOccupied={capacityWarningOverride.totalOccupied}
+            capacity={capacityWarningOverride.capacity}
+          />
+        )
+      }
 
       // Get exceeded slot info from capacityCheck or calculate it
       let exceededSlot = null
@@ -796,6 +968,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
           isOpen={showCapacityWarning}
           onClose={() => {
             setShowCapacityWarning(false)
+            cancelNavigationGuardSave()
           }}
           onConfirm={() => {
             setShowCapacityWarning(false)
@@ -803,6 +976,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({ onSubmit }) 
           }}
           onCancel={() => {
             setShowCapacityWarning(false)
+            cancelNavigationGuardSave()
           }}
           exceededBy={exceededSlot.exceededBy}
           slotName={exceededSlot.slotName}

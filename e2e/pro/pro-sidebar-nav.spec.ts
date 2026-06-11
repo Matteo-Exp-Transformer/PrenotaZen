@@ -24,21 +24,20 @@ async function loginAsProAdmin(page: import('@playwright/test').Page) {
   await page.getByLabel(/email/i).fill(PRO_EMAIL)
   await page.getByLabel(/password/i).fill(PRO_PASSWORD)
   await page.getByRole('button', { name: /accedi|login/i }).click()
-  await expect(page.getByRole('navigation', { name: /navigazione principale/i })).toBeVisible({
+  await expect(page.getByRole('complementary', { name: /navigazione principale/i })).toBeVisible({
     timeout: 15000,
   })
 }
 
 function sidebarNav(page: import('@playwright/test').Page) {
-  return page.getByRole('navigation', { name: /navigazione principale/i })
+  return page.getByRole('complementary', { name: /navigazione principale/i })
 }
 
 test.describe('Admin Pro — Sidebar e navigazione', () => {
-  test('sidebar contiene i bottoni delle 4 sezioni Pro', async ({ page }) => {
+  test('sidebar contiene Home e le sezioni Pro abilitate', async ({ page }) => {
     await loginAsProAdmin(page)
     const nav = sidebarNav(page)
     await expect(nav.getByRole('button', { name: /home/i })).toBeVisible()
-    await expect(nav.getByRole('button', { name: /prenotazioni/i })).toBeVisible()
     await expect(nav.getByRole('button', { name: /crm clienti/i })).toBeVisible()
     await expect(nav.getByRole('button', { name: /servizio/i })).toBeVisible()
     await expect(nav.getByRole('button', { name: /analytics/i })).toBeVisible()
@@ -75,10 +74,10 @@ test.describe('Admin Pro — Sidebar e navigazione', () => {
     ).toBeVisible({ timeout: 5000 })
   })
 
-  test('click Prenotazioni dalla sidebar apre la dashboard classica', async ({ page }) => {
+  test('da CRM il pulsante X torna alla dashboard prenotazioni', async ({ page }) => {
     await loginAsProAdmin(page)
-    await sidebarNav(page).getByRole('button', { name: /prenotazioni/i }).click()
-    // L'header con i 5 tab dell'admin classica deve diventare visibile
+    await sidebarNav(page).getByRole('button', { name: /crm clienti/i }).click()
+    await page.getByRole('button', { name: /torna alla dashboard/i }).click()
     await expect(page.locator('header nav')).toBeVisible({ timeout: 5000 })
   })
 })

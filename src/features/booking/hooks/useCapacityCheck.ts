@@ -71,6 +71,7 @@ export function useCapacityCheck(params: UseCapacityCheckParams): AvailabilityCh
     // Prenotazioni del giorno (escluse quelle da escludere)
     const dayBookings = acceptedBookings.filter((booking) => {
       if (booking.id === excludeBookingId) return false
+      if (booking.no_show) return false
       if (!booking.confirmed_start) return false
       return extractDateFromISO(booking.confirmed_start) === date
     })

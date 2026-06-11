@@ -154,7 +154,7 @@ export const transformBookingsToCalendarEvents = (
   bookings: BookingRequest[]
 ): CalendarEvent[] => {
   return bookings
-    .filter((b) => b.status === 'accepted' && b.confirmed_start && b.confirmed_end)
+    .filter((b) => b.status === 'accepted' && !b.no_show && b.confirmed_start && b.confirmed_end)
     .map(transformBookingToCalendarEvent)
 }
 

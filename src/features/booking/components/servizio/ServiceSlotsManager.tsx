@@ -584,8 +584,9 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
           </p>
           {maxGuestsInfoOpen && (
             <FormInfoPanel onClose={() => setMaxGuestsInfoOpen(false)}>
-              Impostando i coperti massimi, le prenotazioni dei clienti che superano il limite
-              verranno rifiutate automaticamente dal sistema.
+              I coperti massimi sono un riferimento per te: quando vengono superati la fascia
+              segnala che è piena (semaforo/avviso), ma non blocca né rifiuta nulla. Decidi tu
+              caso per caso se accettare le prenotazioni in attesa.
             </FormInfoPanel>
           )}
         </div>

@@ -125,7 +125,7 @@ const bookingWindowDaysSchema = z.coerce
 const dailyGuestLimitSchema = z.coerce
   .number()
   .int('Deve essere un intero')
-  .min(1, 'Minimo 1 ospite')
+  .min(0, 'Non può essere negativo') // 0 = nessun limite (gestito come "illimitato")
   .max(1000, 'Massimo 1000 ospiti')
 
 const optionalSlotCapSchema = z.union([
@@ -202,7 +202,8 @@ function parseBookingWindowDaysFromDb(raw: unknown): number {
 function parseDailyGuestLimitFromDb(raw: unknown): number | null {
   if (raw == null) return null
   if (typeof raw === 'number' && Number.isFinite(raw)) {
-    if (raw === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE) return null
+    // -1 (sentinella) e 0 significano entrambi «nessun limite».
+    if (raw === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || raw <= 0) return null
     return raw
   }
   if (typeof raw === 'string') {
@@ -210,7 +211,7 @@ function parseDailyGuestLimitFromDb(raw: unknown): number | null {
     if (trimmed === '') return null
     const n = parseInt(trimmed, 10)
     if (!Number.isNaN(n)) {
-      if (n === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE) return null
+      if (n === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || n <= 0) return null
       return n
     }
   }
@@ -396,7 +397,10 @@ export const restaurantSettingRegistry: {
     parseFromDb: (raw) => parseDailyGuestLimitFromDb(raw),
     serializeToDb: (value) => {
       // La colonna DB e NOT NULL: usiamo -1 come sentinella per «nessun limite».
-      if (value == null) return DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE as unknown as Json
+      // null e 0 (e valori non positivi) significano «nessun limite».
+      if (value == null || (typeof value === 'number' && value <= 0)) {
+        return DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE as unknown as Json
+      }
       return value as Json
     },
     validate: (value) => {

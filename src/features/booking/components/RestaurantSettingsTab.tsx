@@ -308,6 +308,7 @@ export const RestaurantSettingsTab: React.FC = () => {
 
   const nameQuery = useRestaurantSetting('restaurant_name')
   const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities')
+  const dailyGuestLimitQuery = useRestaurantSetting('daily_guest_limit')
   const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled')
   const serviceSlotsQuery = useServiceSlots()
   const updateServiceSlot = useUpdateServiceSlot()
@@ -341,6 +342,8 @@ export const RestaurantSettingsTab: React.FC = () => {
   const tempSlotCounterRef = useRef(0)
   const [timeSlotsEnabled, setTimeSlotsEnabled] = useState(true)
   const [timeSlotsHelpOpen, setTimeSlotsHelpOpen] = useState(false)
+  // Limite coperti giornaliero (esterno): '' = nessun limite. Blocca solo la pagina pubblica.
+  const [dailyGuestLimit, setDailyGuestLimit] = useState<number | ''>('')
   const [slotValidationError, setSlotValidationError] = useState<string | null>(null)
   const [businessHours, setBusinessHours] = useState<BusinessHours>(() => getDefaultBusinessHours())
   const businessHoursValidationError = validateBusinessHours(businessHours)
@@ -443,6 +446,7 @@ export const RestaurantSettingsTab: React.FC = () => {
   const allSuccess =
     nameQuery.isSuccess &&
     slotGuestCapacitiesQuery.isSuccess &&
+    dailyGuestLimitQuery.isSuccess &&
     timeSlotsEnabledQuery.isSuccess &&
     serviceSlotsQuery.isSuccess &&
     hoursQuery.isSuccess &&
@@ -464,6 +468,7 @@ export const RestaurantSettingsTab: React.FC = () => {
       caps[k] = v == null ? '' : (v as number)
     }
     setSlotCapacities(caps)
+    setDailyGuestLimit(dailyGuestLimitQuery.data == null ? '' : dailyGuestLimitQuery.data)
     setTimeSlotsEnabled(timeSlotsEnabledQuery.data ?? true)
     const slots = (serviceSlotsQuery.data ?? [])
       .slice()
@@ -492,6 +497,7 @@ export const RestaurantSettingsTab: React.FC = () => {
     allSuccess,
     nameQuery.data,
     slotGuestCapacitiesQuery.data,
+    dailyGuestLimitQuery.data,
     timeSlotsEnabledQuery.data,
     serviceSlotsQuery.data,
     hoursQuery.data,
@@ -506,6 +512,7 @@ export const RestaurantSettingsTab: React.FC = () => {
   const loading =
     nameQuery.isPending ||
     slotGuestCapacitiesQuery.isPending ||
+    dailyGuestLimitQuery.isPending ||
     timeSlotsEnabledQuery.isPending ||
     serviceSlotsQuery.isPending ||
     hoursQuery.isPending ||
@@ -560,6 +567,7 @@ export const RestaurantSettingsTab: React.FC = () => {
       caps[k] = v == null ? '' : (v as number)
     }
     setSlotCapacities(caps)
+    setDailyGuestLimit(dailyGuestLimitQuery.data == null ? '' : dailyGuestLimitQuery.data)
     setTimeSlotsEnabled(timeSlotsEnabledQuery.data ?? true)
     const slots = (serviceSlotsQuery.data ?? [])
       .slice()
@@ -777,6 +785,8 @@ export const RestaurantSettingsTab: React.FC = () => {
       await upsert.mutateAsync([
         { key: 'restaurant_name', value: safeName },
         { key: 'slot_guest_capacities', value: slotCapValue },
+        // '' = nessun limite → null: il registry lo serializza nella sentinella DB -1.
+        { key: 'daily_guest_limit', value: dailyGuestLimit === '' ? null : dailyGuestLimit },
         { key: 'booking_time_slots_enabled', value: timeSlotsEnabled },
         { key: 'business_hours', value: businessHours },
         { key: 'contact_email', value: safeEmail },
@@ -1125,6 +1135,52 @@ export const RestaurantSettingsTab: React.FC = () => {
       </section>
       </div>
 
+      {/* Coperti massimi al giorno — limite esterno verso il pubblico, vale sia Classic sia Pro.
+          DEVE stare FUORI dal gate !features.servizio (altrimenti spariva in Pro). */}
+      <div className="w-full max-w-2xl mx-auto">
+      <section className={sectionSurfaceClass}>
+        <div className="w-full space-y-1.5">
+          <h3 className="text-center text-lg font-semibold leading-tight text-slate-800">
+            Coperti massimi al giorno
+          </h3>
+          <p className="text-center text-sm leading-relaxed text-slate-600">
+            Quando le prenotazioni accettate raggiungono questo numero di coperti, la pagina pubblica
+            non accetta nuove richieste per quel giorno. Lascia vuoto per non mettere alcun limite.
+          </p>
+        </div>
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Label htmlFor="daily_guest_limit" className="text-sm text-slate-600 whitespace-nowrap">
+            Coperti max al giorno:
+          </Label>
+          <Input
+            id="daily_guest_limit"
+            type="number"
+            min={1}
+            max={1000}
+            value={dailyGuestLimit}
+            disabled={upsert.isPending}
+            placeholder="Nessun limite"
+            className="w-32 rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-center text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            onChange={(e) => {
+              setSlotsDirty(true)
+              const raw = e.target.value.trim()
+              if (raw === '') {
+                setDailyGuestLimit('')
+                return
+              }
+              if (!/^\d+$/.test(raw)) return
+              const n = parseInt(raw, 10)
+              if (n <= 0) {
+                setDailyGuestLimit('')
+                return
+              }
+              if (n <= 1000) setDailyGuestLimit(n)
+            }}
+          />
+        </div>
+      </section>
+      </div>
+
       {!features.servizio && (
       <div className="w-full max-w-2xl mx-auto">
       <section className={sectionSurfaceClass}>
@@ -1160,8 +1216,9 @@ export const RestaurantSettingsTab: React.FC = () => {
         {timeSlotsHelpOpen && (
           <p className="text-sm leading-relaxed text-slate-600">
             Cambia le fasce orarie in cui vengono raggruppate le prenotazioni nel calendario. Puoi
-            impostare un numero massimo di coperti per ogni fascia oraria. Raggiunto il limite le
-            prenotazioni ricevute verranno rifiutate.
+            impostare un numero massimo di coperti per ogni fascia oraria: ti serve come riferimento
+            per organizzare il servizio e decidere se accettare le richieste, ma non blocca nulla in
+            automatico.
           </p>
         )}
 

@@ -114,3 +114,20 @@ export function calculateDailyCapacityV2(
   return { date, slots: entries }
 }
 
+/**
+ * Somma i coperti per data (YYYY-MM-DD) per il badge «% riempimento» del calendario.
+ * Stesso criterio del blocco pubblico giornaliero (edge create-booking) e del digest:
+ * conta SOLO le prenotazioni accettate, NON no-show, con confirmed_start E confirmed_end
+ * (stesso criterio di digest/eventi FC). Decisione Matteo 11-06-26: i no-show liberano il posto.
+ */
+export function sumGuestsByDate(bookings: BookingRequest[]): Record<string, number> {
+  const acc: Record<string, number> = {}
+  for (const b of bookings) {
+    if (b.status !== 'accepted' || b.no_show || !b.confirmed_start || !b.confirmed_end) continue
+    const date = extractDateFromISO(b.confirmed_start)
+    if (!date) continue
+    acc[date] = (acc[date] ?? 0) + (b.num_guests ?? 0)
+  }
+  return acc
+}
+
