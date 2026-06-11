@@ -24,6 +24,11 @@ import { buildOrderedCategoryEntries } from '../utils/orderCategoryKeys'
 import type { BookingType } from '@/types/booking'
 import { bookingTypeUsesMenuSelections } from '../utils/bookingTypeMenu'
 import { isMenuItemVisibleForSelection } from '../utils/bookingCapabilities'
+import {
+  filterMenuCategoriesForPublic,
+  filterMenuItemsForPublic,
+  isMenuCategoryAvailable,
+} from '../constants/menuMagazzinoLimits'
 import { MENU_CARD_MAX_WIDTH_PX } from './menuPricesCatalogLayout'
 import { BookingMenuComposeGrid } from './publicBooking/BookingMenuComposeGrid'
 import { BOOKING_PUBLIC_CONTENT_WIDTH } from '@/features/booking/constants/bookingPublicFieldStyles'
@@ -161,11 +166,21 @@ export const MenuSelection: React.FC<MenuSelectionProps> = ({
     return uuid ? customStaffPresets.find((p) => p.id === uuid) : undefined
   }, [presetMenu, customStaffPresets])
 
+  const publicMenuItems = useMemo(
+    () => filterMenuItemsForPublic(menuItems, dbCategories),
+    [menuItems, dbCategories],
+  )
+
+  const publicDbCategories = useMemo(
+    () => filterMenuCategoriesForPublic(dbCategories),
+    [dbCategories],
+  )
+
   const normalizedMenuItems = useMemo<NormalizedMenuItem[]>(() => {
     const hiddenCategories = new Set(hiddenCategoryKeys)
     const hiddenItems = new Set(hiddenItemIds)
     const activePresetItemIds = new Set(activeCustomPreset?.item_ids ?? [])
-    return menuItems
+    return publicMenuItems
       .filter((item) =>
         // Fonte unica testabile del predicato (LOCK Ingredienti preset custom): card con preset
         // → SOLO item del preset per ogni booking_type; senza preset → legacy per tipo.
@@ -188,31 +203,33 @@ export const MenuSelection: React.FC<MenuSelectionProps> = ({
         sort_order: item.sort_order ?? 0,
         image_url: item.image_url ?? null,
       }))
-  }, [menuItems, bookingType, hiddenCategoryKeys, hiddenItemIds, activeCustomPreset])
+  }, [publicMenuItems, bookingType, hiddenCategoryKeys, hiddenItemIds, activeCustomPreset])
 
   const categoryEntries = useMemo(() => {
     // Parti SEMPRE dal catalogo DB: le card categoria non devono sparire quando
     // un preset/bookingType filtra via gli ingredienti (la griglia nasconde da
     // sé le categorie senza ingredienti visibili). Aggiungi solo le categorie
     // extra presenti negli item ma non in DB, per non perderle.
-    const catalogKeys = dbCategories.map((category) => category.key)
+    const catalogKeys = publicDbCategories.map((category) => category.key)
     const itemCategoryKeys = [...new Set(normalizedMenuItems.map((item) => item.category))]
     const extraKeys = itemCategoryKeys.filter((key) => !catalogKeys.includes(key))
     const keys = [...catalogKeys, ...extraKeys]
     const categoriesForOrder = [
-      ...dbCategories,
+      ...publicDbCategories,
       ...extraKeys.map((key, index) => ({ key, label: key, sort_order: 1000 + index })),
     ]
     return buildOrderedCategoryEntries(categoriesForOrder, keys, categoryOrderKeys)
-  }, [dbCategories, categoryOrderKeys, normalizedMenuItems])
+  }, [publicDbCategories, categoryOrderKeys, normalizedMenuItems])
 
   const categoryImageByKey = useMemo(() => {
     const map: Record<string, string | null | undefined> = {}
-    for (const cat of dbCategories) {
-      map[cat.key] = cat.image_url
+    for (const cat of publicDbCategories) {
+      if (isMenuCategoryAvailable(cat)) {
+        map[cat.key] = cat.image_url
+      }
     }
     return map
-  }, [dbCategories])
+  }, [publicDbCategories])
 
   const showComposeHeader =
     !hideMenuGrid &&

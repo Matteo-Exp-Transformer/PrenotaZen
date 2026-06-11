@@ -6,6 +6,10 @@ import fs from 'fs'
 if (fs.existsSync('.env.local.test')) {
   process.loadEnvFile('.env.local.test')
 }
+// Worker Playwright: allinea alias service key
+if (!process.env.E2E_SUPABASE_SERVICE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  process.env.E2E_SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+}
 
 /**
  * I test e2e richiedono un progetto Supabase staging separato.
@@ -34,6 +38,23 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      grepInvert: /@viewport:(mobile-375|tablet-834)/,
+    },
+    {
+      name: 'mobile-chrome',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 375, height: 812 },
+      },
+      grep: /@viewport:mobile-375/,
+    },
+    {
+      name: 'tablet-chrome',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 834, height: 1194 },
+      },
+      grep: /@viewport:tablet-834/,
     },
   ],
   webServer: {

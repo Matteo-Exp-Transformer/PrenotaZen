@@ -4,6 +4,10 @@ import { cn } from '@/lib/utils'
 import { useMenuItems } from '../hooks/useMenuItems'
 import { useMenuCategories } from '../hooks/useMenuCategories'
 import type { SelectedMenuItem } from '@/types/menu'
+import {
+  filterMenuCategoriesForPublic,
+  filterMenuItemsForPublic,
+} from '../constants/menuMagazzinoLimits'
 import { groupMenuItemsByCategory } from '../utils/menuCatalogGrouping'
 import {
   MENU_CATEGORY_COLLAPSIBLE_CLASS,
@@ -39,8 +43,13 @@ export const PresetMenuBuilder: React.FC<PresetMenuBuilderProps> = ({
   const { data: menuItems = [], isLoading, error } = useMenuItems()
   const { data: dbCategories = [] } = useMenuCategories()
 
+  const publicMenuItems = useMemo(
+    () => filterMenuItemsForPublic(menuItems, dbCategories),
+    [menuItems, dbCategories],
+  )
+
   const normalizedMenuItems = useMemo<NormalizedMenuItem[]>(() => {
-    return menuItems.map<NormalizedMenuItem>((item) => {
+    return publicMenuItems.map<NormalizedMenuItem>((item) => {
       return {
         id: item.id,
         name: item.name,
@@ -50,10 +59,13 @@ export const PresetMenuBuilder: React.FC<PresetMenuBuilderProps> = ({
         sort_order: item.sort_order ?? 0,
       }
     })
-  }, [menuItems])
+  }, [publicMenuItems])
 
   const categoryEntries = useMemo(
-    () => dbCategories.map((category) => [category.key, category.label] as const),
+    () =>
+      filterMenuCategoriesForPublic(dbCategories).map(
+        (category) => [category.key, category.label] as const,
+      ),
     [dbCategories],
   )
 

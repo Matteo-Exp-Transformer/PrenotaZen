@@ -15,6 +15,11 @@ import { MenuQrModal } from './MenuQrModal'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { cn } from '@/lib/utils'
 import type { MenuQrCode, MenuQrSettingsSavePayload } from '@/types/menu'
+import {
+  canAddMenuQrCode,
+  getMenuQrCodeLimitMessage,
+} from '../constants/menuMagazzinoLimits'
+import { MenuMagazzinoLimitNotice } from './MenuMagazzinoLimitNotice'
 function buildPublicUrl(tenantSlug: string | null, shortCode: string): string {
   return `${window.location.origin}/menu/${tenantSlug}/qr/${shortCode}`
 }
@@ -125,7 +130,14 @@ export function MenuQrManager() {
   const [saveSuccess, setSaveSuccess] = useState<{ isNew: boolean } | null>(null)
   const [qrToDelete, setQrToDelete] = useState<MenuQrCode | null>(null)
 
+  const qrAtLimit = !canAddMenuQrCode(qrCodes.length)
+  const qrLimitMessage = getMenuQrCodeLimitMessage()
+
   const openCreate = () => {
+    if (qrAtLimit) {
+      toast.error(qrLimitMessage)
+      return
+    }
     void refetchCategories()
     setEditing(null)
     setModalOpen(true)
@@ -169,20 +181,26 @@ export function MenuQrManager() {
       aria-label="Gestione QR menu"
     >
       <div className="mx-auto max-w-3xl">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-gray-600 sm:text-sm">
+        <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-gray-600 sm:text-sm sm:flex-1">
             Ogni QR apre una versione pubblica del menu. Scansiona con il telefono per vedere l'anteprima.
           </p>
-          <Button
-            variant="success"
-            size="sm"
-            type="button"
-            onClick={openCreate}
-            className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nuovo QR
-          </Button>
+          <div className="flex flex-col items-end gap-2">
+            <Button
+              variant="success"
+              size="sm"
+              type="button"
+              onClick={openCreate}
+              disabled={qrAtLimit}
+              className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nuovo QR
+            </Button>
+            {qrAtLimit && (
+              <MenuMagazzinoLimitNotice message={qrLimitMessage} className="max-w-xs text-right" />
+            )}
+          </div>
         </div>
 
         <div className="mt-6 flex flex-col gap-3">

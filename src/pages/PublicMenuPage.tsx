@@ -12,6 +12,7 @@ import { MenuQrCategoryIconGlyph } from '@/features/public-menu/MenuQrCategoryIc
 import type { MenuCategoryRecord } from '@/features/booking/hooks/useMenuCategories'
 import type { MenuQrCode, CarouselItem, MenuQrcodeCategoryOverride } from '@/types/menu'
 import { orderMenuCategoriesByFilter } from '@/features/booking/utils/menuQrAppearance'
+import { filterMenuCategoriesForPublic } from '@/features/booking/constants/menuMagazzinoLimits'
 import { usePublicMenuViewport } from '@/hooks/usePublicMenuViewport'
 import { useRestaurantName } from '@/hooks/useRestaurantName'
 import { PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS } from '@/features/public-menu/publicMenuLayout'
@@ -40,7 +41,7 @@ function usePublicCategories(tenantId: string | null, categoryFilter: string[] |
 
       let query = (supabasePublic
         .from('menu_categories') as any)
-        .select('id, key, label, description, sort_order')
+        .select('id, key, label, description, sort_order, is_available')
         .eq('tenant_id', tenantId)
         .order('sort_order', { ascending: true })
         .order('label', { ascending: true })
@@ -51,7 +52,7 @@ function usePublicCategories(tenantId: string | null, categoryFilter: string[] |
 
       const { data, error } = await query
       if (error) throw error
-      const rows = (data ?? []) as MenuCategoryRecord[]
+      const rows = filterMenuCategoriesForPublic((data ?? []) as MenuCategoryRecord[])
       return orderMenuCategoriesByFilter(rows, categoryFilter)
     },
     enabled: !!tenantId,

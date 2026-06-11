@@ -89,6 +89,7 @@ export const useCreateMenuItem = () => {
           price: item.price,
           description: item.description || null,
           sort_order: item.sort_order || 0,
+          is_available: item.is_available ?? true,
           booking_types: item.booking_types ?? [],
         })
         .select()
@@ -141,6 +142,39 @@ export const useUpdateMenuItem = () => {
     onError: (error: Error) => {
       toast.error(error.message || 'Errore nell\'aggiornamento del prodotto')
     }
+  })
+}
+
+export const useSetMenuItemAvailability = () => {
+  const queryClient = useQueryClient()
+  const { tenantId } = useTenantContext()
+
+  return useMutation({
+    mutationFn: async ({ id, is_available }: { id: string; is_available: boolean }) => {
+      const { data, error } = await ((supabase
+        .from('menu_items') as any) as any)
+        .update({
+          is_available,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId!)
+        .select()
+        .single()
+
+      if (error) {
+        throw new Error(getMenuItemMutationError(error))
+      }
+
+      return data as MenuItem
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu-items'] })
+      toast.success('Disponibilità ingrediente aggiornata')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Errore aggiornamento disponibilità ingrediente')
+    },
   })
 }
 

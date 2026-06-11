@@ -22,6 +22,10 @@ import {
   isMenuQrCategoryIconKey,
   MENU_QR_DEFAULT_CATEGORY_ICON_KEY,
 } from '@/features/public-menu/categoryIcons'
+import {
+  filterMenuCategoriesForPublic,
+  filterMenuItemsForPublic,
+} from '../constants/menuMagazzinoLimits'
 import { validateMenuQrSettings, isMenuQrSettingsValid } from '../utils/menuQrValidation'
 import { buildCatalogPrefillForKeys } from '../utils/menuQrStorage'
 import type {
@@ -54,8 +58,9 @@ function resolveCategoryFilterForUi(
   raw: string[] | null,
   keysWithItems: string[],
 ): string[] {
+  const allowed = new Set(keysWithItems)
   if (raw === null) return [...keysWithItems]
-  return raw
+  return raw.filter((key) => allowed.has(key))
 }
 
 function pruneHiddenItemIds(
@@ -132,21 +137,31 @@ export function MenuQrModal({
   const [overridesHydratedVersion, setOverridesHydratedVersion] = useState(0)
   const [baselineReady, setBaselineReady] = useState(false)
 
+  const publicMenuItems = useMemo(
+    () => filterMenuItemsForPublic(menuItems, categories),
+    [menuItems, categories],
+  )
+
+  const publicCategories = useMemo(
+    () => filterMenuCategoriesForPublic(categories),
+    [categories],
+  )
+
   const categoriesWithItems = useMemo(() => {
-    const keysWithItems = new Set(menuItems.map((i) => i.category))
-    return categories.filter((c) => keysWithItems.has(c.key))
-  }, [categories, menuItems])
+    const keysWithItems = new Set(publicMenuItems.map((i) => i.category))
+    return publicCategories.filter((c) => keysWithItems.has(c.key))
+  }, [publicCategories, publicMenuItems])
 
   const categoryKeysWithItems = useMemo(
     () => categoriesWithItems.map((c) => c.key),
     [categoriesWithItems],
   )
 
-  const allCategoryKeys = useMemo(() => categories.map((c) => c.key), [categories])
+  const allCategoryKeys = useMemo(() => publicCategories.map((c) => c.key), [publicCategories])
 
   const itemsByCategory = useMemo(
-    () => groupMenuItemsByCategory(menuItems, allCategoryKeys),
-    [menuItems, allCategoryKeys],
+    () => groupMenuItemsByCategory(publicMenuItems, allCategoryKeys),
+    [publicMenuItems, allCategoryKeys],
   )
 
   const categoryByKey = useMemo(
@@ -371,7 +386,7 @@ export function MenuQrModal({
       draftShortCode: editing ? null : draftShortCode,
       input: {
         name: trimmed,
-        category_filter: categoryFilter,
+        category_filter: categoryFilter.filter((key) => categoryKeysWithItems.includes(key)),
         is_active: editing?.is_active ?? true,
         theme_key: themeKey,
         carousel_items: carouselItems,
@@ -451,7 +466,7 @@ export function MenuQrModal({
           />
         </div>
 
-        {categories.length > 0 ? (
+        {publicCategories.length > 0 ? (
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-gray-800">Categorie di prodotti visibili</p>
@@ -468,11 +483,11 @@ export function MenuQrModal({
               ) : null}
             </div>
             <p className="mb-2 text-xs text-gray-500">
-              Elenco allineato alle categorie della tab Menu. Serve almeno una categoria con almeno un
-              ingrediente visibile.
+              Elenco allineato alle categorie disponibili in tab Menu (escluse quelle spente nel
+              magazzino). Serve almeno una categoria con almeno un ingrediente visibile.
             </p>
             <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => {
+              {publicCategories.map((cat) => {
                 const hasItems = categoryKeysWithItems.includes(cat.key)
                 return (
                   <label

@@ -13,12 +13,19 @@ import { Button, CollapsibleCard, Input, Textarea } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
 import { Plus, Edit, Trash2, Save, X, Eye, EyeOff, QrCode, ImageIcon } from 'lucide-react'
-import { useMenuItems, useCreateMenuItem, useUpdateMenuItem, useDeleteMenuItem } from '../hooks/useMenuItems'
+import {
+  useMenuItems,
+  useCreateMenuItem,
+  useUpdateMenuItem,
+  useDeleteMenuItem,
+  useSetMenuItemAvailability,
+} from '../hooks/useMenuItems'
 import {
   useCreateMenuCategory,
   useDeleteMenuCategory,
   useMenuCategories,
-  useUpdateMenuCategory
+  useUpdateMenuCategory,
+  useSetMenuCategoryAvailability,
 } from '../hooks/useMenuCategories'
 import { type MenuItem, type MenuItemInput } from '@/types/menu'
 import type { SelectedMenuItem } from '@/types/menu'
@@ -60,6 +67,20 @@ import { adminBlueCtaSurfaceClass } from '@/lib/adminBlueCtaClass'
 import { CATEGORY_KEY_RENAME_INFO_MESSAGE } from '@/features/booking/services/syncMenuCategoryKeyRename'
 import { CATEGORY_KEY_DELETE_INFO_MESSAGE } from '@/features/booking/services/syncMenuCategoryKeyDelete'
 import { BOOKING_MENU_COMPOSE_TEXT_LIMITS } from '../constants/bookingPrenotaTextLimits'
+import {
+  canAddMenuCategory,
+  canAddMenuProductAnywhere,
+  canAddMenuProductToCategory,
+  canAddStaffPreset,
+  countMenuProductsInCategory,
+  getMenuCategoryLimitMessage,
+  getMenuProductPerCategoryLimitMessage,
+  getStaffPresetLimitMessage,
+  isMenuCategoryAvailable,
+} from '../constants/menuMagazzinoLimits'
+import { MenuMagazzinoLimitNotice } from './MenuMagazzinoLimitNotice'
+import { MenuMagazzinoPropagationNotice } from './MenuMagazzinoPropagationNotice'
+import { MenuMagazzinoAvailabilityToggle } from './MenuMagazzinoAvailabilityToggle'
 
 const COMPOSE_L = BOOKING_MENU_COMPOSE_TEXT_LIMITS
 
@@ -218,11 +239,13 @@ type AdminMenuIngredientCardProps = {
   onEdit: () => void
   onDelete: () => void
   /** Es. nome categoria (vista elenco prodotti) */
-  metaLine?: string
+  metaLine?: ReactNode
   /** Sotto la card bianca. */
   footer?: ReactNode
   /** Vista modifica: icone azione. */
   showActions?: boolean
+  onToggleAvailability?: () => void
+  availabilityToggleDisabled?: boolean
 }
 
 const AdminMenuIngredientCard: React.FC<AdminMenuIngredientCardProps> = ({
@@ -232,11 +255,17 @@ const AdminMenuIngredientCard: React.FC<AdminMenuIngredientCardProps> = ({
   metaLine,
   footer,
   showActions = false,
+  onToggleAvailability,
+  availabilityToggleDisabled = false,
 }) => {
   const hasDesc = Boolean(item.description?.trim())
+  const available = item.is_available !== false
   return (
     <div
-      className="flex w-full flex-col items-stretch gap-1.5"
+      className={cn(
+        'flex w-full flex-col items-stretch gap-1.5',
+        !available && 'opacity-60',
+      )}
       style={{
         maxWidth: `min(${MENU_CARD_MAX_WIDTH_PX}px, calc(100% - 16px))`,
         marginLeft: 'auto',
@@ -260,26 +289,37 @@ const AdminMenuIngredientCard: React.FC<AdminMenuIngredientCardProps> = ({
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
             <span className={MENU_INGREDIENT_PRICE_CLASS}>€{item.price.toFixed(2)}</span>
-            {showActions ? (
-              <div className="menu-prices-item-actions flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={onEdit}
-                  className="menu-prices-icon-btn menu-prices-icon-btn--edit"
-                  aria-label={`Modifica ${item.name}`}
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  className="menu-prices-icon-btn menu-prices-icon-btn--delete"
-                  aria-label={`Elimina ${item.name}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : null}
+            <div className="menu-prices-item-actions flex gap-1.5">
+              {onToggleAvailability ? (
+                <MenuMagazzinoAvailabilityToggle
+                  available={available}
+                  disabled={availabilityToggleDisabled}
+                  onToggle={onToggleAvailability}
+                  entityLabel={item.name}
+                  compact
+                />
+              ) : null}
+              {showActions ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="menu-prices-icon-btn menu-prices-icon-btn--edit"
+                    aria-label={`Modifica ${item.name}`}
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="menu-prices-icon-btn menu-prices-icon-btn--delete"
+                    aria-label={`Elimina ${item.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
         {hasDesc ? (
@@ -298,6 +338,7 @@ const AdminMenuIngredientCard: React.FC<AdminMenuIngredientCardProps> = ({
 type AdminMenuCategoryLabelCardProps = {
   label: string
   imageUrl?: string | null
+  available?: boolean
   onEdit: () => void
   onDelete: () => void
 }
@@ -305,6 +346,7 @@ type AdminMenuCategoryLabelCardProps = {
 const AdminMenuCategoryLabelCard: React.FC<AdminMenuCategoryLabelCardProps> = ({
   label,
   imageUrl,
+  available = true,
   onEdit,
   onDelete,
 }) => {
@@ -312,7 +354,10 @@ const AdminMenuCategoryLabelCard: React.FC<AdminMenuCategoryLabelCardProps> = ({
 
   return (
     <div
-      className="flex w-full min-w-0 max-w-full flex-col items-stretch gap-2"
+      className={cn(
+        'flex w-full min-w-0 max-w-full flex-col items-stretch gap-2',
+        !available && 'opacity-60',
+      )}
       style={{
         maxWidth: `min(${MENU_CARD_MAX_WIDTH_PX}px, calc(100% - 16px))`,
         marginLeft: 'auto',
@@ -393,6 +438,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   const deleteCategoryMutation = useDeleteMenuCategory()
   const updateMutation = useUpdateMenuItem()
   const deleteMutation = useDeleteMenuItem()
+  const setItemAvailabilityMutation = useSetMenuItemAvailability()
+  const setCategoryAvailabilityMutation = useSetMenuCategoryAvailability()
 
   const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets')
   const { data: bookingPublicFormConfig } = useRestaurantSetting('booking_public_form_config')
@@ -471,6 +518,10 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   }
 
   const startNewCustomPreset = () => {
+    if (!canAddStaffPreset(customStaffPresets.length)) {
+      toast.error(getStaffPresetLimitMessage())
+      return
+    }
     setEditingCustomPresetId(null)
     setPresetName('')
     setPresetDescription('')
@@ -509,6 +560,10 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     const ids = presetSelectedItems.map((i) => i.id).filter(Boolean)
     if (!ids.length) {
       toast.error('Seleziona almeno un ingrediente')
+      return
+    }
+    if (editingCustomPresetId === null && !canAddStaffPreset(customStaffPresets.length)) {
+      toast.error(getStaffPresetLimitMessage())
       return
     }
     const next: CustomStaffPreset[] =
@@ -594,14 +649,29 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     [dbCategories]
   )
 
+  const categoriesAtLimit = !canAddMenuCategory(dbCategories.length)
+  const categoryLimitMessage = getMenuCategoryLimitMessage()
+  const presetsAtLimit = !canAddStaffPreset(customStaffPresets.length)
+  const presetLimitMessage = getStaffPresetLimitMessage()
+  const canAddAnyProduct = canAddMenuProductAnywhere(menuItems, dbCategories)
+  const productLimitMessage = getMenuProductPerCategoryLimitMessage()
+
+  const getCategoryProductCount = (categoryKey: string, categoryLabel: string) =>
+    countMenuProductsInCategory(menuItems, categoryKey, categoryLabel)
+
+  const canAddProductToCategoryKey = (categoryKey: string) => {
+    const label = dbCategoryByKey.get(categoryKey)?.label ?? categoryKey
+    return canAddMenuProductToCategory(getCategoryProductCount(categoryKey, label))
+  }
+
   const [formData, setFormData] = useState<MenuItemInput>({
     name: '',
     category: categoryKeys[0] ?? '',
     price: 0,
     description: '',
-    sort_order: 0
+    sort_order: 0,
+    is_available: true,
   })
-
   const resetProductFormState = () => {
     setIngredientEditMode(false)
     setIsAdding(false)
@@ -613,6 +683,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       price: 0,
       description: '',
       sort_order: 0,
+      is_available: true,
     })
     setPhotoFile(null)
     setPhotoPreviewUrl(null)
@@ -643,7 +714,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       category: categoryKeys[0] ?? '',
       price: 0,
       description: '',
-      sort_order: 0
+      sort_order: 0,
+      is_available: true,
     })
     setPhotoFile(null)
     setPhotoPreviewUrl(null)
@@ -653,6 +725,20 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   // Raggruppa per categoria
   const itemsByCategory = groupMenuItemsByCategory(menuItems, categoryKeys)
 
+  const toggleItemAvailability = (item: MenuItem) => {
+    setItemAvailabilityMutation.mutate({
+      id: item.id,
+      is_available: item.is_available === false,
+    })
+  }
+
+  const toggleCategoryAvailabilityById = (categoryId: string, currentlyAvailable: boolean) => {
+    setCategoryAvailabilityMutation.mutate({
+      id: categoryId,
+      is_available: !currentlyAvailable,
+    })
+  }
+
   const handleStartEdit = (item: MenuItem) => {
     setIngredientEditMode(true)
     setEditingId(item.id)
@@ -661,7 +747,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       category: item.category,
       price: item.price,
       description: item.description || '',
-      sort_order: item.sort_order
+      sort_order: item.sort_order,
+      is_available: item.is_available !== false,
     })
     setPriceInput(item.price === 0 ? '' : String(item.price))
     setIsAdding(false)
@@ -672,6 +759,11 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   }
 
   const handleStartAdd = (preselectedCategory?: string) => {
+    const category = preselectedCategory ?? categoryKeys[0] ?? ''
+    if (category && !canAddProductToCategoryKey(category)) {
+      toast.error(productLimitMessage)
+      return
+    }
     setViewMode('menu')
     setIsAddingCategory(false)
     setIngredientEditMode(true)
@@ -683,7 +775,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       category: preselectedCategory ?? categoryKeys[0] ?? '',
       price: 0,
       description: '',
-      sort_order: 0
+      sort_order: 0,
+      is_available: true,
     })
     scrollProductFormIntoViewAfterEditRef.current = true
   }
@@ -698,6 +791,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       price: 0,
       description: '',
       sort_order: 0,
+      is_available: true,
     })
     setPhotoFile(null)
     setPhotoPreviewUrl(null)
@@ -748,8 +842,10 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     imageUrl?: string | null
     previousKey?: string
     newKey?: string
+    is_available?: boolean
   }) => {
-    const { editingCategoryId: catId, rawLabel, description, imageUrl, previousKey, newKey } = params
+    const { editingCategoryId: catId, rawLabel, description, imageUrl, previousKey, newKey, is_available } =
+      params
 
     if (catId && previousKey != null && newKey != null) {
       await updateCategoryMutation.mutateAsync({
@@ -759,6 +855,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         label: rawLabel,
         description,
         ...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
+        ...(typeof is_available === 'boolean' ? { is_available } : {}),
       })
       return
     }
@@ -772,6 +869,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         label: rawLabel,
         description,
         sort_order: 999,
+        is_available: is_available ?? true,
       })
 
       if (categoryPhotoFile && tenantId && created?.id) {
@@ -847,8 +945,14 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
           imageUrl,
           previousKey: editingCategory.key,
           newKey,
+          is_available: isMenuCategoryAvailable(editingCategory),
         })
       } else {
+        if (!canAddMenuCategory(dbCategories.length)) {
+          toast.error(categoryLimitMessage)
+          return
+        }
+
         const key = slugifyCategory(rawLabel)
         if (!key) {
           toast.error('Nome categoria non valido')
@@ -865,6 +969,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
           rawLabel,
           description: newCategoryDescription.trim() || null,
           newKey: key,
+          is_available: true,
         })
       }
 
@@ -887,6 +992,9 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         imageUrl: pending.image_url,
         previousKey: pending.previousKey,
         newKey: pending.newKey,
+        is_available: isMenuCategoryAvailable(
+          dbCategories.find((c) => c.id === pending.id) ?? { is_available: true },
+        ),
       })
       setCategoryRenameConfirm(null)
       await refetchCategories()
@@ -996,7 +1104,17 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       return
     }
 
-    const payload = { ...formData, price: parsedPrice }
+    const editingItem = editingId ? menuItems.find((item) => item.id === editingId) : undefined
+    const payload = {
+      ...formData,
+      price: parsedPrice,
+      is_available: editingItem ? editingItem.is_available !== false : true,
+    }
+
+    if (!editingId && !canAddProductToCategoryKey(formData.category)) {
+      toast.error(productLimitMessage)
+      return
+    }
 
     try {
       if (editingId) {
@@ -1187,16 +1305,22 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         {ingredientEditMode && (
           <div className="mt-6 flex flex-col items-stretch gap-4">
             {!(isAdding || editingId) && (
-              <Button
-                variant="success"
-                size="sm"
-                type="button"
-                onClick={() => handleStartAdd()}
-                className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs self-center sm:self-end"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Aggiungi nuovo ingrediente
-              </Button>
+              <div className="flex flex-col items-center gap-2 self-center sm:self-end">
+                <Button
+                  variant="success"
+                  size="sm"
+                  type="button"
+                  onClick={() => handleStartAdd()}
+                  disabled={!canAddAnyProduct}
+                  className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Aggiungi nuovo ingrediente
+                </Button>
+                {!canAddAnyProduct && (
+                  <MenuMagazzinoLimitNotice message={productLimitMessage} className="max-w-xs" />
+                )}
+              </div>
             )}
             {(isAdding || editingId) && (
               <div
@@ -1379,7 +1503,10 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                       </p>
                     </div>
                   </div>
-                  <div className="mt-10 flex justify-center gap-3">
+                  <div className="mt-6 md:col-span-2">
+                    <MenuMagazzinoPropagationNotice />
+                  </div>
+                  <div className="mt-10 flex justify-center gap-3 md:col-span-2">
                     <button
                       type="button"
                       onClick={handleSave}
@@ -1418,6 +1545,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
             {categoryEntries.map(([categoryKey, categoryLabel]) => {
               const categoryItems = itemsByCategory[categoryKey] ?? []
               const itemCount = categoryItems.length
+              const dbCategory = dbCategoryByKey.get(categoryKey)
+              const categoryAvailable = dbCategory ? isMenuCategoryAvailable(dbCategory) : true
               return (
                 <CollapsibleCard
                   key={categoryKey}
@@ -1428,11 +1557,23 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                     </span>
                   }
                   defaultExpanded={false}
-                  className={MENU_CATEGORY_COLLAPSIBLE_CLASS}
+                  className={cn(MENU_CATEGORY_COLLAPSIBLE_CLASS, !categoryAvailable && 'opacity-60')}
                   headerClassName={MENU_CATEGORY_COLLAPSIBLE_HEADER_CLASS}
                   contentClassName="bg-transparent p-0"
                   titleClassName={cn(MENU_CATEGORY_LABEL_TITLE_CLASS, 'break-words')}
                   titleStyle={MENU_CATEGORY_LABEL_TITLE_STYLE}
+                  actions={
+                    dbCategory ? (
+                      <MenuMagazzinoAvailabilityToggle
+                        available={categoryAvailable}
+                        disabled={setCategoryAvailabilityMutation.isPending}
+                        onToggle={() =>
+                          toggleCategoryAvailabilityById(dbCategory.id, categoryAvailable)
+                        }
+                        entityLabel={categoryLabel}
+                      />
+                    ) : undefined
+                  }
                 >
                   <div className="flex flex-col gap-2 px-1 pb-3 pt-0.5 sm:px-2">
                     {itemCount === 0 ? (
@@ -1441,16 +1582,25 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                           Nessun ingrediente in questa categoria.
                         </p>
                         {ingredientEditMode && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            type="button"
-                            onClick={() => handleStartAdd(categoryKey)}
-                            className="gap-1.5 text-xs"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            Aggiungi ingrediente
-                          </Button>
+                          <div className="flex flex-col items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              type="button"
+                              onClick={() => handleStartAdd(categoryKey)}
+                              disabled={!canAddProductToCategoryKey(categoryKey)}
+                              className="gap-1.5 text-xs"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Aggiungi ingrediente
+                            </Button>
+                            {!canAddProductToCategoryKey(categoryKey) && (
+                              <MenuMagazzinoLimitNotice
+                                message={productLimitMessage}
+                                className="max-w-xs px-2"
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -1461,6 +1611,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                           onEdit={() => handleStartEdit(item)}
                           onDelete={() => handleDelete(item.id, item.name)}
                           showActions={ingredientEditMode}
+                          onToggleAvailability={() => toggleItemAvailability(item)}
+                          availabilityToggleDisabled={setItemAvailabilityMutation.isPending}
                         />
                       ))
                     )}
@@ -1507,16 +1659,22 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
 
               {presetEditorMode === 'list' && (
                 <div className="mx-auto mt-8 max-w-3xl flex flex-col items-stretch gap-4">
-                  <Button
-                    variant="success"
-                    size="sm"
-                    type="button"
-                    onClick={startNewCustomPreset}
-                    className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs self-center sm:self-end"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Nuovo menù preselezionato
-                  </Button>
+                  <div className="flex flex-col items-center gap-2 self-center sm:self-end">
+                    <Button
+                      variant="success"
+                      size="sm"
+                      type="button"
+                      onClick={startNewCustomPreset}
+                      disabled={presetsAtLimit}
+                      className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Nuovo menù preselezionato
+                    </Button>
+                    {presetsAtLimit && (
+                      <MenuMagazzinoLimitNotice message={presetLimitMessage} className="max-w-sm" />
+                    )}
+                  </div>
                   {customStaffPresets.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-gray-300 bg-white/60 py-12 text-center text-sm text-gray-600">
                       Nessun menù personalizzato. Crea il primo con il pulsante sopra.
@@ -1719,11 +1877,26 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                     </label>
                     <Textarea
                       value={newCategoryDescription}
-                      onChange={(e) => setNewCategoryDescription(e.target.value)}
+                      onChange={(e) =>
+                        setNewCategoryDescription(
+                          e.target.value.slice(0, COMPOSE_L.itemDescription),
+                        )
+                      }
+                      maxLength={COMPOSE_L.itemDescription}
                       placeholder="Testo breve sotto il titolo (opzionale)"
                       rows={3}
                       className="w-full rounded-2xl border-gray-200 px-4 py-3 text-sm"
                     />
+                    <p
+                      className={cn(
+                        'mt-1 text-right text-[11px] tabular-nums',
+                        newCategoryDescription.length >= COMPOSE_L.itemDescription
+                          ? 'text-red-500'
+                          : 'text-gray-500',
+                      )}
+                    >
+                      {newCategoryDescription.length}/{COMPOSE_L.itemDescription}
+                    </p>
                     <p className="mt-1 text-xs text-gray-500">
                       Visibile nella pagina Prenota. Nel menu QR puoi personalizzarla separatamente.
                     </p>
@@ -1789,6 +1962,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                       Salvata per la pagina Prenota. Le foto del menu QR si gestiscono nel pannello homepage QR.
                     </p>
                   </div>
+                  <MenuMagazzinoPropagationNotice />
                 </div>
                 <div className="mt-10 flex justify-center gap-3">
                   <button
@@ -1815,7 +1989,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                 </div>
               </div>
             ) : (
-              <div className="mt-8 flex w-full justify-end">
+              <div className="mt-8 flex w-full flex-col items-end gap-2">
                 <Button
                   variant="success"
                   size="sm"
@@ -1827,11 +2001,15 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                     setNewCategoryDescription('')
                     resetCategoryPhotoState()
                   }}
+                  disabled={categoriesAtLimit}
                   className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Nuova categoria ingredienti
                 </Button>
+                {categoriesAtLimit && (
+                  <MenuMagazzinoLimitNotice message={categoryLimitMessage} className="w-full" />
+                )}
               </div>
             )}
 
@@ -1841,15 +2019,20 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                   className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 min-[1050px]:grid-cols-2"
                   style={{ marginTop: '0', paddingTop: '0.5rem' }}
                 >
-                  {categoryEntries.map(([key, label]) => (
-                    <AdminMenuCategoryLabelCard
-                      key={key}
-                      label={label}
-                      imageUrl={dbCategoryByKey.get(key)?.image_url}
-                      onEdit={() => handleEditCategory(key, label)}
-                      onDelete={() => handleDeleteCategory(key, label)}
-                    />
-                  ))}
+                  {categoryEntries.map(([key, label]) => {
+                    const dbCat = dbCategoryByKey.get(key)
+                    const catAvailable = dbCat ? isMenuCategoryAvailable(dbCat) : true
+                    return (
+                      <AdminMenuCategoryLabelCard
+                        key={key}
+                        label={label}
+                        imageUrl={dbCat?.image_url}
+                        available={catAvailable}
+                        onEdit={() => handleEditCategory(key, label)}
+                        onDelete={() => handleDeleteCategory(key, label)}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -454,6 +454,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_available: boolean
           key: string
           label: string
           sort_order: number
@@ -465,6 +466,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_available?: boolean
           key: string
           label: string
           sort_order?: number
@@ -476,6 +478,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_available?: boolean
           key?: string
           label?: string
           sort_order?: number
@@ -552,6 +555,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_available: boolean
           name: string
           price: number
           sort_order: number
@@ -565,6 +569,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_available?: boolean
           name: string
           price: number
           sort_order?: number
@@ -578,6 +583,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_available?: boolean
           name?: string
           price?: number
           sort_order?: number

@@ -1148,7 +1148,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
               >
                 Oggi
               </button>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-primary-900 max-[537px]:text-xs sm:text-base">
+              <span className="hidden shrink-0 text-sm font-semibold tabular-nums text-primary-900 lg:inline">
                 {currentDateLabel}
               </span>
             </div>

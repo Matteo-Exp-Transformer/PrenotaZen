@@ -15,6 +15,8 @@ export interface MenuCategoryRecord {
   description?: string | null
   /** Foto categoria per pagina Prenota (non thumbnail homepage QR). */
   image_url?: string | null
+  /** false = nascosta in Prenota e Menu QR. Default true. */
+  is_available?: boolean
   sort_order: number
   created_at: string
   updated_at: string
@@ -25,6 +27,7 @@ export interface MenuCategoryInput {
   label: string
   description?: string | null
   image_url?: string | null
+  is_available?: boolean
   sort_order?: number
 }
 
@@ -35,6 +38,7 @@ interface MenuCategoryUpdateInput {
   label: string
   description?: string | null
   image_url?: string | null
+  is_available?: boolean
 }
 
 const DUPLICATE_CATEGORY_MSG = 'Esiste già una categoria con questo nome'
@@ -105,6 +109,7 @@ export const useCreateMenuCategory = () => {
           label: category.label,
           description: category.description?.trim() || null,
           image_url: category.image_url ?? null,
+          is_available: category.is_available ?? true,
           sort_order: category.sort_order ?? 999
         })
         .select()
@@ -131,7 +136,7 @@ export const useUpdateMenuCategory = () => {
   const { tenantId } = useTenantContext()
 
   return useMutation({
-    mutationFn: async ({ id, key, previousKey, label, description, image_url }: MenuCategoryUpdateInput) => {
+    mutationFn: async ({ id, key, previousKey, label, description, image_url, is_available }: MenuCategoryUpdateInput) => {
       const now = new Date().toISOString()
       const supabaseAny = supabase as any
 
@@ -143,6 +148,9 @@ export const useUpdateMenuCategory = () => {
       }
       if (image_url !== undefined) {
         patch.image_url = image_url
+      }
+      if (typeof is_available === 'boolean') {
+        patch.is_available = is_available
       }
 
       const { data, error } = await ((supabaseAny.from('menu_categories') as any) as any)
@@ -224,6 +232,38 @@ export const useUpdateCategoryDescription = () => {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Errore salvataggio descrizione')
+    },
+  })
+}
+
+export const useSetMenuCategoryAvailability = () => {
+  const queryClient = useQueryClient()
+  const { tenantId } = useTenantContext()
+
+  return useMutation({
+    mutationFn: async ({ id, is_available }: { id: string; is_available: boolean }) => {
+      const { data, error } = await ((supabase as any).from('menu_categories') as any)
+        .update({
+          is_available,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId!)
+        .select()
+        .single()
+
+      if (error) {
+        throw new Error(handleSupabaseError(error))
+      }
+
+      return data as MenuCategoryRecord
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
+      toast.success('Disponibilità categoria aggiornata')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Errore aggiornamento disponibilità categoria')
     },
   })
 }

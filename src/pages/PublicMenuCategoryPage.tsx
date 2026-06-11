@@ -10,6 +10,10 @@ import { categoryHeaderBackgroundStyle } from '@/features/public-menu/categoryHe
 import { getMenuTheme } from '@/features/public-menu/menuThemes'
 import { PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS } from '@/features/public-menu/publicMenuLayout'
 import type { MenuItem } from '@/types/menu'
+import {
+  filterMenuItemsForPublicQr,
+  isMenuCategoryAvailable,
+} from '@/features/booking/constants/menuMagazzinoLimits'
 
 /** Fascia header categoria — crop piccolo del PNG tema QR. Asset ottimizzati scroll: FU-021. */
 const CATEGORY_HEADER_BAND_PX = 56
@@ -31,7 +35,7 @@ function usePublicCategoryItems(tenantId: string | null, categoryKey: string | u
     queryFn: async () => {
       const { data, error } = await (supabasePublic
         .from('menu_items') as any)
-        .select('id, name, description, price, image_url, sort_order, category')
+        .select('id, name, description, price, image_url, sort_order, category, is_available')
         .eq('tenant_id', tenantId)
         .eq('category', categoryKey)
         .order('sort_order', { ascending: true })
@@ -48,18 +52,22 @@ function usePublicCategoryItems(tenantId: string | null, categoryKey: string | u
   })
 }
 
-function usePublicCategoryLabel(tenantId: string | null, categoryKey: string | undefined) {
+function usePublicCategoryMeta(tenantId: string | null, categoryKey: string | undefined) {
   return useQuery({
-    queryKey: ['public-menu-category-label', tenantId, categoryKey],
+    queryKey: ['public-menu-category-meta', tenantId, categoryKey],
     queryFn: async () => {
       const { data } = await (supabasePublic
         .from('menu_categories') as any)
-        .select('label')
+        .select('label, is_available')
         .eq('tenant_id', tenantId)
         .eq('key', categoryKey)
         .single()
 
-      return (data as { label: string } | null)?.label ?? categoryKey ?? ''
+      const row = data as { label: string; is_available?: boolean } | null
+      return {
+        label: row?.label ?? categoryKey ?? '',
+        is_available: row?.is_available,
+      }
     },
     enabled: !!tenantId && !!categoryKey,
   })
@@ -114,30 +122,37 @@ export function PublicMenuCategoryPage() {
     tenantReady ? tenantId : null,
     shortCode ?? null,
   )
-  const categoryAllowed =
+  const categoryInQrFilter =
     !!categoryKey && !!qr && isCategoryInQrFilter(qr.category_filter, categoryKey)
 
-  const { data: rawItems = [], isLoading: itemsLoading } = usePublicCategoryItems(
-    tenantReady && categoryAllowed ? tenantId : null,
+  const { data: categoryMeta } = usePublicCategoryMeta(
+    tenantReady ? tenantId : null,
     categoryKey,
   )
-  const { data: categoryLabel = '' } = usePublicCategoryLabel(
-    tenantReady ? tenantId : null,
+
+  const categoryAllowed =
+    categoryInQrFilter && !!categoryMeta && isMenuCategoryAvailable(categoryMeta)
+
+  const { data: rawItems = [], isLoading: itemsLoading } = usePublicCategoryItems(
+    tenantReady && categoryInQrFilter && categoryMeta && isMenuCategoryAvailable(categoryMeta)
+      ? tenantId
+      : null,
     categoryKey,
   )
 
   const theme = getMenuTheme(qr?.theme_key)
   const headerBgStyle = categoryHeaderBackgroundStyle(theme.headerImage, theme.headerFallbackBg)
 
-  const hiddenSet = useMemo(
-    () => new Set(qr?.hidden_menu_item_ids ?? []),
-    [qr?.hidden_menu_item_ids],
-  )
+  const items = useMemo(() => {
+    if (!categoryKey || !categoryMeta) return []
+    return filterMenuItemsForPublicQr(
+      rawItems,
+      [{ key: categoryKey, label: categoryMeta.label, is_available: categoryMeta.is_available }],
+      qr?.hidden_menu_item_ids ?? [],
+    )
+  }, [rawItems, categoryKey, categoryMeta, qr?.hidden_menu_item_ids])
 
-  const items = useMemo(
-    () => rawItems.filter((i) => !hiddenSet.has(i.id)),
-    [rawItems, hiddenSet],
-  )
+  const categoryLabel = categoryMeta?.label ?? ''
 
   const backHref = `/menu/${tenantSlug}/qr/${shortCode}`
 
@@ -185,7 +200,9 @@ export function PublicMenuCategoryPage() {
         {!loading && qr && !categoryAllowed && (
           <div className="rounded-2xl bg-white px-4 py-10 text-center shadow-sm">
             <p className="text-sm font-medium text-gray-700">
-              Questa categoria non fa parte di questo menù QR.
+              {categoryInQrFilter
+                ? 'Questa categoria non è al momento disponibile.'
+                : 'Questa categoria non fa parte di questo menù QR.'}
             </p>
             <p className="mt-2 text-sm text-gray-500">
               Torna alla homepage del menù per vedere le categorie disponibili.

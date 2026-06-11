@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { CaretUpIcon } from '@phosphor-icons/react/dist/csr/CaretUp'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
@@ -46,6 +46,11 @@ import { MenuQrCategoryIconGlyph } from '@/features/public-menu/MenuQrCategoryIc
 import type { MenuQrCategoryIconKey } from '@/features/public-menu/categoryIcons'
 import type { CustomStaffPreset } from '@/features/booking/constants/presetMenus'
 import type { SubTabOverridableField } from '@/features/booking/constants/bookingPublicFormConfig'
+import {
+  filterMenuCategoriesForPublic,
+  filterMenuItemsForPublic,
+  isMenuCategoryAvailable,
+} from '@/features/booking/constants/menuMagazzinoLimits'
 import { normalizeMenuItemBookingTypes, type MenuItem } from '@/types/menu'
 import { toast } from 'react-toastify'
 import { SETTINGS_AUTOSAVE_ENABLED } from '@/config/settingsAutosave'
@@ -314,6 +319,14 @@ export const BookingFormConfigPanel: React.FC<BookingFormConfigPanelProps> = ({
   const { data: customPresetsRaw } = useRestaurantSetting('booking_custom_staff_presets')
   const { data: menuItems = [] } = useMenuItems()
   const { data: menuCategories = [] } = useMenuCategories()
+  const publicMenuItems = useMemo(
+    () => filterMenuItemsForPublic(menuItems, menuCategories),
+    [menuItems, menuCategories],
+  )
+  const publicMenuCategories = useMemo(
+    () => filterMenuCategoriesForPublic(menuCategories),
+    [menuCategories],
+  )
   const upsert = useUpsertRestaurantSetting()
 
   const displayRestaurantName =
@@ -952,22 +965,22 @@ export const BookingFormConfigPanel: React.FC<BookingFormConfigPanelProps> = ({
     const presetItemIds = new Set(linkedPreset?.item_ids ?? [])
     const presetCategoryKeys =
       linkedPreset != null
-        ? menuCategories
+        ? publicMenuCategories
             .filter((cat) =>
-              menuItems.some(
+              publicMenuItems.some(
                 (item) => item.category === cat.key && presetItemIds.has(item.id),
               ),
             )
             .map((cat) => cat.key)
         : []
-    const categorySortOrderMap = buildCategorySortOrderMap(menuCategories)
+    const categorySortOrderMap = buildCategorySortOrderMap(publicMenuCategories)
     // Chiavi nascoste restano nell'array ordine; in Pagina Prenota vengono filtrate dopo l'ordinamento.
     const orderedPresetCategoryKeys = orderCategoryKeys(
       presetCategoryKeys,
       tab.field_overrides?.category_order_keys ? tab.category_order_keys : undefined,
       categorySortOrderMap,
     )
-    const categoryByKey = new Map(menuCategories.map((cat) => [cat.key, cat]))
+    const categoryByKey = new Map(publicMenuCategories.map((cat) => [cat.key, cat]))
     // Lo swap delle frecce deve operare sulle STESSE chiavi mostrate all'admin
     // (`orderedPresetCategoryKeys`: orfane già filtrate, duplicati rimossi, ordine salvato
     // preservato). Usare il `tab.category_order_keys` grezzo disallineerebbe l'index della riga
@@ -1237,7 +1250,7 @@ export const BookingFormConfigPanel: React.FC<BookingFormConfigPanelProps> = ({
 
         {tab.display === 'cards' &&
           linkedPreset &&
-          bookingTypeUsesMenuItems(mode.booking_type, menuItems) && (
+          bookingTypeUsesMenuItems(mode.booking_type, publicMenuItems) && (
           <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -1251,7 +1264,8 @@ export const BookingFormConfigPanel: React.FC<BookingFormConfigPanelProps> = ({
               {orderedPresetCategoryKeys.map((categoryKey, categoryIndex) => {
                 const cat = categoryByKey.get(categoryKey)
                 if (!cat) return null
-                const itemsForCat = menuItems.filter(
+                if (!isMenuCategoryAvailable(cat)) return null
+                const itemsForCat = publicMenuItems.filter(
                   (item) =>
                     item.category === cat.key &&
                     presetItemIds.has(item.id),

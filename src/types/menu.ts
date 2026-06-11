@@ -30,6 +30,8 @@ export interface MenuItem {
   price: number
   description?: string
   sort_order: number
+  /** false = nascosto in Prenota e Menu QR (magazzino). Default true. */
+  is_available?: boolean
   /** Campo legacy: non valorizzare dalla UI ingredienti. */
   booking_types?: BookingType[]
   /** URL pubblico foto piatto (Supabase Storage bucket menu-photos). Opzionale. */
@@ -42,6 +44,7 @@ export interface MenuItemInput {
   price: number
   description?: string
   sort_order?: number
+  is_available?: boolean
   booking_types?: BookingType[]
   image_url?: string | null
 }
