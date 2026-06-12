@@ -43,8 +43,12 @@ export function useCapacityCheck(params: UseCapacityCheckParams): AvailabilityCh
   const { data: digestSlots } = useDigestSlotConfigs()
   const { data: serviceSlots = [] } = useServiceSlots()
   const { data: slotOverrides = [] } = useServiceSlotOverrides()
-  const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities')
-  const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled')
+  const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities', {
+    authenticated: true,
+  })
+  const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled', {
+    authenticated: true,
+  })
 
   const legacySlotCapacities = slotGuestCapacitiesQuery.data ?? DEFAULT_SLOT_GUEST_CAPACITIES
   const slots = digestSlots ?? []

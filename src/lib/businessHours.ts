@@ -4,6 +4,7 @@
  */
 
 import { slotRangesOverlap } from '@/features/booking/utils/bookingTimeSlots'
+import { logger } from '@/lib/logger'
 
 export interface BusinessHourSlot {
   open: string // Format: "HH:mm" (e.g., "11:00")
@@ -266,7 +267,7 @@ export function parseBusinessHours(settingValue: any): BusinessHours | null {
     
     return hours
   } catch (error) {
-    console.error('Error parsing business hours:', error)
+    logger.error('Error parsing business hours:', error)
     return null
   }
 }

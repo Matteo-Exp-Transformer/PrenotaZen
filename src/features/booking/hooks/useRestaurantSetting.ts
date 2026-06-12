@@ -9,13 +9,20 @@ import {
   type RestaurantSettingValueMap,
 } from '@/features/booking/lib/restaurantSettingRegistry'
 
-export function useRestaurantSetting<K extends RestaurantSettingKeyV1>(key: K) {
+export function useRestaurantSetting<K extends RestaurantSettingKeyV1>(
+  key: K,
+  options?: { authenticated?: boolean },
+) {
   const { tenantId } = useTenantContext()
 
   return useQuery({
     queryKey: ['restaurant_settings', key, tenantId],
     queryFn: async (): Promise<RestaurantSettingValueMap[K]> => {
-      const { data, error } = await (supabasePublic
+      // Le chiavi solo-admin (es. app_theme, daily_guest_limit) vanno lette dal
+      // client autenticato: la policy RLS anon le nasconde (whitelist sole 11
+      // chiavi pubbliche). Le pagine pubbliche restano su supabasePublic.
+      const client = options?.authenticated ? supabase : supabasePublic
+      const { data, error } = await (client
         .from('restaurant_settings') as any)
         .select('setting_value')
         .eq('tenant_id', tenantId!)

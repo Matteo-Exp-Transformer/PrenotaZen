@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { useNavigate } from 'react-router-dom'
 import { supabase, handleSupabaseError, isInvalidStoredRefreshTokenError } from '@/lib/supabase'
 import { useTenantContext } from '@/contexts/TenantContext'
+import { logger } from '@/lib/logger'
 
 const AUTH_REVOKED_REASON_KEY = 'auth_revoked_reason'
 const SUBSCRIPTION_INACTIVE_REASON = 'subscription_inactive'
@@ -60,7 +61,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (isInvalidStoredRefreshTokenError(sessionError)) {
           await supabase.auth.signOut({ scope: 'local' })
         } else {
-          console.error('Session check error:', sessionError)
+          logger.error('Session check error:', sessionError)
         }
         setUser(null)
         setIsLoading(false)
@@ -101,7 +102,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         name: (adminUser as any).name || undefined,
       })
     } catch (error) {
-      console.error('Error checking session:', error)
+      logger.error('Error checking session:', error)
       setUser(null)
     } finally {
       setIsLoading(false)
@@ -169,7 +170,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return { success: true }
     } catch (error) {
-      console.error('Login exception:', error)
+      logger.error('Login exception:', error)
       return {
         success: false,
         error: handleSupabaseError(error),
@@ -186,7 +187,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       clearTenant()
       navigate('/login')
     } catch (error) {
-      console.error('Logout error:', error)
+      logger.error('Logout error:', error)
       navigate('/login')
     }
   }

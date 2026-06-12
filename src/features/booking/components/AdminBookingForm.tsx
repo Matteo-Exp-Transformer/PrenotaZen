@@ -127,7 +127,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   const { data: menuItems = [] } = useMenuItems()
   const { data: staffPresetsDropdownVisible = true } = useRestaurantSetting('booking_staff_presets_visible')
   const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets')
-  const { data: placementAreasSetting = DEFAULT_PLACEMENT_AREAS } = useRestaurantSetting('booking_placement_areas')
+  const { data: placementAreasSetting = DEFAULT_PLACEMENT_AREAS } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
 
   const normalizedPlacementAreas = useMemo(() => {
     if (!features.servizio) return []
@@ -140,7 +140,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   }, [features.servizio, placementAreasSetting])
 
   const { data: acceptedBookings = [] } = useAcceptedBookings()
-  const { data: dailyGuestLimit = null } = useRestaurantSetting('daily_guest_limit')
+  const { data: dailyGuestLimit = null } = useRestaurantSetting('daily_guest_limit', { authenticated: true })
 
   // Convert desired_time to startTime and endTime for capacity check
   // Default endTime is startTime + 3 hours (same as AcceptBookingModal)

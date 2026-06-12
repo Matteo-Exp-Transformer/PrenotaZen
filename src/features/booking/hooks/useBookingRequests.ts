@@ -3,6 +3,7 @@ import { supabase, handleSupabaseError } from '@/lib/supabase'
 import type { BookingRequest, BookingRequestInput } from '@/types/booking'
 import { toast } from 'react-toastify'
 import { useTenantContext } from '@/contexts/TenantContext'
+import { logger } from '@/lib/logger'
 
 // Lock globale per prevenire chiamate multiple simultanee alla mutation
 // Usa un lock atomico con ID univoco per prevenire race conditions
@@ -67,7 +68,7 @@ export const useCreateBookingRequest = () => {
       try {
         // ⚠️ CRITICO: Verifica lock PRIMA di inserire
         if (mutationLockId !== lockId) {
-          console.error('❌ [useCreateBookingRequest] Lock perso! Lock ID non corrisponde:', {
+          logger.error('❌ [useCreateBookingRequest] Lock perso! Lock ID non corrisponde:', {
             expected: lockId,
             current: mutationLockId,
           })
@@ -110,7 +111,7 @@ export const useCreateBookingRequest = () => {
 
         // Verifica lock DOPO l'insert per assicurarsi che non sia cambiato
         if (mutationLockId !== lockId) {
-          console.error('❌ [useCreateBookingRequest] Lock cambiato durante INSERT!', {
+          logger.error('❌ [useCreateBookingRequest] Lock cambiato durante INSERT!', {
             expected: lockId,
             current: mutationLockId,
           })

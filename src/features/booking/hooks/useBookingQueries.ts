@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, handleSupabaseError } from '@/lib/supabase'
 import type { BookingRequest } from '@/types/booking'
 import { useTenantContext } from '@/contexts/TenantContext'
+import { logger } from '@/lib/logger'
 
 // Hook per prenotazioni pending
 export const usePendingBookings = () => {
@@ -21,7 +22,7 @@ export const usePendingBookings = () => {
 
 
       if (error) {
-        console.error('❌ [usePendingBookings] Error:', error)
+        logger.error('❌ [usePendingBookings] Error:', error)
         throw new Error(handleSupabaseError(error))
       }
 
@@ -51,7 +52,7 @@ export const useAcceptedBookings = () => {
         .order('confirmed_start', { ascending: true })
 
       if (error) {
-        console.error('❌ [useAcceptedBookings] Error:', error)
+        logger.error('❌ [useAcceptedBookings] Error:', error)
         throw new Error(handleSupabaseError(error))
       }
 
@@ -103,7 +104,7 @@ export const useBookingStats = () => {
 
 
       if (error) {
-        console.error('❌ [useBookingStats] Error:', error)
+        logger.error('❌ [useBookingStats] Error:', error)
         throw new Error(handleSupabaseError(error))
       }
 

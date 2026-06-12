@@ -307,9 +307,15 @@ export const RestaurantSettingsTab: React.FC = () => {
   const features = useFeatures()
 
   const nameQuery = useRestaurantSetting('restaurant_name')
-  const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities')
-  const dailyGuestLimitQuery = useRestaurantSetting('daily_guest_limit')
-  const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled')
+  const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities', {
+    authenticated: true,
+  })
+  const dailyGuestLimitQuery = useRestaurantSetting('daily_guest_limit', {
+    authenticated: true,
+  })
+  const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled', {
+    authenticated: true,
+  })
   const serviceSlotsQuery = useServiceSlots()
   const updateServiceSlot = useUpdateServiceSlot()
   const createServiceSlot = useCreateServiceSlot()
@@ -320,7 +326,7 @@ export const RestaurantSettingsTab: React.FC = () => {
   const contactAddressQuery = useRestaurantSetting('contact_address')
   const publicBookingPageBgQuery = useRestaurantSetting('public_booking_page_background')
   const stripPhotoQuery = useRestaurantSetting('public_booking_strip_photo')
-  const appThemeQuery = useRestaurantSetting('app_theme')
+  const appThemeQuery = useRestaurantSetting('app_theme', { authenticated: true })
   const upsert = useUpsertRestaurantSetting()
 
   const [anagraficaDirty, setAnagraficaDirty] = useState(false)

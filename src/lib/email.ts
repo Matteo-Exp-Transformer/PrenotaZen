@@ -1,3 +1,5 @@
+import { logger } from '@/lib/logger'
+
 // Email client using Resend API
 // https://resend.com/docs/api-reference
 // 
@@ -73,7 +75,7 @@ export const sendEmail = async (options: SendEmailOptions): Promise<{ success: b
         (typeof data.message === 'string' && data.message) ||
         `HTTP ${response.status}`
       if (import.meta.env.DEV) {
-        console.warn('[Email] Edge send-email:', errMsg)
+        logger.warn('[Email] Edge send-email:', errMsg)
       }
       return { success: false, error: errMsg }
     }
@@ -81,7 +83,7 @@ export const sendEmail = async (options: SendEmailOptions): Promise<{ success: b
     if (data.error) {
       const err = String(data.error)
       if (import.meta.env.DEV) {
-        console.warn('[Email] Provider error:', err)
+        logger.warn('[Email] Provider error:', err)
       }
       return { success: false, error: err }
     }
@@ -90,7 +92,7 @@ export const sendEmail = async (options: SendEmailOptions): Promise<{ success: b
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     if (import.meta.env.DEV) {
-      console.warn('[Email] send-email non raggiungibile (funzione assente o rete):', msg)
+      logger.warn('[Email] send-email non raggiungibile (funzione assente o rete):', msg)
     }
     return { success: false, error: msg }
   }
@@ -117,10 +119,10 @@ export const logEmailToDatabase = async (log: EmailLog): Promise<void> => {
     const { error } = await supabase.from('email_logs').insert(logData as any)
 
     if (error) {
-      console.error('❌ [logEmailToDatabase] Error:', error)
+      logger.error('❌ [logEmailToDatabase] Error:', error)
     }
   } catch (error) {
-    console.error('❌ [logEmailToDatabase] Exception:', error)
+    logger.error('❌ [logEmailToDatabase] Exception:', error)
   }
 }
 
@@ -161,7 +163,7 @@ export const sendAndLogEmail = async (
     log.status = 'failed'
     log.error_message = result.error
     if (import.meta.env.DEV) {
-      console.warn('[sendAndLogEmail] invio non riuscito:', result.error)
+      logger.warn('[sendAndLogEmail] invio non riuscito:', result.error)
     }
   }
 

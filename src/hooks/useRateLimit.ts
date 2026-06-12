@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toast } from 'react-toastify'
+import { logger } from '@/lib/logger'
 
 interface RateLimitOptions {
   maxAttempts: number
@@ -58,7 +59,7 @@ export const useRateLimit = (options: RateLimitOptions = { maxAttempts: 3, timeW
       localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(state))
       return true
     } catch (error) {
-      console.error('[RateLimit] Error:', error)
+      logger.error('[RateLimit] Error:', error)
       // Allow submission if localStorage fails
       return true
     }

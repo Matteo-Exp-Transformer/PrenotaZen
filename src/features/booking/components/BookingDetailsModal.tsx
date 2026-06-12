@@ -237,8 +237,10 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const { data: serviceSlots = [] } = useServiceSlots()
   const { data: slotOverrides = [] } = useServiceSlotOverrides()
   const { data: slotGuestCapacities = DEFAULT_SLOT_GUEST_CAPACITIES } =
-    useRestaurantSetting('slot_guest_capacities')
-  const { data: timeSlotsEnabledRaw = true } = useRestaurantSetting('booking_time_slots_enabled')
+    useRestaurantSetting('slot_guest_capacities', { authenticated: true })
+  const { data: timeSlotsEnabledRaw = true } = useRestaurantSetting('booking_time_slots_enabled', {
+    authenticated: true,
+  })
   const timeSlotsEnabled = features.servizio ? true : timeSlotsEnabledRaw
 
   // Initialize form data from booking

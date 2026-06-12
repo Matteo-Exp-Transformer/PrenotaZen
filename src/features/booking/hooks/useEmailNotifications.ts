@@ -5,6 +5,7 @@ import {
   getBookingCancelledEmail,
 } from '@/lib/emailTemplates'
 import type { BookingRequest } from '@/types/booking'
+import { logger } from '@/lib/logger'
 
 /**
  * Send email when booking is accepted
@@ -30,7 +31,7 @@ export const sendBookingAcceptedEmail = async (booking: BookingRequest): Promise
 
     return { success: result.success }
   } catch (error) {
-    console.error('[Email] Error sending accepted email:', error)
+    logger.error('[Email] Error sending accepted email:', error)
     return { success: false }
   }
 }
@@ -59,7 +60,7 @@ export const sendBookingRejectedEmail = async (booking: BookingRequest): Promise
 
     return { success: result.success }
   } catch (error) {
-    console.error('[Email] Error sending rejected email:', error)
+    logger.error('[Email] Error sending rejected email:', error)
     return { success: false }
   }
 }
@@ -88,7 +89,7 @@ export const sendBookingCancelledEmail = async (booking: BookingRequest): Promis
 
     return { success: result.success }
   } catch (error) {
-    console.error('[Email] Error sending cancelled email:', error)
+    logger.error('[Email] Error sending cancelled email:', error)
     return { success: false }
   }
 }

@@ -5,6 +5,7 @@ import type { BookingRequest, BookingRequestInput } from '@/types/booking'
 import { toast } from 'react-toastify'
 import { createBookingDateTime, calculateEndTimeFromStart } from '../utils/dateUtils'
 import { buildFeatures } from '@/config/features'
+import { logger } from '@/lib/logger'
 
 // Hook for creating booking requests directly as ACCEPTED (admin only)
 export const useCreateAdminBooking = () => {
@@ -66,14 +67,14 @@ export const useCreateAdminBooking = () => {
 
 
       if (error) {
-        console.error('❌ [useCreateAdminBooking] Error:', error)
+        logger.error('❌ [useCreateAdminBooking] Error:', error)
         throw new Error(error.message)
       }
 
       return result as BookingRequest
     },
     onError: (error: Error) => {
-      console.error('Error creating admin booking:', error)
+      logger.error('Error creating admin booking:', error)
       toast.error('Errore nella creazione della prenotazione')
     }
   })

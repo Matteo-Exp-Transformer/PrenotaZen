@@ -33,7 +33,7 @@ export const WalkInModal: FC<WalkInModalProps> = ({ isOpen, onClose }) => {
   const { data: tables = [] } = useTables()
   const { data: rooms = [] } = useRooms()
   const { data: acceptedBookings = [] } = useAcceptedBookings()
-  const { data: maxGuests = 20 } = useRestaurantSetting('walk_in_max_guests')
+  const { data: maxGuests = 20 } = useRestaurantSetting('walk_in_max_guests', { authenticated: true })
 
   const tablesInRoom = useMemo(() => {
     if (!selectedRoomId) return []

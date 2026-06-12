@@ -125,7 +125,7 @@ const AdminShellInner: FC = () => {
   const asideRef = useRef<HTMLDivElement | null>(null)
 
   const { data: savedAppTheme = DEFAULT_APP_THEME, isPending: isAppThemePending } =
-    useRestaurantSetting('app_theme')
+    useRestaurantSetting('app_theme', { authenticated: true })
 
   useEffect(() => {
     const resolved = isAppThemePending ? DEFAULT_APP_THEME : savedAppTheme

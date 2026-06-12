@@ -215,7 +215,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const restaurantName = useRestaurantName()
   const appIconSrc = `${import.meta.env.BASE_URL}icons/Icona-per-adminPage-no-bg.png`
   const { data: savedAppTheme = DEFAULT_APP_THEME, isPending: isAppThemePending } =
-    useRestaurantSetting('app_theme')
+    useRestaurantSetting('app_theme', { authenticated: true })
 
   useEffect(() => {
     const resolved = isAppThemePending ? DEFAULT_APP_THEME : savedAppTheme

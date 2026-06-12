@@ -26,6 +26,7 @@ import {
 import { QuickTableAssignModal } from './QuickTableAssignModal'
 import { AdminBookingForm, type AdminBookingFormNavigationGuardHandle } from './AdminBookingForm'
 import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
+import { logger } from '@/lib/logger'
 import { Modal } from '@/components/ui/Modal'
 import { UnsavedNavigationGuardModal } from './settings/SettingsSaveUi'
 import {
@@ -409,7 +410,9 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   } = useUnsavedChangesGuard()
   const features = useFeatures()
   const { data: digestSlots = [] } = useDigestSlotConfigs()
-  const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled')
+  const timeSlotsEnabledQuery = useRestaurantSetting('booking_time_slots_enabled', {
+    authenticated: true,
+  })
   // In Pro le fasce sono sempre attive; in Classic rispetta il flag
   const timeSlotsEnabled = features.servizio ? true : (timeSlotsEnabledQuery.data ?? true)
 
@@ -504,7 +507,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
         calendarApi.gotoDate(targetDate)
         setSelectedDate(initialDate)
       } catch (error) {
-        console.error('Error navigating to calendar date:', error)
+        logger.error('Error navigating to calendar date:', error)
       }
     }
   }, [initialDate])
@@ -514,7 +517,9 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   const events = transformBookingsToCalendarEvents(visibleBookings)
 
   // Limite coperti giornaliero (esterno): null = nessun limite → nel calendario mostriamo solo il conteggio.
-  const dailyGuestLimitQuery = useRestaurantSetting('daily_guest_limit')
+  const dailyGuestLimitQuery = useRestaurantSetting('daily_guest_limit', {
+    authenticated: true,
+  })
   const dailyGuestLimit = dailyGuestLimitQuery.data ?? null
 
   // Somma coperti per data (YYYY-MM-DD) → alimenta % riempimento e badge cella-giorno.

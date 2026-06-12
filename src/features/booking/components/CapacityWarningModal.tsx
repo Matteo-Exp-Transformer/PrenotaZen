@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertTriangle, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { logger } from '@/lib/logger'
 
 interface CapacityWarningModalProps {
   isOpen: boolean
@@ -63,7 +64,7 @@ export const CapacityWarningModal: React.FC<CapacityWarningModalProps> = ({
 
   // Verify document.body exists
   if (!document.body) {
-    console.error('❌ [CapacityWarningModal] document.body is null!')
+    logger.error('❌ [CapacityWarningModal] document.body is null!')
     return null
   }
 
@@ -217,7 +218,7 @@ export const CapacityWarningModal: React.FC<CapacityWarningModalProps> = ({
     const portal = createPortal(modalContent, document.body)
     return portal
   } catch (error) {
-    console.error('❌ [CapacityWarningModal] Error creating portal:', error)
+    logger.error('❌ [CapacityWarningModal] Error creating portal:', error)
     // Fallback: render directly without portal
     return modalContent
   }

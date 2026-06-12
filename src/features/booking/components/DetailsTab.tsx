@@ -73,7 +73,7 @@ export const DetailsTab: React.FC<Props> = ({
   const features = useFeatures()
   const { data: menuPromos = [] } = useRestaurantSetting('booking_menu_promos')
   const menuPromoLabels = resolveMenuPromoLabelsForBooking(booking, menuPromos)
-  const { data: placementAreasSetting = DEFAULT_PLACEMENT_AREAS } = useRestaurantSetting('booking_placement_areas')
+  const { data: placementAreasSetting = DEFAULT_PLACEMENT_AREAS } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
   const placementAreas = Array.isArray(placementAreasSetting)
     ? placementAreasSetting
         .map((item) => String(item ?? '').trim())

@@ -28,7 +28,7 @@ export const PendingRequestsTab: React.FC = () => {
   const { data: serviceSlots = [] } = useServiceSlots()
   const { data: slotOverrides = [] } = useServiceSlotOverrides()
   const { data: slotGuestCapacities = DEFAULT_SLOT_GUEST_CAPACITIES } =
-    useRestaurantSetting('slot_guest_capacities')
+    useRestaurantSetting('slot_guest_capacities', { authenticated: true })
   const acceptMutation = useAcceptBooking()
   const rejectMutation = useRejectBooking()
 
