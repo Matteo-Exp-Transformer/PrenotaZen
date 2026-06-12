@@ -19,9 +19,7 @@ if (import.meta.env.DEV) {
       }
       original(...args)
     }
-  // eslint-disable-next-line no-console
   console.log = stripReactDevtoolsBanner(console.log.bind(console))
-  // eslint-disable-next-line no-console
   console.info = stripReactDevtoolsBanner(console.info.bind(console))
 }
 

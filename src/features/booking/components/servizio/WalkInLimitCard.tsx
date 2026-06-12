@@ -1,57 +1,77 @@
 import type { FC, FormEvent } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button, Input, Label } from '@/components/ui'
-import { useUpsertRestaurantSetting } from '@/features/booking/hooks/useRestaurantSetting'
-import { useTenantContext } from '@/contexts/TenantContext'
-import { supabase, handleSupabaseError } from '@/lib/supabase'
-import { useQuery } from '@tanstack/react-query'
-import { restaurantSettingRegistry } from '@/features/booking/lib/restaurantSettingRegistry'
+import {
+  useRestaurantSetting,
+  useUpsertRestaurantSetting,
+} from '@/features/booking/hooks/useRestaurantSetting'
+import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
+
+const UNSAVED_SOURCE_ID = 'servizio-walk-in-limit'
 
 export const WalkInLimitCard: FC = () => {
-  const { tenantId } = useTenantContext()
   const upsert = useUpsertRestaurantSetting()
   const [value, setValue] = useState<number | ''>('')
-  const hydratedRef = useRef(false)
+  const [savedValue, setSavedValue] = useState<number | ''>('')
 
-  const { data: rawRow, isPending, isSuccess, error } = useQuery({
-    queryKey: ['restaurant_settings', 'walk_in_max_guests', tenantId, 'raw-row'],
-    queryFn: async () => {
-      const { data, error: dbError } = await (supabase.from('restaurant_settings') as any)
-        .select('setting_value')
-        .eq('tenant_id', tenantId!)
-        .eq('setting_key', 'walk_in_max_guests')
-        .maybeSingle()
+  const {
+    data: loadedValue,
+    isPending,
+    isSuccess,
+    error,
+  } = useRestaurantSetting('walk_in_max_guests', { authenticated: true })
 
-      if (dbError) {
-        throw new Error(handleSupabaseError(dbError))
-      }
-      return data as { setting_value: unknown } | null
-    },
-    enabled: !!tenantId,
-  })
+  const {
+    registerUnsavedSource,
+    registerUnsavedHandlers,
+    clearUnsavedSource,
+  } = useUnsavedChangesGuard()
 
   useEffect(() => {
-    hydratedRef.current = false
-    setValue('')
-  }, [tenantId])
+    if (!isSuccess) return
+    const next = loadedValue ?? ''
+    setValue(next)
+    setSavedValue(next)
+  }, [isSuccess, loadedValue])
+
+  const isDirty = useMemo(() => value !== savedValue, [savedValue, value])
+
+  const discardDraft = useCallback(() => {
+    setValue(savedValue)
+  }, [savedValue])
+
+  const saveDraft = useCallback(() => {
+    if (value === '') return
+    upsert.mutate([{ key: 'walk_in_max_guests', value }], {
+      onSuccess: () => setSavedValue(value),
+    })
+  }, [upsert, value])
 
   useEffect(() => {
-    if (!isSuccess || hydratedRef.current) return
-    if (!rawRow) {
-      setValue('')
-    } else {
-      setValue(restaurantSettingRegistry.walk_in_max_guests.parseFromDb(rawRow.setting_value))
+    if (!isDirty) {
+      clearUnsavedSource(UNSAVED_SOURCE_ID)
+      return
     }
-    hydratedRef.current = true
-  }, [isSuccess, rawRow])
+    registerUnsavedSource(UNSAVED_SOURCE_ID, 'Limite coperti walk-in', true)
+    return () => clearUnsavedSource(UNSAVED_SOURCE_ID)
+  }, [clearUnsavedSource, isDirty, registerUnsavedSource])
+
+  useEffect(() => {
+    if (!isDirty) {
+      registerUnsavedHandlers(UNSAVED_SOURCE_ID, null)
+      return
+    }
+    registerUnsavedHandlers(UNSAVED_SOURCE_ID, {
+      saveAll: saveDraft,
+      discardAll: discardDraft,
+    })
+    return () => registerUnsavedHandlers(UNSAVED_SOURCE_ID, null)
+  }, [discardDraft, isDirty, registerUnsavedHandlers, saveDraft])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (value === '') return
-    const err = restaurantSettingRegistry.walk_in_max_guests.validate(value)
-    if (err) return
-    upsert.mutate([{ key: 'walk_in_max_guests', value }])
+    saveDraft()
   }
 
   if (error) {
@@ -104,7 +124,7 @@ export const WalkInLimitCard: FC = () => {
               type="submit"
               variant="primary"
               size="sm"
-              disabled={upsert.isPending || value === ''}
+              disabled={upsert.isPending || value === '' || !isDirty}
             >
               {upsert.isPending ? 'Salvataggio…' : 'Salva limite'}
             </Button>

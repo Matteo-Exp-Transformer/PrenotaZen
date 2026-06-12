@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createEdgeLogger } from "../_shared/log.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,6 +54,8 @@ function getDietaryRestrictionsTextLength(
 }
 
 Deno.serve(async (req: Request) => {
+  const log = createEdgeLogger("create-booking", req);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -524,7 +527,7 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (insertError) {
-      console.error("Insert error:", insertError);
+      log.error("Insert error", { err: insertError });
       return new Response(
         JSON.stringify({ error: "Errore durante il salvataggio della prenotazione" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -567,7 +570,7 @@ Deno.serve(async (req: Request) => {
       { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("Unexpected error:", err);
+    log.error("Unexpected error", { err });
     return new Response(
       JSON.stringify({ error: "Errore interno del server" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

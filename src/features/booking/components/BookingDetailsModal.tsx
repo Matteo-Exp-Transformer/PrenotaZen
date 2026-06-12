@@ -38,6 +38,9 @@ import { UnsavedNavigationGuardModal } from './settings/SettingsSaveUi'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { adminBlueCtaSurfaceClass } from '@/lib/adminBlueCtaClass'
+import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
+
+const BOOKING_DETAILS_BLOCKING_SOURCE_ID = 'booking-details-modal'
 
 export type BookingDetailsNavigationGuardHandle = {
   saveAll: () => Promise<void>
@@ -132,6 +135,9 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const [showPastStartWarning, setShowPastStartWarning] = useState(false)
   const [closeGuardOpen, setCloseGuardOpen] = useState(false)
   const [closeGuardPending, setCloseGuardPending] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const { registerBlockingSource, clearBlockingSource } = useUnsavedChangesGuard()
 
   const navigationSaveResolveRef = useRef<(() => void) | null>(null)
   const navigationSaveRejectRef = useRef<((error: Error) => void) | null>(null)
@@ -370,11 +376,32 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       onEditDirtyChange?.(false)
       setCloseGuardOpen(false)
       setCloseGuardPending(false)
+      setSaveError(null)
     }
     return () => {
       onEditDirtyChange?.(false)
     }
   }, [isOpen, onEditDirtyChange])
+
+  const mutationPending =
+    updateMutation.isPending || cancelMutation.isPending || markNoShowMutation.isPending
+
+  // U3: blocca cambio tab admin mentre salva/elimina/no-show (stesso vincolo di U7 sulla chiusura).
+  useEffect(() => {
+    if (!isOpen || !mutationPending) {
+      clearBlockingSource(BOOKING_DETAILS_BLOCKING_SOURCE_ID)
+      return
+    }
+    registerBlockingSource(BOOKING_DETAILS_BLOCKING_SOURCE_ID, 'Dettaglio prenotazione', true)
+    return () => {
+      clearBlockingSource(BOOKING_DETAILS_BLOCKING_SOURCE_ID)
+    }
+  }, [
+    clearBlockingSource,
+    isOpen,
+    mutationPending,
+    registerBlockingSource,
+  ])
 
   // Capacita per slot: service_slots.max_guests > override > slot_guest_capacities
   const getSlotCap = (slotId: string, date: string): number | null => {
@@ -444,6 +471,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   }
 
   const handleFormDataChange = (field: string, value: any) => {
+    setSaveError(null)
     if (field === 'startTime') {
       // Quando cambia startTime, ricalcola automaticamente endTime se non è stato modificato manualmente
       setFormData(prev => {
@@ -587,6 +615,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         onSuccess: () => {
           // Il toast di successo è già mostrato da useUpdateBooking (fonte unica): qui
           // gestiamo solo il reset dello stato locale, evitando il doppio toast (U1).
+          setSaveError(null)
           setIsEditMode(false)
           setEndTimeManuallyModified(false)
           setShowOverbookingConfirm(false)
@@ -595,6 +624,8 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         },
         onError: (error) => {
           logger.error('❌ [BookingDetailsModal] Save failed:', error)
+          const message = error.message || 'Errore nell\'aggiornamento della prenotazione'
+          setSaveError(message)
           rejectNavigationSave('Salvataggio non riuscito')
         },
       }
@@ -964,6 +995,14 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
               overflowX: 'hidden'
             }}
           >
+            {saveError && (
+              <div
+                role="alert"
+                className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+              >
+                {saveError}
+              </div>
+            )}
             {activeTab === 'details' && (
               <DetailsTab
                 booking={booking}

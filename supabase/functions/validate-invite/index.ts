@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createEdgeLogger } from "../_shared/log.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,8 @@ function jsonResponse(body: Record<string, unknown>, status: number) {
 }
 
 Deno.serve(async (req: Request) => {
+  const log = createEdgeLogger("validate-invite", req);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -134,7 +137,7 @@ Deno.serve(async (req: Request) => {
         .select("id");
 
       if (consumeError) {
-        console.error("Token consume error:", consumeError);
+        log.error("Token consume error", { err: consumeError });
         return jsonResponse(
           { error: "Errore durante la validazione dell'invito" },
           500
@@ -160,7 +163,7 @@ Deno.serve(async (req: Request) => {
           .update({ used_at: null })
           .eq("id", tokenData.id);
         if (rollbackError) {
-          console.error("Token rollback error:", rollbackError);
+          log.error("Token rollback error", { err: rollbackError });
         }
       };
 
@@ -173,7 +176,7 @@ Deno.serve(async (req: Request) => {
         });
 
       if (authError) {
-        console.error("Auth error:", authError);
+        log.error("Auth error", { err: authError });
         await rollbackToken();
         return jsonResponse(
           { error: authError.message || "Errore nella creazione dell'utente" },
@@ -191,7 +194,7 @@ Deno.serve(async (req: Request) => {
         });
 
       if (adminInsertError) {
-        console.error("Admin insert error:", adminInsertError);
+        log.error("Admin insert error", { err: adminInsertError });
         // Cleanup: delete the auth user we just created, then free the token.
         if (authUser?.user?.id) {
           await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
@@ -214,7 +217,7 @@ Deno.serve(async (req: Request) => {
     // Method not allowed
     return jsonResponse({ error: "Metodo non consentito" }, 405);
   } catch (err) {
-    console.error("Unexpected error:", err);
+    log.error("Unexpected error", { err });
     return jsonResponse({ error: "Errore interno del server" }, 500);
   }
 });

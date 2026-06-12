@@ -1,7 +1,15 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { UnsavedChangesProvider, useUnsavedChangesGuard } from '../UnsavedChangesContext'
+
+vi.mock('react-toastify', () => ({
+  toast: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}))
 
 function DirtyGuardHarness() {
   const { confirmNavigation, registerUnsavedSource, clearUnsavedSource } = useUnsavedChangesGuard()
@@ -16,6 +24,30 @@ function DirtyGuardHarness() {
       </button>
       <button type="button" onClick={() => clearUnsavedSource('settings')}>
         Azzera dirty
+      </button>
+      <button
+        type="button"
+        onClick={() => void confirmNavigation()}
+      >
+        Cambia schermata
+      </button>
+    </>
+  )
+}
+
+function BlockingGuardHarness() {
+  const { confirmNavigation, registerBlockingSource, clearBlockingSource } = useUnsavedChangesGuard()
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => registerBlockingSource('booking-details', 'Dettaglio prenotazione', true)}
+      >
+        Attiva blocco
+      </button>
+      <button type="button" onClick={() => clearBlockingSource('booking-details')}>
+        Disattiva blocco
       </button>
       <button
         type="button"
@@ -76,6 +108,34 @@ describe('UnsavedChangesProvider — Admin blindatura', () => {
     })
     expect(screen.queryByRole('heading', { name: /modifiche non salvate/i })).not.toBeInTheDocument()
 
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /cambia schermata/i }))
+    })
+    expect(screen.queryByRole('heading', { name: /modifiche non salvate/i })).not.toBeInTheDocument()
+  })
+
+  it('blocca il cambio schermata durante operazioni in corso senza modale dirty', async () => {
+    // @admin-blindatura: prenotazioni — U3 tab switch durante mutation
+    const user = userEvent.setup()
+
+    render(
+      <UnsavedChangesProvider>
+        <BlockingGuardHarness />
+      </UnsavedChangesProvider>,
+    )
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /^attiva blocco$/i }))
+    })
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /cambia schermata/i }))
+    })
+
+    expect(screen.queryByRole('heading', { name: /modifiche non salvate/i })).not.toBeInTheDocument()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /^disattiva blocco$/i }))
+    })
     await act(async () => {
       await user.click(screen.getByRole('button', { name: /cambia schermata/i }))
     })

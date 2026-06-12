@@ -7,11 +7,16 @@ import React, {
   useRef,
   useState,
 } from 'react'
+import { toast } from 'react-toastify'
 import { UnsavedNavigationGuardModal } from '@/features/booking/components/settings/SettingsSaveUi'
 
 type UnsavedEntry = {
   label: string
   dirty: boolean
+}
+
+type BlockingEntry = {
+  label: string
 }
 
 export type UnsavedSourceHandlers = {
@@ -26,9 +31,13 @@ export type UnsavedChangesGuardOptions = {
 
 type UnsavedChangesContextValue = {
   hasUnsavedChanges: boolean
+  /** U3: mutation/salvataggio in corso — blocca navigazione senza modale Salva/Annulla. */
+  hasBlockingOperations: boolean
   registerUnsavedSource: (id: string, label: string, dirty: boolean) => void
   registerUnsavedHandlers: (id: string, handlers: UnsavedSourceHandlers | null) => void
   clearUnsavedSource: (id: string) => void
+  registerBlockingSource: (id: string, label: string, blocking: boolean) => void
+  clearBlockingSource: (id: string) => void
   /** @deprecated Preferire `confirmNavigation`. Restituisce false se ci sono modifiche (mostra modale). */
   guardNavigation: (options?: UnsavedChangesGuardOptions) => boolean
   /** Modale guard: true = procedi, false = resta. */
@@ -37,8 +46,12 @@ type UnsavedChangesContextValue = {
 
 const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(null)
 
+const BLOCKING_TOAST_MESSAGE =
+  'Operazione in corso. Attendi il completamento prima di cambiare sezione.'
+
 export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [entries, setEntries] = useState<Record<string, UnsavedEntry>>({})
+  const [blockingEntries, setBlockingEntries] = useState<Record<string, BlockingEntry>>({})
   const handlersRef = useRef<Record<string, UnsavedSourceHandlers>>({})
   const [guardOpen, setGuardOpen] = useState(false)
   const [guardPending, setGuardPending] = useState(false)
@@ -77,11 +90,33 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
     })
   }, [])
 
+  const registerBlockingSource = useCallback((id: string, label: string, blocking: boolean) => {
+    setBlockingEntries((prev) => {
+      if (!blocking) {
+        if (!(id in prev)) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      }
+      return { ...prev, [id]: { label } }
+    })
+  }, [])
+
+  const clearBlockingSource = useCallback((id: string) => {
+    setBlockingEntries((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }, [])
+
   const dirtyEntries = useMemo(
     () => Object.entries(entries).filter(([, entry]) => entry.dirty),
     [entries],
   )
   const hasUnsavedChanges = dirtyEntries.length > 0
+  const hasBlockingOperations = Object.keys(blockingEntries).length > 0
   const dirtyLabels = useMemo(
     () => dirtyEntries.map(([, entry]) => entry.label).filter(Boolean),
     [dirtyEntries],
@@ -106,6 +141,10 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
 
   const confirmNavigation = useCallback(
     (options?: UnsavedChangesGuardOptions): Promise<boolean> => {
+      if (hasBlockingOperations) {
+        toast.warn(BLOCKING_TOAST_MESSAGE)
+        return Promise.resolve(false)
+      }
       if (!hasUnsavedChanges) return Promise.resolve(true)
       if (options?.allowPrenotazioniDashboard) return Promise.resolve(true)
 
@@ -115,17 +154,21 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
         setGuardOpen(true)
       })
     },
-    [hasUnsavedChanges],
+    [hasBlockingOperations, hasUnsavedChanges],
   )
 
   const guardNavigation = useCallback(
     (options?: UnsavedChangesGuardOptions) => {
+      if (hasBlockingOperations) {
+        toast.warn(BLOCKING_TOAST_MESSAGE)
+        return false
+      }
       if (!hasUnsavedChanges) return true
       if (options?.allowPrenotazioniDashboard) return true
       void confirmNavigation(options)
       return false
     },
-    [confirmNavigation, hasUnsavedChanges],
+    [confirmNavigation, hasBlockingOperations, hasUnsavedChanges],
   )
 
   const runSaveAllDirty = useCallback(async () => {
@@ -178,17 +221,23 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
   const value = useMemo(
     () => ({
       hasUnsavedChanges,
+      hasBlockingOperations,
       registerUnsavedSource,
       registerUnsavedHandlers,
       clearUnsavedSource,
+      registerBlockingSource,
+      clearBlockingSource,
       guardNavigation,
       confirmNavigation,
     }),
     [
       hasUnsavedChanges,
+      hasBlockingOperations,
       registerUnsavedSource,
       registerUnsavedHandlers,
       clearUnsavedSource,
+      registerBlockingSource,
+      clearBlockingSource,
       guardNavigation,
       confirmNavigation,
     ],

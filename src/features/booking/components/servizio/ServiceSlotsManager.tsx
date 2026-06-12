@@ -1,5 +1,5 @@
 import type { FC, FormEvent, ReactNode } from 'react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Plus, Pencil, Trash2, AlertCircle, Clock, Users, CalendarClock, ChevronDown, X, RotateCcw } from 'lucide-react'
 import { Modal, Button, Input, TimePicker24h } from '@/components/ui'
@@ -30,6 +30,30 @@ import {
   type ServiceSlotOverride,
 } from '@/features/booking/hooks/useServiceSlotOverrides'
 import { useBusinessHours } from '@/hooks/useBusinessHours'
+import { DiscardChangesConfirmModal } from '@/features/booking/components/settings/SettingsSaveUi'
+import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
+
+const SLOT_MODAL_UNSAVED_SOURCE_ID = 'servizio-slot-modal'
+
+function serializeSlotDraft(input: {
+  name: string
+  startTime: string
+  endTime: string
+  maxTurnsStr: string
+  maxGuestsStr: string
+  scope: OverrideScope
+  customDays: Set<string>
+}): string {
+  return JSON.stringify({
+    name: input.name.trim(),
+    startTime: input.startTime,
+    endTime: input.endTime,
+    maxTurnsStr: input.maxTurnsStr,
+    maxGuestsStr: input.maxGuestsStr,
+    scope: input.scope,
+    customDays: [...input.customDays].sort(),
+  })
+}
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -285,31 +309,50 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
   const [saveTypeInfoOpen, setSaveTypeInfoOpen] = useState(false)
   const [maxGuestsInfoOpen, setMaxGuestsInfoOpen] = useState(false)
   const [customDays, setCustomDays] = useState<Set<string>>(new Set())
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
+  const baselineRef = useRef('')
+  const formRef = useRef<HTMLFormElement>(null)
   const scopeMenuRef = useRef<HTMLDivElement>(null)
+
+  const {
+    registerUnsavedSource,
+    registerUnsavedHandlers,
+    clearUnsavedSource,
+  } = useUnsavedChangesGuard()
 
   useEffect(() => {
     if (isOpen) {
-      setName(initial?.name ?? '')
-      setStartTime(initial?.start_time?.slice(0, 5) ?? '12:00')
-      setEndTime(initial?.end_time?.slice(0, 5) ?? '15:00')
+      const nextName = initial?.name ?? ''
+      const nextStart = initial?.start_time?.slice(0, 5) ?? '12:00'
+      const nextEnd = initial?.end_time?.slice(0, 5) ?? '15:00'
+      let nextMaxTurns = ''
       if (initial?.max_turns === 0) {
-        setMaxTurnsStr(
-          initial.max_turns_resume == null ? '' : String(initial.max_turns_resume),
-        )
-      } else {
-        setMaxTurnsStr(
-          initial?.max_turns === null || initial?.max_turns === undefined
-            ? ''
-            : String(initial.max_turns),
-        )
+        nextMaxTurns = initial.max_turns_resume == null ? '' : String(initial.max_turns_resume)
+      } else if (initial?.max_turns !== null && initial?.max_turns !== undefined) {
+        nextMaxTurns = String(initial.max_turns)
       }
-      setMaxGuestsStr(initial?.max_guests == null ? '' : String(initial.max_guests))
+      const nextMaxGuests = initial?.max_guests == null ? '' : String(initial.max_guests)
+      setName(nextName)
+      setStartTime(nextStart)
+      setEndTime(nextEnd)
+      setMaxTurnsStr(nextMaxTurns)
+      setMaxGuestsStr(nextMaxGuests)
       setValidationError(null)
       setScope('forever')
       setScopeMenuOpen(false)
       setSaveTypeInfoOpen(false)
       setMaxGuestsInfoOpen(false)
       setCustomDays(new Set())
+      setDiscardConfirmOpen(false)
+      baselineRef.current = serializeSlotDraft({
+        name: nextName,
+        startTime: nextStart,
+        endTime: nextEnd,
+        maxTurnsStr: nextMaxTurns,
+        maxGuestsStr: nextMaxGuests,
+        scope: 'forever',
+        customDays: new Set(),
+      })
     }
   }, [isOpen, initial])
 
@@ -330,6 +373,62 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
   const createOverride = useCreateServiceSlotOverride()
   const { data: overrides = [] } = useServiceSlotOverrides()
   const isPending = create.isPending || update.isPending || createOverride.isPending
+
+  const isDirty = useMemo(
+    () =>
+      serializeSlotDraft({
+        name,
+        startTime,
+        endTime,
+        maxTurnsStr,
+        maxGuestsStr,
+        scope,
+        customDays,
+      }) !== baselineRef.current,
+    [customDays, endTime, maxGuestsStr, maxTurnsStr, name, scope, startTime],
+  )
+
+  const confirmDiscardClose = useCallback(() => {
+    setDiscardConfirmOpen(false)
+    clearUnsavedSource(SLOT_MODAL_UNSAVED_SOURCE_ID)
+    onClose()
+  }, [clearUnsavedSource, onClose])
+
+  const requestClose = useCallback(() => {
+    if (isPending) return
+    if (isDirty) {
+      setDiscardConfirmOpen(true)
+      return
+    }
+    onClose()
+  }, [isDirty, isPending, onClose])
+
+  useEffect(() => {
+    if (!isOpen || !isDirty) {
+      clearUnsavedSource(SLOT_MODAL_UNSAVED_SOURCE_ID)
+      return
+    }
+    registerUnsavedSource(
+      SLOT_MODAL_UNSAVED_SOURCE_ID,
+      isEdit ? 'Modifica fascia oraria' : 'Nuova fascia oraria',
+      true,
+    )
+    return () => clearUnsavedSource(SLOT_MODAL_UNSAVED_SOURCE_ID)
+  }, [clearUnsavedSource, isDirty, isEdit, isOpen, registerUnsavedSource])
+
+  useEffect(() => {
+    if (!isOpen || !isDirty) {
+      registerUnsavedHandlers(SLOT_MODAL_UNSAVED_SOURCE_ID, null)
+      return
+    }
+    registerUnsavedHandlers(SLOT_MODAL_UNSAVED_SOURCE_ID, {
+      saveAll: () => {
+        formRef.current?.requestSubmit()
+      },
+      discardAll: confirmDiscardClose,
+    })
+    return () => registerUnsavedHandlers(SLOT_MODAL_UNSAVED_SOURCE_ID, null)
+  }, [confirmDiscardClose, isDirty, isOpen, registerUnsavedHandlers])
 
   // Override già attivo su questa fascia (solo in modifica): serve per l'alert ①.
   const existingActiveOverride =
@@ -480,13 +579,16 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={isEdit ? 'Modifica fascia oraria' : 'Nuova fascia oraria'}
-      size="sm"
-    >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={requestClose}
+        title={isEdit ? 'Modifica fascia oraria' : 'Nuova fascia oraria'}
+        size="sm"
+        closeOnOverlayClick={!isPending}
+        closeOnEscape={!isPending}
+      >
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4">
         <div className="space-y-1">
           <label htmlFor="slot-name" className="block text-sm font-medium text-primary-900">
             Nome fascia
@@ -735,7 +837,7 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
         )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isPending}>
+          <Button type="button" variant="outline" size="sm" onClick={requestClose} disabled={isPending}>
             Annulla
           </Button>
           <Button type="submit" variant="primary" size="sm" disabled={isPending}>
@@ -743,7 +845,14 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
           </Button>
         </div>
       </form>
-    </Modal>
+      </Modal>
+
+      <DiscardChangesConfirmModal
+        isOpen={discardConfirmOpen}
+        onStay={() => setDiscardConfirmOpen(false)}
+        onDiscard={confirmDiscardClose}
+      />
+    </>
   )
 }
 

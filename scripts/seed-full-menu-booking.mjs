@@ -18,6 +18,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { createCliLogger, sanitizeBookingLog } from './_cliLog.mjs'
 import {
   FIXED_BOOKING_DATE,
   PLACEHOLDER_SLUGS,
@@ -30,6 +31,8 @@ import {
   fetchMenuItemsForTenant,
   resolveSeedClientName,
 } from './bookingSeedShared.mjs'
+
+const { log, ok, fail } = createCliLogger('seed-full-menu-booking')
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -63,8 +66,8 @@ function pickRandomMenuRows(menuRows) {
   if (!hasNonTiramisuBase && poolNonTiramisu.length > 0) {
     shuffleInPlace(poolNonTiramisu)
     picked.push(poolNonTiramisu[0])
-    console.log(
-      '[seed-full-menu-booking] Aggiunta una voce non-tiramisù al campione perché serve menu_total_per_person > 0.',
+    log(
+      'Aggiunta una voce non-tiramisù al campione perché serve menu_total_per_person > 0.',
     )
   }
 
@@ -132,47 +135,47 @@ async function main() {
   const slugFromFile = parseTenantSlugFromProjectRoot()
   const tenantSlug = resolveTenantSlugFromEnv()
 
-  console.log('[seed-full-menu-booking] slug risolto:', JSON.stringify(tenantSlug || '(vuoto)'))
-  console.log(
-    '[seed-full-menu-booking] SUPABASE_SERVICE_ROLE_KEY:',
-    serviceKey ? `presente — origine ${serviceRoleKeyOrigin()}` : `assente — ${serviceRoleKeyOrigin()}`,
-  )
+  log('slug risolto', { slug: tenantSlug || '(vuoto)' })
+  log('SUPABASE_SERVICE_ROLE_KEY', {
+    present: Boolean(serviceKey),
+    origin: serviceKey
+      ? `presente — origine ${serviceRoleKeyOrigin()}`
+      : `assente — ${serviceRoleKeyOrigin()}`,
+  })
   if (slugFromFile) {
-    console.log('[seed-full-menu-booking] (tenant da .env.local / .env nel repo, ignora TENANT_SLUG ereditato dalla shell)')
+    log('tenant da .env.local / .env nel repo (ignora TENANT_SLUG ereditato dalla shell)')
   }
 
   if (PLACEHOLDER_SLUGS.has(tenantSlug)) {
-    console.error(`
-[seed-full-menu-booking] Stai usando un placeholder (${tenantSlug}), non lo slug vero dell’organizzazione.
-Per Al Ritrovo usa: TENANT_SLUG=al-ritrovo
-
-Se hai già aggiornato .env.local ma vedi ancora il placeholder:
-  • In PowerShell potresti avere $env:TENANT_SLUG impostato in sessione → Node NON sovrascrive con il file.
-  • Risoluzione: chiudi il terminale, aprine uno nuovo, oppure:
-      Remove-Item Env:TENANT_SLUG -ErrorAction SilentlyContinue
-    poi rilanci npm run seed:booking-menu-full
-`)
-    process.exit(1)
+    fail(
+      `Stai usando un placeholder (${tenantSlug}), non lo slug vero dell'organizzazione.\n` +
+        'Per Al Ritrovo usa: TENANT_SLUG=al-ritrovo\n\n' +
+        'Se hai già aggiornato .env.local ma vedi ancora il placeholder:\n' +
+        '  • In PowerShell potresti avere $env:TENANT_SLUG impostato in sessione → Node NON sovrascrive con il file.\n' +
+        '  • Risoluzione: chiudi il terminale, aprine uno nuovo, oppure:\n' +
+        '      Remove-Item Env:TENANT_SLUG -ErrorAction SilentlyContinue\n' +
+        '    poi rilanci npm run seed:booking-menu-full',
+      1,
+    )
   }
 
   if (!supabaseUrl || !anonKey) {
-    console.error('Mancano VITE_SUPABASE_URL e/o VITE_SUPABASE_ANON_KEY (o equivalenti SUPABASE_*).')
-    process.exit(1)
+    fail('Mancano VITE_SUPABASE_URL e/o VITE_SUPABASE_ANON_KEY (o equivalenti SUPABASE_*).', 1)
   }
   if (!tenantSlug) {
-    console.error(`
-[seed-full-menu-booking] Manca lo slug dell’organizzazione.
+    fail(
+      `Manca lo slug dell'organizzazione.
 
 Aggiungi in .env.local (stesso folder del progetto) una di queste righe:
   TENANT_SLUG=il-tuo-slug
 
 Il valore è il campo slug in Supabase → Table Editor → organizations,
-(o la parte dopo /prenota/ nell’URL pubblico di prenotazione).
+(o la parte dopo /prenota/ nell'URL pubblico di prenotazione).
 
 Esempio solo per questa shell (PowerShell):
-  $env:TENANT_SLUG="nome-slug"; npm run seed:booking-menu-full
-`)
-    process.exit(1)
+  $env:TENANT_SLUG="nome-slug"; npm run seed:booking-menu-full`,
+      1,
+    )
   }
 
   /** Client per SELECT: la service role vede sempre `menu_items` (anon può essere bloccato da RLS sul DB remoto). */
@@ -182,16 +185,13 @@ Esempio solo per questa shell (PowerShell):
       : createClient(supabaseUrl, anonKey)
 
   if (serviceKey != null && String(serviceKey).trim() !== '') {
-    console.log(
-      '[seed-full-menu-booking] Lettura organizations + menu_items con SUPABASE_SERVICE_ROLE_KEY (aggira RLS).',
-    )
+    log('Lettura organizations + menu_items con SUPABASE_SERVICE_ROLE_KEY (aggira RLS).')
   }
 
   const { org, orgErr } = await fetchOrgBySlug(supabaseDb, tenantSlug)
 
   if (orgErr || !org) {
-    console.error('Organizzazione non trovata per slug:', tenantSlug, orgErr?.message || '')
-    process.exit(1)
+    fail('Organizzazione non trovata per slug', { slug: tenantSlug, err: orgErr }, 1)
   }
 
   const { menuRows: allMenuRows, menuErr } = await fetchMenuItemsForTenant(
@@ -200,8 +200,7 @@ Esempio solo per questa shell (PowerShell):
   )
 
   if (menuErr) {
-    console.error('Errore lettura menu_items:', menuErr.message)
-    process.exit(1)
+    fail('Errore lettura menu_items', menuErr, 1)
   }
 
   if (!allMenuRows.length) {
@@ -239,7 +238,7 @@ ${
   where tenant_id in (${inList});
 
 Poi rilancia questo script.`
-            : 'Apri Table Editor su menu_items e imposta tenant_id uguale all’organization.id sopra (non è stato possibile suggerire uno UPDATE automatico).'
+            : "Apri Table Editor su menu_items e imposta tenant_id uguale all'organization.id sopra (non è stato possibile suggerire uno UPDATE automatico)."
         }
 
 In alternativa modifica a mano tenant_id per ogni riga in Table Editor.
@@ -251,24 +250,22 @@ Service role non caricata. Nel file .env.local (root del repo) usa il nome esatt
   SUPABASE_SERVICE_ROLE_KEY=<Dashboard → Settings → API → service_role>
 (non usare il prefisso VITE_ per questa chiave).
 
-Se l’hai già messa: salva il file, rilancia da quella stessa cartella; su Windows evita spazi attorno a «=» nella riga.
+Se l'hai già messa: salva il file, rilancia da quella stessa cartella; su Windows evita spazi attorno a «=» nella riga.
 `
     }
 
-    console.error(`
-Nessuna riga in menu_items per tenant_id dell’organizzazione «${tenantSlug}».
+    fail(
+      `Nessuna riga in menu_items per tenant_id dell'organizzazione «${tenantSlug}».
 ${diagnostica}
-• Se l’admin è vuoto: crea le voci menù dall’admin.
+• Se l'admin è vuoto: crea le voci menù dall'admin.
 
-• Se vedi prodotti in admin ma conteggio 0 qui: solitamente slug/tenant_id non coincidono con le righe in menu_items.
-`)
-    process.exit(1)
+• Se vedi prodotti in admin ma conteggio 0 qui: solitamente slug/tenant_id non coincidono con le righe in menu_items.`,
+      1,
+    )
   }
 
   const sampledRows = pickRandomMenuRows(allMenuRows)
-  console.log(
-    `[seed-full-menu-booking] estratte ${sampledRows.length} voci su ${allMenuRows.length} disponibili (RANDOM_MENU_MIN/MAX).`,
-  )
+  log(`estratte ${sampledRows.length} voci su ${allMenuRows.length} disponibili (RANDOM_MENU_MIN/MAX).`)
 
   const numGuests = Math.max(1, parseInt(process.env.NUM_GUESTS || '12', 10))
   const desiredTime = normalizeTime(process.env.DESIRED_TIME || '20:00')
@@ -322,14 +319,13 @@ ${diagnostica}
       .single()
 
     if (insErr) {
-      console.error('Insert fallita:', insErr.message)
-      process.exit(1)
+      fail('Insert fallita', insErr, 1)
     }
 
-    console.log('OK — prenotazione PENDING (service role, come create-booking):', JSON.stringify(row, null, 2))
-    console.log(`
-Richiesta in sospeso: approvala dall’admin per vederla nel calendario con orari confermati.
-`)
+    ok('prenotazione PENDING (service role, come create-booking)', {
+      booking: sanitizeBookingLog(row),
+    })
+    log("Richiesta in sospeso: approvala dall'admin per vederla nel calendario con orari confermati.")
     return
   }
 
@@ -356,19 +352,16 @@ Richiesta in sospeso: approvala dall’admin per vederla nel calendario con orar
   }
 
   if (!res.ok) {
-    console.error('create-booking fallita:', res.status, parsed)
-    process.exit(1)
+    fail('create-booking fallita', { status: res.status, body: parsed }, 1)
   }
 
   const booking = typeof parsed === 'object' ? parsed.booking ?? parsed : parsed
-  console.log('OK — creata tramite Edge Function:', JSON.stringify(booking, null, 2))
-  console.log(`
---- Calendario admin ---
-Richiesta PENDING: compare in «Richieste in sospeso» finché non la accetti con orari confermati.
-`)
+  ok('creata tramite Edge Function', { booking: sanitizeBookingLog(booking) })
+  log(
+    'Richiesta PENDING: compare in «Richieste in sospeso» finché non la accetti con orari confermati.',
+  )
 }
 
 main().catch((e) => {
-  console.error(e)
-  process.exit(1)
+  fail('Errore imprevisto', e, 1)
 })

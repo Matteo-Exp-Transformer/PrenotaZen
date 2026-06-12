@@ -183,13 +183,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [archiveSortOrder, setArchiveSortOrder] = useState<SortOrder>('booking_date')
   const menuPricesTabRef = useRef<MenuPricesTabHandle>(null)
   const features = useFeatures()
-  const { confirmNavigation, hasUnsavedChanges, registerUnsavedSource, clearUnsavedSource } =
+  const { confirmNavigation, hasUnsavedChanges, hasBlockingOperations, registerUnsavedSource, clearUnsavedSource } =
     useUnsavedChangesGuard()
   const dashboardRootRef = useRef<HTMLDivElement>(null)
   const { data: stats } = useBookingStats()
 
   const dashboardTabHistoryBlocker = useBlocker(({ currentLocation, historyAction, nextLocation }) => {
-    if (historyAction !== 'POP' || !hasUnsavedChanges) return false
+    if (historyAction !== 'POP' || (!hasUnsavedChanges && !hasBlockingOperations)) return false
 
     const currentTab = resolveAdminDashboardTabFromPath(currentLocation.pathname)
     const nextTab = resolveAdminDashboardTabFromPath(nextLocation.pathname)
@@ -199,6 +199,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     if (dashboardTabHistoryBlocker.state !== 'blocked') return
 
+    if (hasBlockingOperations) {
+      void confirmNavigation().then(() => {
+        dashboardTabHistoryBlocker.reset()
+      })
+      return
+    }
+
     void confirmNavigation().then((ok) => {
       if (ok) {
         dashboardTabHistoryBlocker.proceed()
@@ -206,7 +213,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       dashboardTabHistoryBlocker.reset()
     })
-  }, [confirmNavigation, dashboardTabHistoryBlocker])
+  }, [confirmNavigation, dashboardTabHistoryBlocker, hasBlockingOperations])
 
   useEffect(() => {
     if (activeTab !== 'pending') setShowNewBookingPanel(false)

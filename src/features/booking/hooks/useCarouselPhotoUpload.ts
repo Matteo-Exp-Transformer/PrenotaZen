@@ -54,17 +54,17 @@ async function compressImage(file: File): Promise<Blob> {
 
 export async function uploadMenuPhotoFile(file: File, path: string): Promise<string> {
   const blob = await compressImage(file)
-  const { error } = await (supabase.storage.from(BUCKET) as any).upload(path, blob, {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     contentType: 'image/webp',
     upsert: true,
   })
-  if (error) throw new Error((error as any).message ?? 'Upload fallito')
-  const { data } = (supabase.storage.from(BUCKET) as any).getPublicUrl(path)
-  return `${(data as { publicUrl: string }).publicUrl}?v=${Date.now()}`
+  if (error) throw new Error(error.message ?? 'Upload fallito')
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return `${data.publicUrl}?v=${Date.now()}`
 }
 
 export async function removeMenuPhotoPath(path: string): Promise<void> {
-  await (supabase.storage.from(BUCKET) as any).remove([path])
+  await supabase.storage.from(BUCKET).remove([path])
 }
 
 export function storagePathFromMenuPhotoUrl(url: string): string | null {

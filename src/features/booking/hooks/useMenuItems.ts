@@ -4,6 +4,7 @@ import { supabasePublic } from '@/lib/supabasePublic'
 import type { MenuItem, MenuItemInput } from '@/types/menu'
 import { toast } from 'react-toastify'
 import { useTenantContext } from '@/contexts/TenantContext'
+import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 const DUPLICATE_MENU_ITEM_MSG =
   'Esiste già un prodotto con lo stesso nome in questa categoria'
@@ -20,6 +21,25 @@ function getMenuItemMutationError(error: unknown): string {
   return handleSupabaseError(error)
 }
 
+function buildMenuItemUpdate(
+  updates: Partial<MenuItem>,
+): TablesUpdate<'menu_items'> {
+  const patch: TablesUpdate<'menu_items'> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (updates.name !== undefined) patch.name = updates.name
+  if (updates.category !== undefined) patch.category = updates.category
+  if (updates.price !== undefined) patch.price = updates.price
+  if (updates.description !== undefined) patch.description = updates.description
+  if (updates.sort_order !== undefined) patch.sort_order = updates.sort_order
+  if (updates.is_available !== undefined) patch.is_available = updates.is_available
+  if (updates.booking_types !== undefined) patch.booking_types = updates.booking_types
+  if (updates.image_url !== undefined) patch.image_url = updates.image_url
+
+  return patch
+}
+
 // Hook for fetching all menu items
 export const useMenuItems = () => {
   const { tenantId } = useTenantContext()
@@ -27,10 +47,10 @@ export const useMenuItems = () => {
   return useQuery({
     queryKey: ['menu-items', tenantId],
     queryFn: async () => {
-      const { data, error } = await (supabasePublic
-        .from('menu_items') as any)
+      const { data, error } = await supabasePublic
+        .from('menu_items')
         .select('*')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .order('category', { ascending: true })
         .order('sort_order', { ascending: true })
 
@@ -38,7 +58,7 @@ export const useMenuItems = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as MenuItem[]
+      return data as unknown as MenuItem[]
     },
     enabled: !!tenantId,
   })
@@ -51,10 +71,10 @@ export const useMenuItemsByCategory = (category?: string) => {
   return useQuery({
     queryKey: ['menu-items', 'by-category', category, tenantId],
     queryFn: async () => {
-      let query = (supabasePublic
-        .from('menu_items') as any)
+      let query = supabasePublic
+        .from('menu_items')
         .select('*')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .order('sort_order', { ascending: true })
 
       if (category) {
@@ -67,7 +87,7 @@ export const useMenuItemsByCategory = (category?: string) => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as MenuItem[]
+      return data as unknown as MenuItem[]
     },
     enabled: !!tenantId,
   })
@@ -80,18 +100,20 @@ export const useCreateMenuItem = () => {
 
   return useMutation({
     mutationFn: async (item: MenuItemInput) => {
-      const { data, error } = await ((supabase
-        .from('menu_items') as any) as any)
-        .insert({
-          tenant_id: tenantId,
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          description: item.description || null,
-          sort_order: item.sort_order || 0,
-          is_available: item.is_available ?? true,
-          booking_types: item.booking_types ?? [],
-        })
+      const insertData: TablesInsert<'menu_items'> = {
+        tenant_id: tenantId!,
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        description: item.description || null,
+        sort_order: item.sort_order || 0,
+        is_available: item.is_available ?? true,
+        booking_types: item.booking_types ?? [],
+      }
+
+      const { data, error } = await supabase
+        .from('menu_items')
+        .insert(insertData)
         .select()
         .single()
 
@@ -99,7 +121,7 @@ export const useCreateMenuItem = () => {
         throw new Error(getMenuItemMutationError(error))
       }
 
-      return data as MenuItem
+      return data as unknown as MenuItem
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu-items'] })
@@ -118,12 +140,9 @@ export const useUpdateMenuItem = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<MenuItem> & { id: string }) => {
-      const { data, error } = await ((supabase
-        .from('menu_items') as any) as any)
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
+      const { data, error } = await supabase
+        .from('menu_items')
+        .update(buildMenuItemUpdate(updates))
         .eq('id', id)
         .eq('tenant_id', tenantId!)
         .select()
@@ -133,7 +152,7 @@ export const useUpdateMenuItem = () => {
         throw new Error(getMenuItemMutationError(error))
       }
 
-      return data as MenuItem
+      return data as unknown as MenuItem
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu-items'] })
@@ -151,12 +170,14 @@ export const useSetMenuItemAvailability = () => {
 
   return useMutation({
     mutationFn: async ({ id, is_available }: { id: string; is_available: boolean }) => {
-      const { data, error } = await ((supabase
-        .from('menu_items') as any) as any)
-        .update({
-          is_available,
-          updated_at: new Date().toISOString(),
-        })
+      const updateData: TablesUpdate<'menu_items'> = {
+        is_available,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase
+        .from('menu_items')
+        .update(updateData)
         .eq('id', id)
         .eq('tenant_id', tenantId!)
         .select()
@@ -166,7 +187,7 @@ export const useSetMenuItemAvailability = () => {
         throw new Error(getMenuItemMutationError(error))
       }
 
-      return data as MenuItem
+      return data as unknown as MenuItem
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu-items'] })
@@ -185,8 +206,8 @@ export const useDeleteMenuItem = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase
-        .from('menu_items') as any)
+      const { error } = await supabase
+        .from('menu_items')
         .delete()
         .eq('id', id)
         .eq('tenant_id', tenantId!)
@@ -206,19 +227,3 @@ export const useDeleteMenuItem = () => {
     }
   })
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

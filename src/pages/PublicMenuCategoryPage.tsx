@@ -33,11 +33,11 @@ function usePublicCategoryItems(tenantId: string | null, categoryKey: string | u
   return useQuery({
     queryKey: ['public-menu-items-category', tenantId, categoryKey],
     queryFn: async () => {
-      const { data, error } = await (supabasePublic
-        .from('menu_items') as any)
+      const { data, error } = await supabasePublic
+        .from('menu_items')
         .select('id, name, description, price, image_url, sort_order, category, is_available')
-        .eq('tenant_id', tenantId)
-        .eq('category', categoryKey)
+        .eq('tenant_id', tenantId!)
+        .eq('category', categoryKey!)
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true })
 
@@ -56,11 +56,11 @@ function usePublicCategoryMeta(tenantId: string | null, categoryKey: string | un
   return useQuery({
     queryKey: ['public-menu-category-meta', tenantId, categoryKey],
     queryFn: async () => {
-      const { data } = await (supabasePublic
-        .from('menu_categories') as any)
+      const { data } = await supabasePublic
+        .from('menu_categories')
         .select('label, is_available')
-        .eq('tenant_id', tenantId)
-        .eq('key', categoryKey)
+        .eq('tenant_id', tenantId!)
+        .eq('key', categoryKey!)
         .single()
 
       const row = data as { label: string; is_available?: boolean } | null

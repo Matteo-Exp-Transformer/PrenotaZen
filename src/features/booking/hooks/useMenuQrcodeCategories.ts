@@ -3,20 +3,21 @@ import { supabase } from '@/lib/supabase'
 import { supabasePublic } from '@/lib/supabasePublic'
 import { useTenantContext } from '@/contexts/TenantContext'
 import type { MenuQrcodeCategoryOverride } from '@/types/menu'
+import type { Tables } from '@/types/database'
 
 const QUERY_KEY = 'menu-qrcode-categories'
 
-function parseOverride(raw: Record<string, unknown>): MenuQrcodeCategoryOverride {
+function parseOverride(raw: Tables<'menu_qrcode_categories'>): MenuQrcodeCategoryOverride {
   return {
-    id: String(raw.id),
-    tenant_id: String(raw.tenant_id),
-    menu_qr_code_id: String(raw.menu_qr_code_id),
-    category_key: String(raw.category_key),
-    title: raw.title != null ? String(raw.title) : null,
-    description: raw.description != null ? String(raw.description) : null,
-    icon: raw.icon != null ? String(raw.icon) : null,
-    created_at: String(raw.created_at),
-    updated_at: String(raw.updated_at),
+    id: raw.id,
+    tenant_id: raw.tenant_id,
+    menu_qr_code_id: raw.menu_qr_code_id,
+    category_key: raw.category_key,
+    title: raw.title,
+    description: raw.description,
+    icon: raw.icon,
+    created_at: raw.created_at,
+    updated_at: raw.updated_at,
   }
 }
 
@@ -25,13 +26,13 @@ export function usePublicMenuQrcodeCategories(menuQrCodeId: string | null) {
   return useQuery({
     queryKey: [QUERY_KEY, 'public', menuQrCodeId],
     queryFn: async (): Promise<MenuQrcodeCategoryOverride[]> => {
-      const { data, error } = await (supabasePublic
-        .from('menu_qrcode_categories') as any)
+      const { data, error } = await supabasePublic
+        .from('menu_qrcode_categories')
         .select('*')
-        .eq('menu_qr_code_id', menuQrCodeId)
+        .eq('menu_qr_code_id', menuQrCodeId!)
 
       if (error || !data) return []
-      return (data as Record<string, unknown>[]).map(parseOverride)
+      return data.map(parseOverride)
     },
     enabled: !!menuQrCodeId,
   })
@@ -43,13 +44,13 @@ export function useMenuQrcodeCategoriesForQr(menuQrCodeId: string | null) {
   return useQuery({
     queryKey: [QUERY_KEY, 'admin', tenantId, menuQrCodeId],
     queryFn: async (): Promise<MenuQrcodeCategoryOverride[]> => {
-      const { data, error } = await (supabase
-        .from('menu_qrcode_categories') as any)
+      const { data, error } = await supabase
+        .from('menu_qrcode_categories')
         .select('*')
-        .eq('menu_qr_code_id', menuQrCodeId)
+        .eq('menu_qr_code_id', menuQrCodeId!)
 
       if (error || !data) return []
-      return (data as Record<string, unknown>[]).map(parseOverride)
+      return data.map(parseOverride)
     },
     enabled: !!tenantId && !!menuQrCodeId,
   })

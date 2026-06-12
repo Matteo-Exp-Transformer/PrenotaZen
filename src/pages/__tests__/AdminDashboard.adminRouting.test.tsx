@@ -80,8 +80,11 @@ vi.mock('@/contexts/UnsavedChangesContext', () => ({
   useUnsavedChangesGuard: () => ({
     confirmNavigation: mockConfirmNavigation,
     hasUnsavedChanges: false,
+    hasBlockingOperations: false,
     registerUnsavedSource: vi.fn(),
     clearUnsavedSource: vi.fn(),
+    registerBlockingSource: vi.fn(),
+    clearBlockingSource: vi.fn(),
   }),
 }))
 

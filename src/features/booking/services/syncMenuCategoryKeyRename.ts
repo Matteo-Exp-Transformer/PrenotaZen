@@ -10,12 +10,17 @@ import {
   menuQrStorageSegment,
   tryCopyQrCategoryPhotoOnRename,
 } from '@/features/booking/utils/menuQrStorage'
+import type { Json, TablesInsert, TablesUpdate } from '@/types/database'
 
 const BUCKET = 'menu-photos'
 
 function publicUrlForPath(path: string): string {
-  const { data } = (supabase.storage.from(BUCKET) as any).getPublicUrl(path)
-  return (data as { publicUrl: string }).publicUrl
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return data.publicUrl
+}
+
+function toMenuQrJson(value: unknown): Json {
+  return value as unknown as Json
 }
 
 type QrcodeCategoryRow = {
@@ -38,7 +43,8 @@ async function renameQrcodeCategoryOverridesForQr(
   previousKey: string,
   newKey: string,
 ): Promise<void> {
-  const { data: rows, error: fetchError } = await ((supabase as any).from('menu_qrcode_categories') as any)
+  const { data: rows, error: fetchError } = await supabase
+    .from('menu_qrcode_categories')
     .select('id, menu_qr_code_id, category_key, title, description, icon')
     .eq('tenant_id', tenantId)
     .eq('menu_qr_code_id', menuQrCodeId)
@@ -54,8 +60,13 @@ async function renameQrcodeCategoryOverridesForQr(
   const now = new Date().toISOString()
 
   if (!newRow) {
-    const { error } = await ((supabase as any).from('menu_qrcode_categories') as any)
-      .update({ category_key: newKey, updated_at: now })
+    const patch: TablesUpdate<'menu_qrcode_categories'> = {
+      category_key: newKey,
+      updated_at: now,
+    }
+    const { error } = await supabase
+      .from('menu_qrcode_categories')
+      .update(patch)
       .eq('id', oldRow.id)
       .eq('tenant_id', tenantId)
 
@@ -63,19 +74,22 @@ async function renameQrcodeCategoryOverridesForQr(
     return
   }
 
-  const { error: mergeError } = await ((supabase as any).from('menu_qrcode_categories') as any)
-    .update({
-      title: oldRow.title ?? newRow.title,
-      description: oldRow.description ?? newRow.description,
-      icon: oldRow.icon ?? newRow.icon,
-      updated_at: now,
-    })
+  const mergePatch: TablesUpdate<'menu_qrcode_categories'> = {
+    title: oldRow.title ?? newRow.title,
+    description: oldRow.description ?? newRow.description,
+    icon: oldRow.icon ?? newRow.icon,
+    updated_at: now,
+  }
+  const { error: mergeError } = await supabase
+    .from('menu_qrcode_categories')
+    .update(mergePatch)
     .eq('id', newRow.id)
     .eq('tenant_id', tenantId)
 
   if (mergeError) throw new Error(handleSupabaseError(mergeError))
 
-  const { error: deleteError } = await ((supabase as any).from('menu_qrcode_categories') as any)
+  const { error: deleteError } = await supabase
+    .from('menu_qrcode_categories')
     .delete()
     .eq('id', oldRow.id)
     .eq('tenant_id', tenantId)
@@ -94,7 +108,8 @@ export async function syncMenuCategoryKeyRename(
 ): Promise<void> {
   if (previousKey === newKey) return
 
-  const { data: qrRows, error: qrListError } = await ((supabase as any).from('menu_qr_codes') as any)
+  const { data: qrRows, error: qrListError } = await supabase
+    .from('menu_qr_codes')
     .select('*')
     .eq('tenant_id', tenantId)
 
@@ -127,12 +142,14 @@ export async function syncMenuCategoryKeyRename(
     }
 
     if (patched.changed) {
-      const { error: updateError } = await ((supabase as any).from('menu_qr_codes') as any)
-        .update({
-          category_filter: patched.category_filter,
-          category_images,
-          updated_at: now,
-        })
+      const patch: TablesUpdate<'menu_qr_codes'> = {
+        category_filter: patched.category_filter,
+        category_images: toMenuQrJson(category_images),
+        updated_at: now,
+      }
+      const { error: updateError } = await supabase
+        .from('menu_qr_codes')
+        .update(patch)
         .eq('id', qr.id)
         .eq('tenant_id', tenantId)
 
@@ -142,7 +159,8 @@ export async function syncMenuCategoryKeyRename(
     await renameQrcodeCategoryOverridesForQr(tenantId, qr.id, previousKey, newKey)
   }
 
-  const { data: formSetting, error: formFetchError } = await ((supabase as any).from('restaurant_settings') as any)
+  const { data: formSetting, error: formFetchError } = await supabase
+    .from('restaurant_settings')
     .select('setting_value')
     .eq('tenant_id', tenantId)
     .eq('setting_key', 'booking_public_form_config')
@@ -169,16 +187,17 @@ export async function syncMenuCategoryKeyRename(
         nextConfig as never,
       )
 
-      const { error: formUpsertError } = await ((supabase as any).from('restaurant_settings') as any).upsert(
-        [
-          {
-            tenant_id: tenantId,
-            setting_key: 'booking_public_form_config',
-            setting_value: serialized,
-          },
-        ],
-        { onConflict: 'tenant_id,setting_key' },
-      )
+      const rows: TablesInsert<'restaurant_settings'>[] = [
+        {
+          tenant_id: tenantId,
+          setting_key: 'booking_public_form_config',
+          setting_value: serialized as Json,
+        },
+      ]
+
+      const { error: formUpsertError } = await supabase
+        .from('restaurant_settings')
+        .upsert(rows, { onConflict: 'tenant_id,setting_key' })
 
       if (formUpsertError) {
         throw new Error(handleSupabaseError(formUpsertError))

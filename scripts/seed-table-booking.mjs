@@ -12,6 +12,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { createCliLogger, sanitizeBookingLog } from './_cliLog.mjs'
 import {
   FIXED_BOOKING_DATE,
   PLACEHOLDER_SLUGS,
@@ -23,6 +24,8 @@ import {
   resolveSeedClientName,
 } from './bookingSeedShared.mjs'
 
+const { log, ok, fail } = createCliLogger('seed-table-booking')
+
 async function main() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
@@ -31,33 +34,30 @@ async function main() {
   const slugFromFile = parseTenantSlugFromProjectRoot()
   const tenantSlug = resolveTenantSlugFromEnv()
 
-  console.log('[seed-table-booking] slug risolto:', JSON.stringify(tenantSlug || '(vuoto)'))
+  log('slug risolto', { slug: tenantSlug || '(vuoto)' })
   if (slugFromFile) {
-    console.log('[seed-table-booking] (tenant da .env.local / .env nel repo)')
+    log('tenant da .env.local / .env nel repo')
   }
 
   if (PLACEHOLDER_SLUGS.has(tenantSlug)) {
-    console.error(`
-[seed-table-booking] Placeholder (${tenantSlug}): imposta TENANT_SLUG allo slug vero dell'organizzazione.
-`)
-    process.exit(1)
+    fail(
+      `Placeholder (${tenantSlug}): imposta TENANT_SLUG allo slug vero dell'organizzazione.`,
+      1,
+    )
   }
 
   if (!supabaseUrl || !anonKey) {
-    console.error('Mancano VITE_SUPABASE_URL e/o VITE_SUPABASE_ANON_KEY (o SUPABASE_*).')
-    process.exit(1)
+    fail('Mancano VITE_SUPABASE_URL e/o VITE_SUPABASE_ANON_KEY (o SUPABASE_*).', 1)
   }
   if (!tenantSlug) {
-    console.error('Manca TENANT_SLUG / VITE_TENANT_SLUG in .env.local')
-    process.exit(1)
+    fail('Manca TENANT_SLUG / VITE_TENANT_SLUG in .env.local', 1)
   }
 
   const supabaseAnon = createClient(supabaseUrl, anonKey)
   const { org, orgErr } = await fetchOrgBySlug(supabaseAnon, tenantSlug)
 
   if (orgErr || !org) {
-    console.error('Organizzazione non trovata per slug:', tenantSlug, orgErr?.message || '')
-    process.exit(1)
+    fail('Organizzazione non trovata per slug', { slug: tenantSlug, err: orgErr }, 1)
   }
 
   const numGuests = Math.max(1, parseInt(process.env.NUM_GUESTS || '4', 10))
@@ -100,12 +100,11 @@ async function main() {
       .single()
 
     if (insErr) {
-      console.error('Insert fallita:', insErr.message)
-      process.exit(1)
+      fail('Insert fallita', insErr, 1)
     }
 
-    console.log('OK — prenotazione solo tavolo PENDING (service role):', JSON.stringify(row, null, 2))
-    console.log('Richiesta in sospeso: approvala dall’admin per il calendario.')
+    ok('prenotazione solo tavolo PENDING (service role)', { booking: sanitizeBookingLog(row) })
+    log('Richiesta in sospeso: approvala dall’admin per il calendario.')
     return
   }
 
@@ -131,19 +130,14 @@ async function main() {
   }
 
   if (!res.ok) {
-    console.error('create-booking fallita:', res.status, parsed)
-    process.exit(1)
+    fail('create-booking fallita', { status: res.status, body: parsed }, 1)
   }
 
   const booking = typeof parsed === 'object' ? parsed.booking ?? parsed : parsed
-  console.log('OK — creata tramite Edge Function:', JSON.stringify(booking, null, 2))
-  console.log(`
---- Calendario admin ---
-Richiesta PENDING: compare tra le richieste in sospeso finché non la accetti.
-`)
+  ok('creata tramite Edge Function', { booking: sanitizeBookingLog(booking) })
+  log('Richiesta PENDING: compare tra le richieste in sospeso finché non la accetti.')
 }
 
 main().catch((e) => {
-  console.error(e)
-  process.exit(1)
+  fail('Errore imprevisto', e, 1)
 })

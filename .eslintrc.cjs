@@ -42,4 +42,31 @@ module.exports = {
     '**/__tests__/**',
     'agenti-locali/**',
   ],
+  overrides: [
+    {
+      files: ['src/**/*.{ts,tsx}'],
+      excludedFiles: [
+        'src/lib/logger.ts',
+        'src/main.tsx',
+        'src/lib/devConsole.ts',
+        '**/*.test.{ts,tsx}',
+        '**/__tests__/**',
+      ],
+      rules: {
+        // FU-LOG-1: app code uses logger.* — not console.log/debug/info
+        'no-console': ['error', { allow: ['warn', 'error'] }],
+      },
+    },
+    {
+      files: [
+        'src/lib/logger.ts',
+        'src/main.tsx',
+        'src/lib/devConsole.ts',
+      ],
+      rules: {
+        // FU-LOG-1 allowlist — implementation / DevTools strip / dev health banner
+        'no-console': 'off',
+      },
+    },
+  ],
 }

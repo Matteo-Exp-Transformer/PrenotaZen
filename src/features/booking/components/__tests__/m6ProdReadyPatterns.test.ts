@@ -17,6 +17,9 @@ describe('M6 prod-ready patterns', () => {
       'src/features/booking/components/MenuPricesTab.tsx',
       'src/features/booking/components/settings/BookingFormConfigPanel.tsx',
       'src/features/booking/components/settings/BookingFormPromoSection.tsx',
+      'src/features/booking/components/servizio/RoomConfigModal.tsx',
+      'src/features/booking/components/servizio/TableFormModal.tsx',
+      'src/features/booking/components/servizio/ServiceSlotsManager.tsx',
     ]
 
     for (const file of files) {
@@ -32,6 +35,25 @@ describe('M6 prod-ready patterns', () => {
       'src/features/booking/hooks/useAdminBookingRequests.ts',
       'src/features/booking/hooks/useBookingMutations.ts',
       'src/features/booking/hooks/useBookingQueries.ts',
+      'src/features/booking/hooks/useRestaurantSetting.ts',
+      'src/hooks/useBusinessHours.ts',
+      'src/lib/email.ts',
+      'src/features/booking/hooks/useBookingRequests.ts',
+      'src/features/booking/hooks/useMenuItems.ts',
+      'src/features/booking/hooks/useMenuQrCodes.ts',
+      'src/features/booking/hooks/useMenuQrcodeCategories.ts',
+      'src/features/booking/hooks/useMenuCategories.ts',
+      'src/hooks/useRestaurantName.ts',
+      'src/features/booking/services/syncMenuCategoryKeyRename.ts',
+      'src/features/booking/services/syncMenuCategoryKeyDelete.ts',
+      'src/pages/PublicMenuPage.tsx',
+      'src/pages/PublicMenuCategoryPage.tsx',
+      'src/lib/menuPhotoUpload.ts',
+      'src/features/booking/hooks/useCarouselPhotoUpload.ts',
+      'src/features/booking/components/servizio/WalkInLimitCard.tsx',
+      'src/features/booking/components/servizio/RoomConfigModal.tsx',
+      'src/features/booking/components/servizio/TableFormModal.tsx',
+      'src/features/booking/components/servizio/ServiceSlotsManager.tsx',
     ]
 
     for (const file of files) {

@@ -15,23 +15,23 @@ export const useBusinessHours = () => {
     queryKey: ['restaurant_settings', 'business_hours', tenantId],
     queryFn: async (): Promise<BusinessHours | null> => {
 
-      const { data, error } = await (supabasePublic
-        .from('restaurant_settings') as any)
+      const { data, error } = await supabasePublic
+        .from('restaurant_settings')
         .select('setting_value')
         .eq('setting_key', 'business_hours')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .maybeSingle()
 
       if (error) {
         return null
       }
 
-      if (!data || !(data as any).setting_value) {
+      if (!data?.setting_value) {
         return null
       }
 
       // Parse and validate structure
-      const parsed = parseBusinessHours((data as any).setting_value)
+      const parsed = parseBusinessHours(data.setting_value)
 
       if (!parsed) {
         return null

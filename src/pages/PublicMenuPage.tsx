@@ -39,10 +39,10 @@ function usePublicCategories(tenantId: string | null, categoryFilter: string[] |
         return []
       }
 
-      let query = (supabasePublic
-        .from('menu_categories') as any)
+      let query = supabasePublic
+        .from('menu_categories')
         .select('id, key, label, description, sort_order, is_available')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .order('sort_order', { ascending: true })
         .order('label', { ascending: true })
 

@@ -234,7 +234,6 @@ export function printDevHealth(title = 'STATO APP'): void {
   lastHealthSignature = signature
 
   // Un solo gruppo: titolo in cima, dati sotto. `groupCollapsed` = compatto, espandibile a click.
-  /* eslint-disable no-console */
   console.groupCollapsed(
     `%c ${title} %c ${headline} `,
     'background:#2f7d32;color:#fff;border-radius:3px 0 0 3px;padding:2px 6px;font-weight:bold',
@@ -243,7 +242,6 @@ export function printDevHealth(title = 'STATO APP'): void {
   if (countsLine) console.log('%c' + countsLine, 'color:#33503a;font-weight:bold')
   if (health.notes?.length) console.log('%c' + health.notes.join(' · '), 'color:#8a8a8a')
   console.groupEnd()
-  /* eslint-enable no-console */
 }
 
 /** Snapshot corrente (per il pannello che mostra anche la salute in testa). */

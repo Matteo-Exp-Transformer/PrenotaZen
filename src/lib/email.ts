@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger'
+import type { Json, TablesInsert } from '@/types/database'
 
 // Email client using Resend API
 // https://resend.com/docs/api-reference
@@ -21,7 +22,7 @@ interface EmailLog {
   email_type: string
   recipient_email: string
   status: 'sent' | 'failed' | 'pending'
-  provider_response?: Record<string, any>
+  provider_response?: Record<string, unknown>
   error_message?: string
 }
 
@@ -105,18 +106,17 @@ export const logEmailToDatabase = async (log: EmailLog): Promise<void> => {
   try {
     const { supabase } = await import('./supabase')
 
-    const logData = {
+    const logData: TablesInsert<'email_logs'> = {
       tenant_id: log.tenant_id,
       booking_id: log.booking_id || null,
       email_type: log.email_type,
       recipient_email: log.recipient_email,
       status: log.status,
-      provider_response: log.provider_response || null,
+      provider_response: (log.provider_response ?? null) as Json | null,
       error_message: log.error_message || null,
     }
 
-
-    const { error } = await supabase.from('email_logs').insert(logData as any)
+    const { error } = await supabase.from('email_logs').insert(logData)
 
     if (error) {
       logger.error('❌ [logEmailToDatabase] Error:', error)

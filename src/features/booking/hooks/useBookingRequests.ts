@@ -4,6 +4,7 @@ import type { BookingRequest, BookingRequestInput } from '@/types/booking'
 import { toast } from 'react-toastify'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
+import type { TablesUpdate } from '@/types/database'
 
 // Lock globale per prevenire chiamate multiple simultanee alla mutation
 // Usa un lock atomico con ID univoco per prevenire race conditions
@@ -156,10 +157,10 @@ export const useBookingRequests = (status?: 'pending' | 'accepted' | 'rejected')
   return useQuery({
     queryKey: ['booking-requests', status, tenantId],
     queryFn: async () => {
-      let query = (supabase
-        .from('booking_requests') as any)
+      let query = supabase
+        .from('booking_requests')
         .select('*')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .order('created_at', { ascending: false })
 
       if (status) {
@@ -172,7 +173,7 @@ export const useBookingRequests = (status?: 'pending' | 'accepted' | 'rejected')
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest[]
+      return data as unknown as BookingRequest[]
     },
     enabled: !!tenantId,
   })
@@ -196,17 +197,18 @@ export const useUpdateBookingStatus = () => {
       confirmed_end?: string
       rejection_reason?: string
     }) => {
-      const updateData: any = {
-        status
+      const updateData: TablesUpdate<'booking_requests'> = {
+        status,
+        updated_at: new Date().toISOString(),
       }
 
       if (confirmed_start) updateData.confirmed_start = confirmed_start
       if (confirmed_end) updateData.confirmed_end = confirmed_end
       if (rejection_reason) updateData.rejection_reason = rejection_reason
 
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update(updateData as any)
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updateData)
         .eq('id', id)
         .eq('tenant_id', tenantId!)
         .select()
@@ -216,7 +218,7 @@ export const useUpdateBookingStatus = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest
+      return data as unknown as BookingRequest
     },
     onSuccess: () => {
       toast.success('Stato aggiornato con successo')

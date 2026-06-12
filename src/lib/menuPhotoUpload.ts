@@ -66,23 +66,21 @@ export async function uploadMenuPhoto(
   const blob = await compressImage(file)
   const path = menuPhotoPath(tenantId, menuItemId)
 
-  const { error } = await (supabase.storage
-    .from(BUCKET) as any)
-    .upload(path, blob, {
-      contentType: 'image/webp',
-      upsert: true,
-    })
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+    contentType: 'image/webp',
+    upsert: true,
+  })
 
-  if (error) throw new Error(`Errore upload foto: ${(error as any).message ?? error}`)
+  if (error) throw new Error(`Errore upload foto: ${error.message}`)
 
-  const { data } = (supabase.storage.from(BUCKET) as any).getPublicUrl(path)
-  return `${(data as { publicUrl: string }).publicUrl}?v=${Date.now()}`
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return `${data.publicUrl}?v=${Date.now()}`
 }
 
 /** Elimina la foto di un piatto da Storage (non lancia se non esiste). */
 export async function deleteMenuPhoto(tenantId: string, menuItemId: string): Promise<void> {
   const path = menuPhotoPath(tenantId, menuItemId)
-  await (supabase.storage.from(BUCKET) as any).remove([path])
+  await supabase.storage.from(BUCKET).remove([path])
 }
 
 /** Carica la foto di una categoria (pagina Prenota) e restituisce l'URL pubblico. */
@@ -94,19 +92,19 @@ export async function uploadMenuCategoryPhoto(
   const blob = await compressImage(file)
   const path = menuCategoryPhotoPath(tenantId, categoryId)
 
-  const { error } = await (supabase.storage.from(BUCKET) as any).upload(path, blob, {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     contentType: 'image/webp',
     upsert: true,
   })
 
-  if (error) throw new Error(`Errore upload foto categoria: ${(error as any).message ?? error}`)
+  if (error) throw new Error(`Errore upload foto categoria: ${error.message}`)
 
-  const { data } = (supabase.storage.from(BUCKET) as any).getPublicUrl(path)
-  return `${(data as { publicUrl: string }).publicUrl}?v=${Date.now()}`
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return `${data.publicUrl}?v=${Date.now()}`
 }
 
 /** Elimina la foto categoria Prenota da Storage. */
 export async function deleteMenuCategoryPhoto(tenantId: string, categoryId: string): Promise<void> {
   const path = menuCategoryPhotoPath(tenantId, categoryId)
-  await (supabase.storage.from(BUCKET) as any).remove([path])
+  await supabase.storage.from(BUCKET).remove([path])
 }

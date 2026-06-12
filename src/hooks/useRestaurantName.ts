@@ -16,16 +16,16 @@ export const useRestaurantName = (): string | null => {
   const { data } = useQuery({
     queryKey: ['restaurant_settings', 'restaurant_name', tenantId],
     queryFn: async (): Promise<string | null> => {
-      const { data, error } = await (supabasePublic
-        .from('restaurant_settings') as any)
+      const { data, error } = await supabasePublic
+        .from('restaurant_settings')
         .select('setting_value')
         .eq('setting_key', 'restaurant_name')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .maybeSingle()
 
       if (error || !data) return null
 
-      const raw = (data as any).setting_value
+      const raw = data.setting_value
       const max = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName
       if (typeof raw === 'string') {
         const trimmed = raw.trim()

@@ -6,6 +6,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { BookingRequest } from '@/types/booking'
 
+vi.mock('@/contexts/UnsavedChangesContext', () => ({
+  useUnsavedChangesGuard: () => ({
+    registerBlockingSource: vi.fn(),
+    clearBlockingSource: vi.fn(),
+    hasBlockingOperations: false,
+    hasUnsavedChanges: false,
+    confirmNavigation: vi.fn().mockResolvedValue(true),
+    registerUnsavedSource: vi.fn(),
+    clearUnsavedSource: vi.fn(),
+  }),
+}))
+
 vi.mock('@/hooks/useFeatures', () => ({
   useFeatures: () => ({
     noShow: true,

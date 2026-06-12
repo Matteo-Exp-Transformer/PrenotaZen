@@ -5,6 +5,11 @@ import { deleteCategoryKeyFromQrRow } from '@/features/booking/utils/menuQrCateg
 import { parseMenuQrCodeRow } from '@/features/booking/utils/menuQrAppearance'
 import { menuQrCategoryPhotoPath, menuQrStorageSegment } from '@/features/booking/utils/menuQrStorage'
 import { removeMenuPhotoPath } from '@/features/booking/hooks/useCarouselPhotoUpload'
+import type { Json, TablesInsert, TablesUpdate } from '@/types/database'
+
+function toMenuQrJson(value: unknown): Json {
+  return value as unknown as Json
+}
 
 /**
  * Dopo delete categoria in `menu_categories`: rimuove la chiave da tutti i Menù QR del tenant,
@@ -14,7 +19,8 @@ export async function syncMenuCategoryKeyDelete(
   tenantId: string,
   categoryKey: string,
 ): Promise<void> {
-  const { data: qrRows, error: qrListError } = await ((supabase as any).from('menu_qr_codes') as any)
+  const { data: qrRows, error: qrListError } = await supabase
+    .from('menu_qr_codes')
     .select('*')
     .eq('tenant_id', tenantId)
 
@@ -42,12 +48,14 @@ export async function syncMenuCategoryKeyDelete(
     }
 
     if (patched.changed) {
-      const { error: updateError } = await ((supabase as any).from('menu_qr_codes') as any)
-        .update({
-          category_filter: patched.category_filter,
-          category_images: patched.category_images,
-          updated_at: now,
-        })
+      const patch: TablesUpdate<'menu_qr_codes'> = {
+        category_filter: patched.category_filter,
+        category_images: toMenuQrJson(patched.category_images),
+        updated_at: now,
+      }
+      const { error: updateError } = await supabase
+        .from('menu_qr_codes')
+        .update(patch)
         .eq('id', qr.id)
         .eq('tenant_id', tenantId)
 
@@ -55,7 +63,8 @@ export async function syncMenuCategoryKeyDelete(
     }
   }
 
-  const { error: overridesDeleteError } = await ((supabase as any).from('menu_qrcode_categories') as any)
+  const { error: overridesDeleteError } = await supabase
+    .from('menu_qrcode_categories')
     .delete()
     .eq('tenant_id', tenantId)
     .eq('category_key', categoryKey)
@@ -64,7 +73,8 @@ export async function syncMenuCategoryKeyDelete(
     throw new Error(handleSupabaseError(overridesDeleteError))
   }
 
-  const { data: formSetting, error: formFetchError } = await ((supabase as any).from('restaurant_settings') as any)
+  const { data: formSetting, error: formFetchError } = await supabase
+    .from('restaurant_settings')
     .select('setting_value')
     .eq('tenant_id', tenantId)
     .eq('setting_key', 'booking_public_form_config')
@@ -90,16 +100,17 @@ export async function syncMenuCategoryKeyDelete(
         nextConfig as never,
       )
 
-      const { error: formUpsertError } = await ((supabase as any).from('restaurant_settings') as any).upsert(
-        [
-          {
-            tenant_id: tenantId,
-            setting_key: 'booking_public_form_config',
-            setting_value: serialized,
-          },
-        ],
-        { onConflict: 'tenant_id,setting_key' },
-      )
+      const rows: TablesInsert<'restaurant_settings'>[] = [
+        {
+          tenant_id: tenantId,
+          setting_key: 'booking_public_form_config',
+          setting_value: serialized as Json,
+        },
+      ]
+
+      const { error: formUpsertError } = await supabase
+        .from('restaurant_settings')
+        .upsert(rows, { onConflict: 'tenant_id,setting_key' })
 
       if (formUpsertError) {
         throw new Error(handleSupabaseError(formUpsertError))

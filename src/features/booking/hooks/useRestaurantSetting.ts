@@ -8,6 +8,7 @@ import {
   type RestaurantSettingKeyV1,
   type RestaurantSettingValueMap,
 } from '@/features/booking/lib/restaurantSettingRegistry'
+import type { Json, TablesInsert } from '@/types/database'
 
 export function useRestaurantSetting<K extends RestaurantSettingKeyV1>(
   key: K,
@@ -22,8 +23,8 @@ export function useRestaurantSetting<K extends RestaurantSettingKeyV1>(
       // client autenticato: la policy RLS anon le nasconde (whitelist sole 11
       // chiavi pubbliche). Le pagine pubbliche restano su supabasePublic.
       const client = options?.authenticated ? supabase : supabasePublic
-      const { data, error } = await (client
-        .from('restaurant_settings') as any)
+      const { data, error } = await client
+        .from('restaurant_settings')
         .select('setting_value')
         .eq('tenant_id', tenantId!)
         .eq('setting_key', key)
@@ -80,7 +81,7 @@ export function useUpsertRestaurantSetting() {
         throw new Error('Tenant non disponibile')
       }
 
-      const rows = items.map(({ key, value }) => {
+      const rows: TablesInsert<'restaurant_settings'>[] = items.map(({ key, value }) => {
         const reg = restaurantSettingRegistry[key]
         const err = reg.validate(value)
         if (err) {
@@ -89,11 +90,11 @@ export function useUpsertRestaurantSetting() {
         return {
           tenant_id: tenantId,
           setting_key: key,
-          setting_value: reg.serializeToDb(value as never),
+          setting_value: reg.serializeToDb(value as never) as Json,
         }
       })
 
-      const { error } = await (supabase.from('restaurant_settings') as any).upsert(rows, {
+      const { error } = await supabase.from('restaurant_settings').upsert(rows, {
         onConflict: 'tenant_id,setting_key',
       })
 

@@ -6,6 +6,7 @@ import { handleSupabaseError, supabase } from '@/lib/supabase'
 import { supabasePublic } from '@/lib/supabasePublic'
 import { syncMenuCategoryKeyRename } from '@/features/booking/services/syncMenuCategoryKeyRename'
 import { syncMenuCategoryKeyDelete } from '@/features/booking/services/syncMenuCategoryKeyDelete'
+import type { TablesInsert, TablesUpdate } from '@/types/database'
 
 export interface MenuCategoryRecord {
   id: string
@@ -66,15 +67,40 @@ function isMenuCategoriesMissingError(error: unknown): boolean {
   )
 }
 
+function buildMenuCategoryUpdate(input: {
+  key: string
+  label: string
+  description?: string | null
+  image_url?: string | null
+  is_available?: boolean
+}): TablesUpdate<'menu_categories'> {
+  const patch: TablesUpdate<'menu_categories'> = {
+    key: input.key,
+    label: input.label,
+    description: input.description?.trim() || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.image_url !== undefined) {
+    patch.image_url = input.image_url
+  }
+  if (typeof input.is_available === 'boolean') {
+    patch.is_available = input.is_available
+  }
+
+  return patch
+}
+
 export const useMenuCategories = () => {
   const { tenantId } = useTenantContext()
 
   return useQuery({
     queryKey: ['menu-categories', tenantId],
     queryFn: async () => {
-      const { data, error } = await ((supabasePublic as any).from('menu_categories') as any)
+      const { data, error } = await supabasePublic
+        .from('menu_categories')
         .select('*')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .order('sort_order', { ascending: true })
         .order('label', { ascending: true })
 
@@ -101,17 +127,19 @@ export const useCreateMenuCategory = () => {
 
   return useMutation({
     mutationFn: async (category: MenuCategoryInput) => {
-      const { data, error } = await (((supabase as any)
-        .from('menu_categories') as any) as any)
-        .insert({
-          tenant_id: tenantId,
-          key: category.key,
-          label: category.label,
-          description: category.description?.trim() || null,
-          image_url: category.image_url ?? null,
-          is_available: category.is_available ?? true,
-          sort_order: category.sort_order ?? 999
-        })
+      const insertData: TablesInsert<'menu_categories'> = {
+        tenant_id: tenantId!,
+        key: category.key,
+        label: category.label,
+        description: category.description?.trim() || null,
+        image_url: category.image_url ?? null,
+        is_available: category.is_available ?? true,
+        sort_order: category.sort_order ?? 999,
+      }
+
+      const { data, error } = await supabase
+        .from('menu_categories')
+        .insert(insertData)
         .select()
         .single()
 
@@ -138,22 +166,10 @@ export const useUpdateMenuCategory = () => {
   return useMutation({
     mutationFn: async ({ id, key, previousKey, label, description, image_url, is_available }: MenuCategoryUpdateInput) => {
       const now = new Date().toISOString()
-      const supabaseAny = supabase as any
+      const patch = buildMenuCategoryUpdate({ key, label, description, image_url, is_available })
 
-      const patch: Record<string, unknown> = {
-        key,
-        label,
-        description: description?.trim() || null,
-        updated_at: now,
-      }
-      if (image_url !== undefined) {
-        patch.image_url = image_url
-      }
-      if (typeof is_available === 'boolean') {
-        patch.is_available = is_available
-      }
-
-      const { data, error } = await ((supabaseAny.from('menu_categories') as any) as any)
+      const { data, error } = await supabase
+        .from('menu_categories')
         .update(patch)
         .eq('id', id)
         .eq('tenant_id', tenantId!)
@@ -167,11 +183,14 @@ export const useUpdateMenuCategory = () => {
       const keyRenamed = previousKey !== key
 
       if (keyRenamed) {
-        const { error: menuItemsError } = await ((supabaseAny.from('menu_items') as any) as any)
-          .update({
-            category: key,
-            updated_at: now
-          })
+        const menuItemsUpdate: TablesUpdate<'menu_items'> = {
+          category: key,
+          updated_at: now,
+        }
+
+        const { error: menuItemsError } = await supabase
+          .from('menu_items')
+          .update(menuItemsUpdate)
           .eq('tenant_id', tenantId!)
           .eq('category', previousKey)
 
@@ -219,8 +238,14 @@ export const useUpdateCategoryDescription = () => {
 
   return useMutation({
     mutationFn: async ({ id, description }: { id: string; description: string | null }) => {
-      const { error } = await ((supabase as any).from('menu_categories') as any)
-        .update({ description, updated_at: new Date().toISOString() })
+      const updateData: TablesUpdate<'menu_categories'> = {
+        description,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase
+        .from('menu_categories')
+        .update(updateData)
         .eq('id', id)
         .eq('tenant_id', tenantId!)
 
@@ -242,11 +267,14 @@ export const useSetMenuCategoryAvailability = () => {
 
   return useMutation({
     mutationFn: async ({ id, is_available }: { id: string; is_available: boolean }) => {
-      const { data, error } = await ((supabase as any).from('menu_categories') as any)
-        .update({
-          is_available,
-          updated_at: new Date().toISOString(),
-        })
+      const updateData: TablesUpdate<'menu_categories'> = {
+        is_available,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase
+        .from('menu_categories')
+        .update(updateData)
         .eq('id', id)
         .eq('tenant_id', tenantId!)
         .select()
@@ -274,7 +302,8 @@ export const useDeleteMenuCategory = () => {
 
   return useMutation({
     mutationFn: async ({ id, categoryKey }: DeleteMenuCategoryInput) => {
-      const { error: itemsError } = await (supabase.from('menu_items') as any)
+      const { error: itemsError } = await supabase
+        .from('menu_items')
         .delete()
         .eq('tenant_id', tenantId!)
         .eq('category', categoryKey)
@@ -283,7 +312,8 @@ export const useDeleteMenuCategory = () => {
         throw new Error(handleSupabaseError(itemsError))
       }
 
-      const { error } = await (supabase.from('menu_categories') as any)
+      const { error } = await supabase
+        .from('menu_categories')
         .delete()
         .eq('id', id)
         .eq('tenant_id', tenantId!)
