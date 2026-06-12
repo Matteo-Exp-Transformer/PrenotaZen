@@ -19,14 +19,6 @@ const mutateSpy = vi.fn()
 vi.mock('@/features/booking/hooks/useBookingRequests', () => ({
   useCreateBookingRequest: () => ({ mutate: mutateSpy, isPending: false }),
 }))
-vi.mock('@/features/booking/hooks/useCheckSlotAvailability', () => ({
-  useCheckSlotAvailability: () => ({
-    check: vi.fn().mockResolvedValue({ available: true }),
-    isChecking: false,
-    result: null,
-    reset: vi.fn(),
-  }),
-}))
 vi.mock('@/hooks/useRateLimit', () => ({
   useRateLimit: () => ({ checkRateLimit: () => true, isBlocked: false }),
 }))

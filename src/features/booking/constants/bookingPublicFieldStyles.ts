@@ -111,10 +111,3 @@ export function publicFormSectionErrorClass(
     lightTextOnDarkBackground ? 'text-white' : 'text-red-500',
   )
 }
-
-/** Disponibilità slot — box rosso su sfondo chiaro; bianco su full-page. */
-export function publicFormSlotAvailabilityErrorClass(lightTextOnDarkBackground: boolean): string {
-  return lightTextOnDarkBackground
-    ? 'text-left text-sm font-semibold text-white'
-    : 'rounded-lg border border-red-200 bg-red-50 p-4 text-left text-sm font-semibold text-red-700'
-}

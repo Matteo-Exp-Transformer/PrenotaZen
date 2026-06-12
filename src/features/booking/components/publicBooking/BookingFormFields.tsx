@@ -41,7 +41,6 @@ interface BookingFormFieldsProps {
   onTimeChange: (time: string) => void
   onNumGuestsChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onNumGuestsKeyPress: (e: React.KeyboardEvent<HTMLInputElement>) => void
-  resetAvailability: () => void
   setErrors: (errors: Record<string, string>) => void
   /** Testo errore in bianco solo su sfondo full-page foto. */
   lightTextOnDarkBackground?: boolean
@@ -60,7 +59,6 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
   onTimeChange,
   onNumGuestsChange,
   onNumGuestsKeyPress,
-  resetAvailability,
   setErrors,
   lightTextOnDarkBackground = false,
 }) => {
@@ -87,7 +85,6 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
 
   const handleDateChange = (newDate: string) => {
     onDateChange(newDate)
-    resetAvailability()
     const timeError = newDate && formData.desired_time
       ? validateDateTime(newDate, formData.desired_time)
       : null
@@ -106,7 +103,6 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
 
   const handleTimeChange = (newTime: string) => {
     onTimeChange(newTime)
-    resetAvailability()
     const timeError = formData.desired_date && newTime
       ? validateDateTime(formData.desired_date, newTime)
       : null

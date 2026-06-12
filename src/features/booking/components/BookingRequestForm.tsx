@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BookingRequestInput } from '@/types/booking'
 import { activeSubTabShowsMenu, modeUsesDietary } from '../utils/bookingCapabilities'
 import { useCreateBookingRequest } from '../hooks/useBookingRequests'
-import { useCheckSlotAvailability } from '../hooks/useCheckSlotAvailability'
 import { useRateLimit } from '@/hooks/useRateLimit'
 import { Send, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { MenuSelection } from './MenuSelection'
@@ -55,7 +54,6 @@ import { resolveBookingStoredIconKey } from '@/features/public-menu/categoryIcon
 import {
   BOOKING_PUBLIC_CONTENT_WIDTH,
   publicFormSectionErrorClass,
-  publicFormSlotAvailabilityErrorClass,
 } from '../constants/bookingPublicFieldStyles'
 import {
   BOOKING_PUBLIC_FIELD_ATTENTION_CLASS,
@@ -533,7 +531,6 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     if (inputValue === '') {
       setFormData({ ...formData, num_guests: 0, menu_total_booking: 0 })
       setErrors({ ...errors, num_guests: '' })
-      resetAvailability()
       return
     }
     if (/^\d+$/.test(inputValue)) {
@@ -732,7 +729,6 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   ])
 
   const { mutate, isPending } = useCreateBookingRequest()
-  const { check: checkSlotAvailability, isChecking: isCheckingAvailability, reset: resetAvailability } = useCheckSlotAvailability()
   const { checkRateLimit, isBlocked } = useRateLimit({
     maxAttempts: 3,
     timeWindow: 60000 // 1 minuto
@@ -741,8 +737,8 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
 
   // Notifica il parent quando cambia lo stato disabled del submit
   useEffect(() => {
-    onIsDisabledChange?.(isPending || isBlocked || isSubmitting || isCheckingAvailability)
-  }, [isPending, isBlocked, isSubmitting, isCheckingAvailability, onIsDisabledChange])
+    onIsDisabledChange?.(isPending || isBlocked || isSubmitting)
+  }, [isPending, isBlocked, isSubmitting, onIsDisabledChange])
   const { data: menuPromos = [] } = useRestaurantSetting('booking_menu_promos')
 
   const { resolvedPromo, viewedPromoIdsRef, resetViewedPromos } = useMenuPromoViewTracking({
@@ -1019,28 +1015,6 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     // Imposta tutti i flag per prevenire doppi submit
     isSubmittingRef.current = true
     setIsSubmitting(true)
-
-    // Check disponibilità fascia (client-side pre-submit)
-    if (tenantSlug && formData.desired_date && formData.desired_time && formData.num_guests > 0) {
-      const availability = await checkSlotAvailability({
-        tenantSlug,
-        desired_date: formData.desired_date,
-        desired_time: formData.desired_time,
-        num_guests: formData.num_guests,
-      })
-      if (!availability.available) {
-        isSubmittingRef.current = false
-        setIsSubmitting(false)
-        releaseGlobalLock(lockId)
-        setErrors((prev) => ({ ...prev, slot_availability: availability.message ?? 'Fascia non disponibile per questa data.' }))
-        toast.error(availability.message ?? 'Fascia non disponibile per questa data.', {
-          position: 'top-center',
-          autoClose: 6000,
-        })
-        focusFirstValidationIssue('desired_time')
-        return
-      }
-    }
 
     // Chiama mutate — il guard server-side in create-booking è la garanzia definitiva
     const finalSubTabPromo = resolveMenuPromoForBookingView({
@@ -1343,14 +1317,8 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
           }}
           onNumGuestsChange={handleNumGuestsChange}
           onNumGuestsKeyPress={handleNumGuestsKeyPress}
-          resetAvailability={resetAvailability}
           setErrors={(newErrors) => setErrors(newErrors)}
         />
-        {errors.slot_availability && (
-          <div className={publicFormSlotAvailabilityErrorClass(publicFormLightTextOnDarkBackground)}>
-            {errors.slot_availability}
-          </div>
-        )}
         {/* Intolleranze e richieste — sempre sotto data/ora/ospiti, per ogni tipologia */}
         <div className="flex w-full min-w-0 flex-col space-y-6 pt-2">
           <DietaryRestrictionsSection
@@ -1396,10 +1364,10 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
       <div className="order-3 col-span-1 hidden min-[1256px]:flex w-full max-w-full justify-center items-center mt-3 mb-6 min-[1256px]:col-span-2">
         <button
             type="submit"
-            disabled={isPending || isBlocked || isSubmitting || isCheckingAvailability}
+            disabled={isPending || isBlocked || isSubmitting}
             className="booking-cross-shine-btn group relative overflow-hidden px-12 md:px-20 py-7 text-xl md:text-2xl uppercase tracking-wide font-bold text-white rounded-full bg-green-600 hover:bg-green-700 shadow-2xl hover:shadow-[0_20px_40px_rgba(34,197,94,0.4)] hover:-translate-y-1 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-2xl w-full md:w-auto max-w-md md:max-w-2xl"
             onPointerDown={(e) => {
-              if (isPending || isBlocked || isSubmitting || isCheckingAvailability) return
+              if (isPending || isBlocked || isSubmitting) return
               if (
                 typeof window !== 'undefined' &&
                 (e.pointerType === 'touch' || window.matchMedia('(hover: none)').matches)
@@ -1422,12 +1390,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
 
             {/* Content */}
             <div className="relative z-10 flex items-center justify-center gap-3 whitespace-nowrap">
-              {isCheckingAvailability ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span className="text-base md:text-lg">Verifica disponibilità...</span>
-                </>
-              ) : isPending ? (
+              {isPending ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span className="text-base md:text-lg">Invio in corso...</span>
