@@ -369,6 +369,9 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       setCloseGuardOpen(false)
       setCloseGuardPending(false)
     }
+    return () => {
+      onEditDirtyChange?.(false)
+    }
   }, [isOpen, onEditDirtyChange])
 
   // Capacita per slot: service_slots.max_guests > override > slot_guest_capacities

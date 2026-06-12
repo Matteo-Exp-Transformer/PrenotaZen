@@ -117,6 +117,9 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
+    return () => {
+      onDirtyChange?.(false)
+    }
   }, [isDirty, onDirtyChange])
 
   const { mutate, isPending } = useCreateAdminBooking()

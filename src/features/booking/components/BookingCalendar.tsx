@@ -553,14 +553,16 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     setIsModalOpen(false)
     setSelectedBooking(null)
     setDetailsEditDirty(false)
-  }, [])
+    clearUnsavedSource(CALENDAR_MODAL_UNSAVED_SOURCE_ID)
+  }, [clearUnsavedSource])
 
   const closeCreateModal = useCallback(() => {
     setNewBookingDate(null)
     setCreateFormDirty(false)
     setCreateCloseGuardOpen(false)
     setCreateCloseGuardPending(false)
-  }, [])
+    clearUnsavedSource(CALENDAR_MODAL_UNSAVED_SOURCE_ID)
+  }, [clearUnsavedSource])
 
   const requestCloseCreateModal = useCallback(() => {
     if (createFormDirty) {
@@ -653,6 +655,13 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     closeDetailsModal,
     registerUnsavedHandlers,
   ])
+
+  useEffect(() => {
+    return () => {
+      clearUnsavedSource(CALENDAR_MODAL_UNSAVED_SOURCE_ID)
+      registerUnsavedHandlers(CALENDAR_MODAL_UNSAVED_SOURCE_ID, null)
+    }
+  }, [clearUnsavedSource, registerUnsavedHandlers])
 
   const handleDateClick = useCallback((clickInfo: any) => {
     const d = new Date(clickInfo.date)

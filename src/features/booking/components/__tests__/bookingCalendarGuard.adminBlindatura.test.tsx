@@ -64,15 +64,24 @@ vi.mock('../QuickTableAssignModal', () => ({
 vi.mock('../BookingDetailsModal', () => ({
   BookingDetailsModal: ({
     isOpen,
+    onClose,
     onEditDirtyChange,
   }: {
     isOpen: boolean
+    onClose: () => void
     onEditDirtyChange?: (dirty: boolean) => void
   }) => {
     useEffect(() => {
       onEditDirtyChange?.(isOpen)
     }, [isOpen, onEditDirtyChange])
-    return isOpen ? <div data-testid="booking-details-modal-stub" /> : null
+    if (!isOpen) return null
+    return (
+      <div data-testid="booking-details-modal-stub">
+        <button type="button" onClick={onClose}>
+          Chiudi modale
+        </button>
+      </div>
+    )
   },
 }))
 
@@ -154,6 +163,50 @@ describe('BookingCalendar — guard tab switch C-U2', () => {
   it('senza modifiche dirty il cambio tab non apre il guard', async () => {
     const user = userEvent.setup()
     renderCalendarWithGuard()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /cambia tab/i }))
+    })
+
+    expect(screen.queryByRole('heading', { name: /modifiche non salvate/i })).not.toBeInTheDocument()
+  })
+
+  it('dopo chiusura modale con guard tab aperto il dialog stale sparisce', async () => {
+    const user = userEvent.setup()
+    renderCalendarWithGuard()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /mario rossi/i }))
+    })
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /cambia tab/i }))
+    })
+    expect(await screen.findByRole('heading', { name: /modifiche non salvate/i })).toBeVisible()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /chiudi modale/i }))
+    })
+    expect(screen.queryByRole('heading', { name: /modifiche non salvate/i })).not.toBeInTheDocument()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /cambia tab/i }))
+    })
+    expect(screen.queryByRole('heading', { name: /modifiche non salvate/i })).not.toBeInTheDocument()
+  })
+
+  it('dopo chiusura modale dirty la navigazione non apre il guard', async () => {
+    const user = userEvent.setup()
+    renderCalendarWithGuard()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /mario rossi/i }))
+    })
+    expect(screen.getByTestId('booking-details-modal-stub')).toBeInTheDocument()
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /chiudi modale/i }))
+    })
+    expect(screen.queryByTestId('booking-details-modal-stub')).not.toBeInTheDocument()
 
     await act(async () => {
       await user.click(screen.getByRole('button', { name: /cambia tab/i }))

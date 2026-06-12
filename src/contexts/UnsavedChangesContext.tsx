@@ -96,6 +96,14 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
     resolve?.(proceed)
   }, [])
 
+  // Se le sorgenti dirty si azzerano (es. chiusura modale calendario) mentre il guard
+  // navigazione è ancora aperto, chiudi il dialog stale — altrimenti resta visibile a ogni
+  // cambio tab anche senza modifiche reali.
+  useEffect(() => {
+    if (hasUnsavedChanges || !guardOpen) return
+    closeGuard(false)
+  }, [closeGuard, guardOpen, hasUnsavedChanges])
+
   const confirmNavigation = useCallback(
     (options?: UnsavedChangesGuardOptions): Promise<boolean> => {
       if (!hasUnsavedChanges) return Promise.resolve(true)
