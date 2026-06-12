@@ -23,7 +23,7 @@ import {
   type BookingPageBackgroundId,
 } from '@/features/booking/constants/bookingPageBackground'
 import {
-  DEFAULT_BOOKING_FORM_CONFIG,
+  DEFAULT_BOOKING_HEADER_STYLES,
   getBookingHeaderTextStyle,
   type SubTab,
 } from '@/features/booking/constants/bookingPublicFormConfig'
@@ -128,9 +128,10 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
   const { data: contactAddress } = useRestaurantSetting('contact_address')
   const { data: publicBookingBg } = useRestaurantSetting('public_booking_page_background')
   const { data: stripPhotoId } = useRestaurantSetting('public_booking_strip_photo')
-  const { data: formConfig } = useRestaurantSetting('booking_public_form_config')
-  const resolvedConfig = formConfig ?? DEFAULT_BOOKING_FORM_CONFIG
-  const headerStyles = resolvedConfig.header_styles ?? DEFAULT_BOOKING_FORM_CONFIG.header_styles
+  const { data: formConfig, isLoading: isFormConfigLoading } = useRestaurantSetting(
+    'booking_public_form_config',
+  )
+  const headerStyles = formConfig?.header_styles ?? DEFAULT_BOOKING_HEADER_STYLES
 
   // Stato form condiviso tra BookingRequestForm e BookingSummarySidebar
   const [sharedFormData, setSharedFormData] = useState<Partial<BookingRequestInput>>({})
@@ -256,7 +257,8 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     menu_total_booking: sharedFormData.menu_total_booking,
     preset_menu: sharedFormData.preset_menu,
   }
-  const hasEnabledBookingModes = resolvedConfig.booking_modes.some((mode) => mode.enabled)
+  const hasEnabledBookingModes =
+    formConfig?.booking_modes.some((mode) => mode.enabled) ?? false
   const summarySubmitButton = (
     <button
       type="submit"
@@ -268,10 +270,10 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
       Invia Prenotazione
     </button>
   )
-  const summarySidebarStacked = hasEnabledBookingModes ? (
+  const summarySidebarStacked = formConfig && hasEnabledBookingModes ? (
     <BookingSummarySidebar
       formData={summaryFormData}
-      modes={resolvedConfig.booking_modes}
+      modes={formConfig.booking_modes}
       contactPhone={displayContactPhone || undefined}
       activeSubTab={activeSubTab}
       submitButton={summarySubmitButton}
@@ -285,10 +287,10 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
       }
     />
   ) : null
-  const summarySidebarDesktopExternal = hasEnabledBookingModes ? (
+  const summarySidebarDesktopExternal = formConfig && hasEnabledBookingModes ? (
     <BookingSummarySidebar
       formData={summaryFormData}
-      modes={resolvedConfig.booking_modes}
+      modes={formConfig.booking_modes}
       contactPhone={displayContactPhone || undefined}
       activeSubTab={activeSubTab}
       submitButton={summarySubmitButton}
@@ -296,10 +298,36 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
       className="sticky top-4"
     />
   ) : null
-  const bookingRequestForm = hasEnabledBookingModes ? (
+  const bookingFormNotConfiguredState = (
+    <div
+      className="w-full rounded-2xl border border-slate-200 bg-white/90 px-6 py-10 text-center shadow-sm animate-fade-in"
+      role="status"
+    >
+      <h2 className="text-lg md:text-xl font-serif text-warm-wood font-bold mb-3">
+        Form prenotazione non ancora configurato
+      </h2>
+      <p className="text-sm md:text-base text-warm-wood-dark font-medium leading-relaxed max-w-md mx-auto">
+        {displayContactPhone || displayContactEmail
+          ? 'Per prenotare, contatta il ristorante usando i recapiti qui sotto.'
+          : 'Per prenotare, contatta direttamente il ristorante.'}
+      </p>
+    </div>
+  )
+
+  const bookingFormLoadingState = (
+    <div className="w-full py-10 text-center text-warm-wood-dark font-medium text-sm">
+      Caricamento form...
+    </div>
+  )
+
+  const bookingRequestForm = isFormConfigLoading ? (
+    bookingFormLoadingState
+  ) : formConfig === null ? (
+    bookingFormNotConfiguredState
+  ) : hasEnabledBookingModes ? (
     <BookingRequestForm
       tenantSlug={tenantSlug}
-      formConfig={resolvedConfig}
+      formConfig={formConfig}
       publicFormLightTextOnDarkBackground={!showPhotoStrip && isFullPagePhoto}
       onFormDataChange={setSharedFormData}
       onActiveSubTabChange={setActiveSubTab}
@@ -314,7 +342,7 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     ['--booking-full-page-summary-w' as string]: `${BOOKING_FULL_PAGE_SUMMARY_WIDTH_PX}px`,
   } as React.CSSProperties
 
-  const bookingPageHeader = (
+  const bookingPageHeader = formConfig ? (
     <div className="flex w-full flex-col gap-1.5 py-1.5 animate-fade-in">
       {displayName && (
         <h1
@@ -329,17 +357,26 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
           className="m-0 w-full"
           style={getBookingHeaderTextStyle('page_title', headerStyles)}
         >
-          {resolvedConfig.page_title}
+          {formConfig.page_title}
         </h2>
         <p
           className="opacity-90 m-0 w-full"
           style={getBookingHeaderTextStyle('page_description', headerStyles)}
         >
-          {resolvedConfig.page_description}
+          {formConfig.page_description}
         </p>
       </div>
     </div>
-  )
+  ) : displayName ? (
+    <div className="flex w-full flex-col gap-1.5 py-1.5 animate-fade-in">
+      <h1
+        className="m-0 w-full"
+        style={getBookingHeaderTextStyle('restaurant_name', headerStyles)}
+      >
+        {displayName}
+      </h1>
+    </div>
+  ) : null
 
   return (
     <div className="min-h-screen font-bold relative isolate" style={pageRootFallbackStyle}>

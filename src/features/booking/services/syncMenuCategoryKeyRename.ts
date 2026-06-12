@@ -1,6 +1,5 @@
 import { supabase, handleSupabaseError } from '@/lib/supabase'
 import { restaurantSettingRegistry } from '@/features/booking/lib/restaurantSettingRegistry'
-import type { BookingPublicFormConfig } from '@/features/booking/constants/bookingPublicFormConfig'
 import { renameCategoryKeyInBookingPublicFormConfig } from '@/features/booking/utils/bookingFormCategoryKeySync'
 import {
   applyCategoryImageUrlRewritesForRename,
@@ -156,7 +155,8 @@ export async function syncMenuCategoryKeyRename(
   if (formSetting?.setting_value != null) {
     const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb(
       formSetting.setting_value,
-    ) as BookingPublicFormConfig
+    )
+    if (!parsed) return
 
     const { config: nextConfig, changed } = renameCategoryKeyInBookingPublicFormConfig(
       parsed,

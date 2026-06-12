@@ -681,6 +681,14 @@ export function applyLegacySubTabLabelOverrides(
   })
 }
 
+/** True se il JSON grezzo dal DB ha almeno una voce `booking_modes` oggetto (config salvata / parziale). */
+export function hasUsableBookingModesInRaw(raw: unknown): boolean {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return false
+  const modes = (raw as Record<string, unknown>).booking_modes
+  if (!Array.isArray(modes) || modes.length === 0) return false
+  return modes.some((m) => m != null && typeof m === 'object' && !Array.isArray(m))
+}
+
 export const DEFAULT_BOOKING_FORM_CONFIG: BookingPublicFormConfig = {
   page_title: 'Configura la pagina Prenota',
   page_description:

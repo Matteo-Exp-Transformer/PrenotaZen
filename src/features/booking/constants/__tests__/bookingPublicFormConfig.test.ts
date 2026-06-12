@@ -432,12 +432,13 @@ describe('parseSubTabFromUnknown — show_offer_details_in_summary', () => {
         },
       ],
     })
-    expect(parsed.page_title.length).toBe(50)
-    expect(parsed.page_description.length).toBe(120)
-    expect(parsed.booking_modes[0].label.length).toBe(40)
-    expect(parsed.booking_modes[0].description.length).toBe(61)
-    expect(parsed.booking_modes[0].sub_tabs).toEqual([])
-    expect(parsed.booking_modes[0].sub_tabs_presentation).toBeNull()
+    expect(parsed).not.toBeNull()
+    expect(parsed!.page_title.length).toBe(50)
+    expect(parsed!.page_description.length).toBe(120)
+    expect(parsed!.booking_modes[0].label.length).toBe(40)
+    expect(parsed!.booking_modes[0].description.length).toBe(61)
+    expect(parsed!.booking_modes[0].sub_tabs).toEqual([])
+    expect(parsed!.booking_modes[0].sub_tabs_presentation).toBeNull()
   })
 })
 
@@ -494,14 +495,16 @@ describe('capabilities BookingMode — round-trip + legacy (LOCK Parser/normaliz
       page_description: 'Desc',
       booking_modes: [modeBase()],
     })
-    expect(legacy.booking_modes[0].capabilities).toBeUndefined()
+    expect(legacy).not.toBeNull()
+    expect(legacy!.booking_modes[0].capabilities).toBeUndefined()
 
     const withCaps = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
       page_title: 'Prenota',
       page_description: 'Desc',
       booking_modes: [modeBase({ capabilities: { uses_menu: true } })],
     })
-    expect(withCaps.booking_modes[0].capabilities).toEqual({ uses_menu: true })
+    expect(withCaps).not.toBeNull()
+    expect(withCaps!.booking_modes[0].capabilities).toEqual({ uses_menu: true })
   })
 })
 

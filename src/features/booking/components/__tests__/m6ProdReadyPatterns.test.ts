@@ -62,6 +62,20 @@ describe('M6 prod-ready patterns', () => {
     expect(parseBookingPageBackgroundFromDb(null)).toBeNull()
   })
 
+  it('non inietta form config demo quando booking_public_form_config manca in DB', () => {
+    const parse = restaurantSettingRegistry.booking_public_form_config.parseFromDb
+    expect(parse(null)).toBeNull()
+    expect(parse(undefined)).toBeNull()
+    expect(parse({ page_title: 'P', booking_modes: [] })).toBeNull()
+  })
+
+  it('BookingRequestPage non applica DEFAULT_BOOKING_FORM_CONFIG sul pubblico', () => {
+    const page = readRepoFile('src/pages/BookingRequestPage.tsx')
+    expect(page).not.toMatch(/formConfig\s*\?\?\s*DEFAULT_BOOKING_FORM_CONFIG/)
+    expect(page).not.toMatch(/resolvedConfig/)
+    expect(page).toContain('Form prenotazione non ancora configurato')
+  })
+
   it('menuQrStorage non usa cast as any su storage', () => {
     expect(readRepoFile('src/features/booking/utils/menuQrStorage.ts')).not.toContain('as any')
   })

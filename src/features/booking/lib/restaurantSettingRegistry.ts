@@ -30,6 +30,7 @@ import {
   type SubTab,
   type SubTabOverride,
   DEFAULT_BOOKING_FORM_CONFIG,
+  hasUsableBookingModesInRaw,
   migrateOverridesToSubTabs,
   normalizeBookingPublicFormConfig,
   parseBookingHeaderStylesFromUnknown,
@@ -350,7 +351,7 @@ export type RestaurantSettingValueMap = {
   /** Classic: abilita raggruppamento digest per fasce. Pro: ignorato (sempre true). Default true per retro-compatibilita. */
   booking_time_slots_enabled: boolean
   /** Configurazione UI pagina pubblica /prenota: titolo, descrizione e modalità di prenotazione. */
-  booking_public_form_config: BookingPublicFormConfig
+  booking_public_form_config: BookingPublicFormConfig | null
 }
 
 export interface RestaurantSettingRegistryEntry<K extends RestaurantSettingKeyV1> {
@@ -580,13 +581,12 @@ export const restaurantSettingRegistry: {
   },
   booking_public_form_config: {
     key: 'booking_public_form_config',
-    parseFromDb: (raw): BookingPublicFormConfig => {
-      if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
-        return DEFAULT_BOOKING_FORM_CONFIG
+    parseFromDb: (raw): BookingPublicFormConfig | null => {
+      if (!hasUsableBookingModesInRaw(raw)) {
+        return null
       }
       const obj = raw as Record<string, unknown>
-      const modes = Array.isArray(obj.booking_modes) ? obj.booking_modes : null
-      if (!modes || modes.length === 0) return DEFAULT_BOOKING_FORM_CONFIG
+      const modes = Array.isArray(obj.booking_modes) ? obj.booking_modes : []
       return normalizeBookingPublicFormConfig({
         page_title: typeof obj.page_title === 'string' ? obj.page_title : DEFAULT_BOOKING_FORM_CONFIG.page_title,
         page_description:

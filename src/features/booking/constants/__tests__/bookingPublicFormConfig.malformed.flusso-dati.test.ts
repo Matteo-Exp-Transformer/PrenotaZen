@@ -105,17 +105,20 @@ describe('parseSubTabFromUnknown — campi con tipo sbagliato', () => {
 })
 
 describe('parseFromDb — config grezza malformata non rompe il flusso', () => {
-  it('raw non-oggetto → DEFAULT', () => {
-    expect(parseConfig(null).booking_modes.length).toBeGreaterThan(0)
-    expect(parseConfig('x').booking_modes.length).toBeGreaterThan(0)
-    expect(parseConfig([]).booking_modes.length).toBeGreaterThan(0)
+  it('raw non-oggetto o senza booking_modes utilizzabili → null (non configurato)', () => {
+    expect(parseConfig(null)).toBeNull()
+    expect(parseConfig(undefined)).toBeNull()
+    expect(parseConfig('x')).toBeNull()
+    expect(parseConfig([])).toBeNull()
+    expect(parseConfig({ page_title: 'P', booking_modes: [] })).toBeNull()
+    expect(parseConfig({ page_title: 'P', booking_modes: ['non-un-oggetto'] })).toBeNull()
   })
 
-  it('booking_modes vuoto → DEFAULT (3 modalità seed)', () => {
-    expect(parseConfig({ page_title: 'P', booking_modes: [] }).booking_modes.length).toBe(3)
+  it('parse null → null', () => {
+    expect(parseConfig(null)).toBeNull()
   })
 
-  it('una mode malformata in mezzo non fa cadere le altre', () => {
+  it('una mode malformata in mezzo non fa cadere le altre (config parziale valida)', () => {
     const parsed = parseConfig({
       page_title: 'Prenota',
       page_description: 'Desc',
@@ -134,9 +137,10 @@ describe('parseFromDb — config grezza malformata non rompe il flusso', () => {
         },
       ],
     })
-    expect(parsed.booking_modes).toHaveLength(2)
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes).toHaveLength(2)
     // la mode malformata è sostituita dal default per posizione, senza crash
-    expect(parsed.booking_modes[1].sub_tabs[0].label).toBe('Card valida')
+    expect(parsed!.booking_modes[1].sub_tabs[0].label).toBe('Card valida')
   })
 
   it('sub_tabs con elementi malformati: tiene solo le card valide', () => {
@@ -162,7 +166,8 @@ describe('parseFromDb — config grezza malformata non rompe il flusso', () => {
         },
       ],
     })
-    const subTabs = parsed.booking_modes[0].sub_tabs
+    expect(parsed).not.toBeNull()
+    const subTabs = parsed!.booking_modes[0].sub_tabs
     expect(subTabs).toHaveLength(1)
     expect(subTabs[0].id).toBe('ok')
   })
@@ -193,7 +198,8 @@ describe('parseFromDb — config grezza malformata non rompe il flusso', () => {
         },
       ],
     })
-    const tab = parsed.booking_modes[0].sub_tabs[0]
+    expect(parsed).not.toBeNull()
+    const tab = parsed!.booking_modes[0].sub_tabs[0]
     expect(tab.preset_id).toBe('preset-xyz')
     // il parser NON applica il resolver: l'override resta com'è salvato
     expect(tab.field_overrides).toEqual({ label: true })

@@ -1,6 +1,5 @@
 import { supabase, handleSupabaseError } from '@/lib/supabase'
 import { restaurantSettingRegistry } from '@/features/booking/lib/restaurantSettingRegistry'
-import type { BookingPublicFormConfig } from '@/features/booking/constants/bookingPublicFormConfig'
 import { removeCategoryKeyFromBookingPublicFormConfig } from '@/features/booking/utils/bookingFormCategoryKeySync'
 import { deleteCategoryKeyFromQrRow } from '@/features/booking/utils/menuQrCategoryKeySync'
 import { parseMenuQrCodeRow } from '@/features/booking/utils/menuQrAppearance'
@@ -78,7 +77,8 @@ export async function syncMenuCategoryKeyDelete(
   if (formSetting?.setting_value != null) {
     const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb(
       formSetting.setting_value,
-    ) as BookingPublicFormConfig
+    )
+    if (!parsed) return
 
     const { config: nextConfig, changed } = removeCategoryKeyFromBookingPublicFormConfig(
       parsed,
