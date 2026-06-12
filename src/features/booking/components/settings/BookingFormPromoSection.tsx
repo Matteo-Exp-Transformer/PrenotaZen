@@ -206,6 +206,7 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
       row: MenuPromo
       conflicts: MenuPromoPlacementConflicts
     } | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ promoId: string; summary: string } | null>(null)
 
     const subTabOptions = useMemo((): SubTabOption[] => {
       const options: SubTabOption[] = []
@@ -403,10 +404,16 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
     }
 
     const handleDeletePromo = (promoId: string, summary: string) => {
-      if (!window.confirm(`Eliminare la promo «${summary}»?`)) return
+      setDeleteConfirm({ promoId, summary })
+    }
+
+    const confirmDeletePromo = () => {
+      if (!deleteConfirm) return
+      const { promoId } = deleteConfirm
       setPromos(promos.filter((p) => p.id !== promoId))
       markDirty()
       if (editingId === promoId) resetEditorDraft()
+      setDeleteConfirm(null)
     }
 
     const toggleVisibility = (promoId: string) => {
@@ -455,6 +462,32 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
             onConfirm={confirmConflictReplacement}
           />
         ) : null}
+        <Modal
+          isOpen={deleteConfirm != null}
+          onClose={() => setDeleteConfirm(null)}
+          title="Eliminare la promo?"
+          size="sm"
+          showCloseButton
+          closeOnOverlayClick
+          closeOnEscape
+        >
+          {deleteConfirm ? (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-700">
+                Sei sicuro di voler eliminare «{deleteConfirm.summary}»? La modifica verrà applicata solo al
+                prossimo salvataggio della sezione.
+              </p>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+                <Button type="button" variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>
+                  Annulla
+                </Button>
+                <Button type="button" variant="danger" size="sm" onClick={confirmDeletePromo}>
+                  Elimina promo
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </Modal>
         <section className="admin-warm-surface rounded-xl border p-5 space-y-4 shadow-sm">
           <div>
             <h3 className="text-base font-semibold text-slate-800">Messaggio Promozionale</h3>

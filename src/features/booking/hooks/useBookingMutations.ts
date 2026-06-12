@@ -12,6 +12,7 @@ import { HOME_STATS_QUERY_KEY } from './useHomeStats'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
 import { extractTimeFromISO } from '@/features/booking/utils/dateUtils'
+import type { Json, TablesUpdate } from '@/types/database'
 
 /** Race guard: update con 0 righe (record non più pending). */
 const BOOKING_ALREADY_HANDLED = 'BOOKING_ALREADY_HANDLED'
@@ -55,10 +56,10 @@ interface UpdateBookingInput {
   numGuests: number
   specialRequests?: string | null
   desiredTime?: string
-  menu_selection?: any
+  menu_selection?: BookingRequest['menu_selection'] | null
   menu_total_per_person?: number
   menu_total_booking?: number
-  dietary_restrictions?: any[]
+  dietary_restrictions?: BookingRequest['dietary_restrictions'] | null
   preset_menu?: string
   menu?: string
   placement?: string | null
@@ -76,7 +77,7 @@ export const useAcceptBooking = () => {
       // scritto con createBookingDateTime con offset +00:00 = cifre = orario locale).
       const resolvedDesiredTime = input.desiredTime ?? extractTimeFromISO(input.confirmedStart)
 
-      const updateData: any = {
+      const updateData: TablesUpdate<'booking_requests'> = {
         status: 'accepted',
         confirmed_start: input.confirmedStart,
         confirmed_end: input.confirmedEnd,
@@ -85,9 +86,9 @@ export const useAcceptBooking = () => {
         desired_time: resolvedDesiredTime || null,
       }
 
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update(updateData as any)
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updateData)
         .eq('id', input.bookingId)
         .eq('tenant_id', tenantId!)
         .eq('status', 'pending')
@@ -101,7 +102,7 @@ export const useAcceptBooking = () => {
         throw new Error(BOOKING_ALREADY_HANDLED)
       }
 
-      return data[0] as BookingRequest
+      return data[0] as unknown as BookingRequest
     },
     onSuccess: async (booking: BookingRequest) => {
       await invalidateAllBookingQueries(queryClient, tenantId)
@@ -136,13 +137,15 @@ export const useRejectBooking = () => {
 
   return useMutation({
     mutationFn: async (input: RejectBookingInput) => {
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update({
-          status: 'rejected',
-          rejection_reason: input.rejectionReason || null,
-          updated_at: new Date().toISOString(),
-        } as any)
+      const updateData: TablesUpdate<'booking_requests'> = {
+        status: 'rejected',
+        rejection_reason: input.rejectionReason || null,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updateData)
         .eq('id', input.bookingId)
         .eq('tenant_id', tenantId!)
         .eq('status', 'pending')
@@ -156,7 +159,7 @@ export const useRejectBooking = () => {
         throw new Error(BOOKING_ALREADY_HANDLED)
       }
 
-      return data[0] as BookingRequest
+      return data[0] as unknown as BookingRequest
     },
     onSuccess: async (booking: BookingRequest) => {
       await invalidateAllBookingQueries(queryClient, tenantId)
@@ -189,7 +192,7 @@ export const useUpdateBooking = () => {
   return useMutation({
     mutationFn: async (input: UpdateBookingInput) => {
       
-      const updateData: any = {
+      const updateData: TablesUpdate<'booking_requests'> = {
         updated_at: new Date().toISOString(),
         confirmed_start: input.confirmedStart,
         confirmed_end: input.confirmedEnd,
@@ -231,7 +234,7 @@ export const useUpdateBooking = () => {
         updateData.menu = input.menu || null
       }
       if (input.menu_selection !== undefined) {
-        updateData.menu_selection = input.menu_selection || null
+        updateData.menu_selection = input.menu_selection ? (input.menu_selection as unknown as Json) : null
       }
       if (input.menu_total_per_person !== undefined) {
         updateData.menu_total_per_person = input.menu_total_per_person || null
@@ -240,7 +243,9 @@ export const useUpdateBooking = () => {
         updateData.menu_total_booking = input.menu_total_booking || null
       }
       if (input.dietary_restrictions !== undefined) {
-        updateData.dietary_restrictions = input.dietary_restrictions || null
+        updateData.dietary_restrictions = input.dietary_restrictions
+          ? (input.dietary_restrictions as unknown as Json)
+          : null
       }
       if (input.preset_menu !== undefined) {
         updateData.preset_menu = input.preset_menu || null
@@ -252,9 +257,9 @@ export const useUpdateBooking = () => {
       }
 
 
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update(updateData as any)
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updateData)
         .eq('id', input.bookingId)
         .eq('tenant_id', tenantId!)
         .select()
@@ -265,7 +270,7 @@ export const useUpdateBooking = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest
+      return data as unknown as BookingRequest
     },
     onSuccess: async (data) => {
       
@@ -273,7 +278,7 @@ export const useUpdateBooking = () => {
       // Usa un approccio sicuro che gestisce diversi formati di dati nella cache
       queryClient.setQueriesData(
         { queryKey: ['bookings'] },
-        (oldData: any) => {
+        (oldData: unknown) => {
           if (!oldData) return oldData
           // Verifica che oldData sia un array
           if (Array.isArray(oldData)) {
@@ -288,7 +293,7 @@ export const useUpdateBooking = () => {
       
       queryClient.setQueriesData(
         { queryKey: ['bookings', 'pending'] },
-        (oldData: any) => {
+        (oldData: unknown) => {
           if (!oldData) return oldData
           if (Array.isArray(oldData)) {
             return oldData.map((booking: BookingRequest) => 
@@ -301,7 +306,7 @@ export const useUpdateBooking = () => {
       
       queryClient.setQueriesData(
         { queryKey: ['bookings', 'accepted'] },
-        (oldData: any) => {
+        (oldData: unknown) => {
           if (!oldData) return oldData
           if (Array.isArray(oldData)) {
             return oldData.map((booking: BookingRequest) => 
@@ -346,7 +351,7 @@ export const useRestoreBooking = () => {
       const bookingId = typeof input === 'string' ? input : input.bookingId
       const providedTimes = typeof input === 'string' ? null : input
 
-      const updatePayload: Record<string, unknown> = {
+      const updatePayload: TablesUpdate<'booking_requests'> = {
         status: 'accepted',
         cancellation_reason: null,
         cancelled_at: null,
@@ -358,8 +363,8 @@ export const useRestoreBooking = () => {
         updatePayload.confirmed_end = providedTimes.confirmedEnd
         updatePayload.desired_time = providedTimes.desiredTime
       } else {
-        const { data: bookingToRestore, error: fetchError } = await (supabase
-          .from('booking_requests') as any)
+        const { data: bookingToRestore, error: fetchError } = await supabase
+          .from('booking_requests')
           .select('id, confirmed_start, confirmed_end')
           .eq('id', bookingId)
           .eq('tenant_id', tenantId!)
@@ -374,9 +379,9 @@ export const useRestoreBooking = () => {
         }
       }
 
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update(updatePayload as any)
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updatePayload)
         .eq('id', bookingId)
         .eq('tenant_id', tenantId!)
         .select()
@@ -387,7 +392,7 @@ export const useRestoreBooking = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest
+      return data as unknown as BookingRequest
     },
     onSuccess: async () => {
       // Invalida tutte le queries per refresh automatico completo
@@ -411,13 +416,15 @@ export const useRequeueRejectedBooking = () => {
 
   return useMutation({
     mutationFn: async (bookingId: string) => {
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update({
+      const updateData: TablesUpdate<'booking_requests'> = {
           status: 'pending',
           rejection_reason: null,
           updated_at: new Date().toISOString(),
-        } as any)
+        }
+
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updateData)
         .eq('id', bookingId)
         .eq('tenant_id', tenantId!)
         .eq('status', 'rejected')
@@ -428,7 +435,7 @@ export const useRequeueRejectedBooking = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest
+      return data as unknown as BookingRequest
     },
     onSuccess: async () => {
       await Promise.all([
@@ -492,14 +499,16 @@ export const useCancelBooking = () => {
   return useMutation({
     mutationFn: async ({ bookingId, cancellationReason }: { bookingId: string; cancellationReason?: string }) => {
 
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
-        .update({
+      const updateData: TablesUpdate<'booking_requests'> = {
           status: 'deleted',
           cancellation_reason: cancellationReason || null,
           cancelled_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } as any)
+        }
+
+      const { data, error } = await supabase
+        .from('booking_requests')
+        .update(updateData)
         .eq('id', bookingId)
         .eq('tenant_id', tenantId!)
         .select()
@@ -510,7 +519,7 @@ export const useCancelBooking = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest
+      return data as unknown as BookingRequest
     },
     onSuccess: async () => {
       // Invalida tutte le queries per refresh automatico completo
@@ -526,4 +535,3 @@ export const useCancelBooking = () => {
     },
   })
 }
-

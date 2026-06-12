@@ -470,6 +470,8 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     label: string
     itemsCount: number
   } | null>(null)
+  const [deleteItemConfirm, setDeleteItemConfirm] = useState<{ id: string; name: string } | null>(null)
+  const [deletePresetConfirm, setDeletePresetConfirm] = useState<{ id: string; label: string } | null>(null)
   /** Stringa controllata per l’input prezzo: evita lo 0 “incollato” con `parseFloat(...) || 0` su campo vuoto. */
   const [priceInput, setPriceInput] = useState('')
   const [presetEditorMode, setPresetEditorMode] = useState<'list' | 'editor'>('list')
@@ -599,13 +601,12 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   }
 
   const handleDeleteCustomPreset = (presetId: string, label: string) => {
-    if (
-      !confirm(
-        `Eliminare il menù preselezionato "${label}"?\n\nLe card collegate a questo menù verranno eliminate anche da Personalizza form.`,
-      )
-    ) {
-      return
-    }
+    setDeletePresetConfirm({ id: presetId, label })
+  }
+
+  const confirmDeleteCustomPreset = () => {
+    if (!deletePresetConfirm) return
+    const presetId = deletePresetConfirm.id
     const next = customStaffPresets.filter((p) => p.id !== presetId)
     const nextFormConfig = bookingPublicFormConfig
       ? normalizeBookingPublicFormConfig({
@@ -621,10 +622,15 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
           }),
         })
       : undefined
-    upsertRestaurantSetting.mutate([
-      { key: 'booking_custom_staff_presets', value: next },
-      ...(nextFormConfig ? [{ key: 'booking_public_form_config' as const, value: nextFormConfig }] : []),
-    ])
+    upsertRestaurantSetting.mutate(
+      [
+        { key: 'booking_custom_staff_presets', value: next },
+        ...(nextFormConfig ? [{ key: 'booking_public_form_config' as const, value: nextFormConfig }] : []),
+      ],
+      {
+        onSettled: () => setDeletePresetConfirm(null),
+      },
+    )
   }
 
   const toggleStaffPresetBookingVisibility = (presetId: string) => {
@@ -1190,9 +1196,14 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   }
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Sei sicuro di voler eliminare "${name}"?`)) {
-      deleteMutation.mutate(id)
-    }
+    setDeleteItemConfirm({ id, name })
+  }
+
+  const confirmDeleteItem = () => {
+    if (!deleteItemConfirm) return
+    deleteMutation.mutate(deleteItemConfirm.id, {
+      onSettled: () => setDeleteItemConfirm(null),
+    })
   }
 
 
@@ -2043,6 +2054,87 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       {viewMode === 'qr_codes' && features.qrMenu && (
         <MenuQrManager />
       )}
+
+      <Modal
+        isOpen={deleteItemConfirm != null}
+        onClose={() => setDeleteItemConfirm(null)}
+        title="Elimina ingrediente"
+        size="sm"
+        showCloseButton
+        closeOnOverlayClick
+        closeOnEscape
+      >
+        {deleteItemConfirm && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-slate-700">
+              Sei sicuro di voler eliminare{' '}
+              <strong className="font-semibold">{deleteItemConfirm.name}</strong> dal magazzino Menu?
+            </p>
+            <p className="text-sm leading-relaxed text-slate-600">
+              Le prenotazioni già ricevute mantengono lo snapshot salvato; le vetrine future non mostreranno più
+              questo ingrediente.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDeleteItemConfirm(null)}
+                disabled={deleteMutation.isPending}
+              >
+                Annulla
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={confirmDeleteItem}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Eliminazione…' : 'Elimina ingrediente'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={deletePresetConfirm != null}
+        onClose={() => setDeletePresetConfirm(null)}
+        title="Elimina menu preselezionato"
+        size="sm"
+        showCloseButton
+        closeOnOverlayClick
+        closeOnEscape
+      >
+        {deletePresetConfirm && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-slate-700">
+              Eliminare il menu preselezionato{' '}
+              <strong className="font-semibold">{deletePresetConfirm.label}</strong>?
+            </p>
+            <p className="text-sm leading-relaxed text-slate-600">
+              Le card collegate a questo menu verranno eliminate anche da Personalizza form.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDeletePresetConfirm(null)}
+                disabled={upsertRestaurantSetting.isPending}
+              >
+                Annulla
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={confirmDeleteCustomPreset}
+                disabled={upsertRestaurantSetting.isPending}
+              >
+                {upsertRestaurantSetting.isPending ? 'Eliminazione…' : 'Elimina menu'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         isOpen={categoryRenameConfirm != null}

@@ -6,6 +6,7 @@ import { toast } from 'react-toastify'
 import { createBookingDateTime, calculateEndTimeFromStart } from '../utils/dateUtils'
 import { buildFeatures } from '@/config/features'
 import { logger } from '@/lib/logger'
+import type { Json, TablesInsert } from '@/types/database'
 
 // Hook for creating booking requests directly as ACCEPTED (admin only)
 export const useCreateAdminBooking = () => {
@@ -30,7 +31,7 @@ export const useCreateAdminBooking = () => {
       const confirmedStart = createBookingDateTime(data.desired_date, startTime, true)
       const confirmedEnd = createBookingDateTime(data.desired_date, endTime, false, startTime)
       
-      const insertData = {
+      const insertData: TablesInsert<'booking_requests'> = {
         tenant_id: tenantId,
         client_name: data.client_name,
         client_email: data.client_email,
@@ -41,11 +42,13 @@ export const useCreateAdminBooking = () => {
         desired_time: normalizedTime,
         num_guests: data.num_guests,
         special_requests: data.special_requests || null,
-        menu_selection: data.menu_selection || null,
+        menu_selection: data.menu_selection ? (data.menu_selection as unknown as Json) : null,
         menu_total_per_person: data.menu_total_per_person || null,
         menu_total_booking: data.menu_total_booking || null,
         preset_menu: data.preset_menu || null,
-        dietary_restrictions: data.dietary_restrictions || null,
+        dietary_restrictions: data.dietary_restrictions
+          ? (data.dietary_restrictions as unknown as Json)
+          : null,
         placement: features.servizio ? data.placement || null : null,
         menu_promo_labels:
           Array.isArray(data.menu_promo_labels) && data.menu_promo_labels.length > 0
@@ -59,9 +62,9 @@ export const useCreateAdminBooking = () => {
 
 
       // Use authenticated supabase client (admin only)
-      const { data: result, error } = await (supabase
-        .from('booking_requests') as any)
-        .insert(insertData as any)
+      const { data: result, error } = await supabase
+        .from('booking_requests')
+        .insert(insertData)
         .select()
         .single()
 
@@ -71,7 +74,7 @@ export const useCreateAdminBooking = () => {
         throw new Error(error.message)
       }
 
-      return result as BookingRequest
+      return result as unknown as BookingRequest
     },
     onError: (error: Error) => {
       logger.error('Error creating admin booking:', error)
@@ -79,4 +82,3 @@ export const useCreateAdminBooking = () => {
     }
   })
 }
-

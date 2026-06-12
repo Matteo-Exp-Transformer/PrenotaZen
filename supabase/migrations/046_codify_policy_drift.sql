@@ -1,7 +1,8 @@
 -- ============================================================================
 -- 046_codify_policy_drift.sql
 -- ============================================================================
--- BOZZA WP-B1 — IN ATTESA DI APPROVAZIONE SENIOR + MATTEO. NON ANCORA APPLICATA.
+-- WP-B1 — APPLICATA su TEST (docnnernvp, version 20260612104237) e PROD
+-- (rwuxgvld, version 20260612104308) il 12-06-26.
 --
 -- Scopo: codificare nelle migrazioni versionate l'UNICO drift reale tra ciò che
 -- le migrazioni dichiarano e le policy realmente presenti sul DB: la policy

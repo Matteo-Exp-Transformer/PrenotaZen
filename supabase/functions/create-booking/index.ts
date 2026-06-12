@@ -71,6 +71,96 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // --- Rate limiting by IP (eseguito PRIMA di qualsiasi validazione/return) ---
+    // Falla chiusa: prima l'IP veniva registrato solo dopo un insert riuscito,
+    // così i tentativi respinti (payload invalido, tenant assente, limite coperti,
+    // conflitto, 429) non venivano mai contati → spam impunito. Ora OGNI tentativo
+    // che raggiunge l'endpoint viene registrato e conteggiato qui, una sola volta.
+    //
+    // Regole (definite con utente 2026-05-23):
+    //   - max 3 richieste/min per IP
+    //   - se l'IP sfora >=2 volte in 10 min → ban 24h (tabella ip_blacklist)
+    //   - blacklist auto-scaduta dopo 24h per non bannare permanentemente
+    //     IP dinamici (NAT, mobile, WiFi pubblici)
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("cf-connecting-ip") ||
+      "unknown";
+
+    // Check blacklist attiva
+    const { data: blacklistedRow } = await supabaseAdmin
+      .from("ip_blacklist")
+      .select("expires_at")
+      .eq("ip_address", ip)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (blacklistedRow) {
+      return new Response(
+        JSON.stringify({
+          error: "Accesso temporaneamente bloccato per violazione ripetuta del rate limit. Riprova tra 24 ore.",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Registra SUBITO il tentativo: ogni richiesta (valida o respinta più avanti)
+    // conta una sola volta. La finestra di conteggio sotto include questa riga,
+    // evitando il TOCTOU (registra-poi-conta, non conta-poi-registra).
+    await supabaseAdmin.from("rate_limits").insert({
+      ip_address: ip,
+      endpoint: "create-booking",
+    });
+
+    const now = Date.now();
+    const oneMinuteAgo = new Date(now - 60_000).toISOString();
+    const tenMinutesAgo = new Date(now - 10 * 60_000).toISOString();
+
+    // 1. Richieste nell'ultimo minuto (include il tentativo appena registrato).
+    //    Soglia: > 3 perché la riga corrente è già contata; le prime 3/min passano.
+    const { count: recentRequests } = await supabaseAdmin
+      .from("rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("ip_address", ip)
+      .eq("endpoint", "create-booking")
+      .gte("requested_at", oneMinuteAgo);
+
+    if (recentRequests !== null && recentRequests > 3) {
+      // Sforamento: conta quante volte questo IP ha sforato negli ultimi 10 min
+      // (= quanti "tentativi" totali ha fatto sopra soglia).
+      // Heuristica: se ha già >=6 richieste in 10 min, significa che sta sforando
+      // sistematicamente → blacklist 24h.
+      const { count: tenMinRequests } = await supabaseAdmin
+        .from("rate_limits")
+        .select("*", { count: "exact", head: true })
+        .eq("ip_address", ip)
+        .eq("endpoint", "create-booking")
+        .gte("requested_at", tenMinutesAgo);
+
+      if (tenMinRequests !== null && tenMinRequests >= 6) {
+        await supabaseAdmin
+          .from("ip_blacklist")
+          .upsert({
+            ip_address: ip,
+            blocked_at: new Date().toISOString(),
+            expires_at: new Date(now + 24 * 60 * 60_000).toISOString(),
+            reason: "rate_limit_violation",
+          });
+
+        return new Response(
+          JSON.stringify({
+            error: "Accesso bloccato per 24 ore: rilevati troppi tentativi ripetuti.",
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ error: "Troppe richieste. Riprova tra un minuto." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Parse request body
     const body = await req.json();
     const {
@@ -181,10 +271,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // --- Resolve tenant from slug ---
+    // Falla chiusa: filtro is_active=true così un'organizzazione disattivata
+    // (is_active=false) è trattata come inesistente — stesso errore/status.
+    // Colonna is_active: boolean NOT NULL default true (nessun NULL possibile a
+    // livello di schema), quindi il filtro non esclude tenant legittimi.
     const { data: org, error: orgError } = await supabaseAdmin
       .from("organizations")
       .select("id, max_booking_requests_per_year")
       .eq("slug", tenantSlug)
+      .eq("is_active", true)
       .single();
 
     if (orgError || !org) {
@@ -209,82 +304,6 @@ Deno.serve(async (req: Request) => {
     if (usage && usage.booking_requests_count >= maxRequestsPerYear) {
       return new Response(
         JSON.stringify({ error: "Limite annuale di richieste raggiunto per questa organizzazione" }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // --- Rate limiting by IP ---
-    // Regole (definite con utente 2026-05-23):
-    //   - max 3 richieste/min per IP
-    //   - se l'IP sfora >=2 volte in 10 min → ban 24h (tabella ip_blacklist)
-    //   - blacklist auto-scaduta dopo 24h per non bannare permanentemente
-    //     IP dinamici (NAT, mobile, WiFi pubblici)
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("cf-connecting-ip") ||
-      "unknown";
-
-    // Check blacklist attiva
-    const { data: blacklistedRow } = await supabaseAdmin
-      .from("ip_blacklist")
-      .select("expires_at")
-      .eq("ip_address", ip)
-      .gt("expires_at", new Date().toISOString())
-      .maybeSingle();
-
-    if (blacklistedRow) {
-      return new Response(
-        JSON.stringify({
-          error: "Accesso temporaneamente bloccato per violazione ripetuta del rate limit. Riprova tra 24 ore.",
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const now = Date.now();
-    const oneMinuteAgo = new Date(now - 60_000).toISOString();
-    const tenMinutesAgo = new Date(now - 10 * 60_000).toISOString();
-
-    // 1. Richieste nell'ultimo minuto
-    const { count: recentRequests } = await supabaseAdmin
-      .from("rate_limits")
-      .select("*", { count: "exact", head: true })
-      .eq("ip_address", ip)
-      .eq("endpoint", "create-booking")
-      .gte("requested_at", oneMinuteAgo);
-
-    if (recentRequests !== null && recentRequests >= 3) {
-      // Sforamento: conta quante volte questo IP ha sforato negli ultimi 10 min
-      // (= quanti "tentativi" totali ha fatto sopra soglia).
-      // Heuristica: se ha già >=6 richieste in 10 min, significa che sta sforando
-      // sistematicamente → blacklist 24h.
-      const { count: tenMinRequests } = await supabaseAdmin
-        .from("rate_limits")
-        .select("*", { count: "exact", head: true })
-        .eq("ip_address", ip)
-        .eq("endpoint", "create-booking")
-        .gte("requested_at", tenMinutesAgo);
-
-      if (tenMinRequests !== null && tenMinRequests >= 6) {
-        await supabaseAdmin
-          .from("ip_blacklist")
-          .upsert({
-            ip_address: ip,
-            blocked_at: new Date().toISOString(),
-            expires_at: new Date(now + 24 * 60 * 60_000).toISOString(),
-            reason: "rate_limit_violation",
-          });
-
-        return new Response(
-          JSON.stringify({
-            error: "Accesso bloccato per 24 ore: rilevati troppi tentativi ripetuti.",
-          }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ error: "Troppe richieste. Riprova tra un minuto." }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -539,11 +558,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // --- Record IP in rate_limits ---
-    await supabaseAdmin.from("rate_limits").insert({
-      ip_address: ip,
-      endpoint: "create-booking",
-    });
+    // Nota: l'IP è già stato registrato all'inizio (vedi blocco rate limiting).
+    // Non lo registriamo di nuovo qui, per non contare due volte una richiesta riuscita.
 
     // --- Return success ---
     return new Response(

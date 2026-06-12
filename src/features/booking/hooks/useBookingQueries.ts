@@ -3,6 +3,9 @@ import { supabase, handleSupabaseError } from '@/lib/supabase'
 import type { BookingRequest } from '@/types/booking'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
+import type { Tables } from '@/types/database'
+
+type BookingStatsRow = Pick<Tables<'booking_requests'>, 'id' | 'status' | 'confirmed_start'>
 
 // Hook per prenotazioni pending
 export const usePendingBookings = () => {
@@ -11,10 +14,11 @@ export const usePendingBookings = () => {
   return useQuery({
     queryKey: ['bookings', 'pending', tenantId],
     queryFn: async () => {
+      if (!tenantId) return []
 
       // Use authenticated supabase client (respects RLS policies)
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
+      const { data, error } = await supabase
+        .from('booking_requests')
         .select('*')
         .eq('tenant_id', tenantId)
         .eq('status', 'pending')
@@ -26,7 +30,7 @@ export const usePendingBookings = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest[]
+      return data as unknown as BookingRequest[]
     },
     enabled: !!tenantId,
     refetchInterval: 30000, // Refetch ogni 30s
@@ -40,12 +44,13 @@ export const useAcceptedBookings = () => {
   return useQuery({
     queryKey: ['bookings', 'accepted', tenantId],
     queryFn: async () => {
+      if (!tenantId) return []
 
       // Show ALL accepted bookings (past, present, and future)
       // For a restaurant calendar, we want to show historical data too
       // ✅ IMPORTANTE: Selezioniamo tutti i campi incluso desired_time per preservare l'orario originale
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
+      const { data, error } = await supabase
+        .from('booking_requests')
         .select('*') // Include tutti i campi incluso desired_time
         .eq('tenant_id', tenantId)
         .eq('status', 'accepted')
@@ -56,7 +61,7 @@ export const useAcceptedBookings = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest[]
+      return data as unknown as BookingRequest[]
     },
     enabled: !!tenantId,
     refetchInterval: 60000, // Refetch ogni minuto
@@ -70,8 +75,10 @@ export const useAllBookings = () => {
   return useQuery({
     queryKey: ['bookings', 'all', tenantId],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('booking_requests') as any)
+      if (!tenantId) return []
+
+      const { data, error } = await supabase
+        .from('booking_requests')
         .select('*')
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
@@ -80,7 +87,7 @@ export const useAllBookings = () => {
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as BookingRequest[]
+      return data as unknown as BookingRequest[]
     },
     enabled: !!tenantId,
     refetchInterval: 60000,
@@ -95,10 +102,21 @@ export const useBookingStats = () => {
     queryKey: ['bookings', 'stats', tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (!tenantId) {
+        return {
+          pending: 0,
+          accepted: 0,
+          rejected: 0,
+          total: 0,
+          totalMonth: 0,
+          totalWeek: 0,
+          totalDay: 0,
+        }
+      }
 
       // Use authenticated supabase client - fetch confirmed_start for accepted bookings
-      const { data: allBookings, error } = await (supabase
-        .from('booking_requests') as any)
+      const { data: allBookings, error } = await supabase
+        .from('booking_requests')
         .select('id, status, confirmed_start')
         .eq('tenant_id', tenantId)
 
@@ -136,7 +154,8 @@ export const useBookingStats = () => {
       
       // Filter bookings based on confirmed_start date for accepted bookings
       // Use confirmed_start for accepted bookings to show when bookings actually happen
-      const acceptedBookings = allBookings?.filter((b: any) => b.status === 'accepted') || []
+      const bookingRows: BookingStatsRow[] = allBookings ?? []
+      const acceptedBookings = bookingRows.filter((b) => b.status === 'accepted')
       
       // Helper to extract date from ISO string to avoid timezone issues
       const getBookingDate = (confirmedStart: string | null): Date | null => {
@@ -154,21 +173,21 @@ export const useBookingStats = () => {
       }
       
       const stats = {
-        pending: allBookings?.filter((b: any) => b.status === 'pending').length || 0,
+        pending: bookingRows.filter((b) => b.status === 'pending').length,
         accepted: acceptedBookings.length,
-        rejected: allBookings?.filter((b: any) => b.status === 'rejected').length || 0,
-        total: allBookings?.length || 0,
-        totalMonth: acceptedBookings.filter((b: any) => {
+        rejected: bookingRows.filter((b) => b.status === 'rejected').length,
+        total: bookingRows.length,
+        totalMonth: acceptedBookings.filter((b) => {
           const bookingDate = getBookingDate(b.confirmed_start)
           if (!bookingDate) return false
           return bookingDate >= startOfMonth && bookingDate <= endOfMonth
         }).length,
-        totalWeek: acceptedBookings.filter((b: any) => {
+        totalWeek: acceptedBookings.filter((b) => {
           const bookingDate = getBookingDate(b.confirmed_start)
           if (!bookingDate) return false
           return bookingDate >= startOfWeek && bookingDate <= endOfWeek
         }).length,
-        totalDay: acceptedBookings.filter((b: any) => {
+        totalDay: acceptedBookings.filter((b) => {
           const bookingDate = getBookingDate(b.confirmed_start)
           if (!bookingDate) return false
           return bookingDate >= startOfDay && bookingDate <= endOfDay
@@ -180,4 +199,3 @@ export const useBookingStats = () => {
     refetchInterval: 30000,
   })
 }
-

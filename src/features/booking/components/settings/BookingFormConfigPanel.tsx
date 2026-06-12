@@ -8,6 +8,7 @@ import { EyeSlashIcon } from '@phosphor-icons/react/dist/csr/EyeSlash'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
+import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 import { useMenuItems } from '@/features/booking/hooks/useMenuItems'
 import { useMenuCategories } from '@/features/booking/hooks/useMenuCategories'
@@ -270,27 +271,53 @@ function SubTabsPresentationBadge({
   presentation: 'cards' | 'carousel'
   onReset: () => void
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const label = presentation === 'cards' ? 'Card scorrevoli' : 'Carosello'
+  const currentDataLabel = presentation === 'cards' ? 'Card scorrevole' : 'Carosello'
+  const confirmReset = () => {
+    setConfirmOpen(false)
+    onReset()
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-      <span>
-        Modalità impostata: <strong className="text-slate-800">{label}</strong>
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          const currentDataLabel = presentation === 'cards' ? 'Card scorrevole' : 'Carosello'
-          const ok = window.confirm(
-            `Se cambi presentazione perderai i dati del "${currentDataLabel}". Sei sicuro di voler procedere?`,
-          )
-          if (!ok) return
-          onReset()
-        }}
-        className="ml-auto text-primary-700 underline hover:text-primary-900"
+    <>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <span>
+          Modalità impostata: <strong className="text-slate-800">{label}</strong>
+        </span>
+        <button
+          type="button"
+          onClick={() => setConfirmOpen(true)}
+          className="ml-auto text-primary-700 underline hover:text-primary-900"
+        >
+          Cambia presentazione
+        </button>
+      </div>
+
+      <Modal
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Cambiare presentazione?"
+        size="sm"
+        showCloseButton
+        closeOnOverlayClick
+        closeOnEscape
       >
-        Cambia presentazione
-      </button>
-    </div>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-slate-700">
+            Se cambi presentazione perderai i dati del "{currentDataLabel}". Vuoi procedere?
+          </p>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+            <Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)}>
+              Annulla
+            </Button>
+            <Button type="button" variant="danger" onClick={confirmReset}>
+              Cambia presentazione
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   )
 }
 

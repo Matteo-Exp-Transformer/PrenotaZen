@@ -119,6 +119,51 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // --- Atomically consume the token BEFORE creating the user ---
+      // Conditional UPDATE guarded by `used_at IS NULL`: only ONE concurrent
+      // request can flip it from NULL to a timestamp. `.select()` returns only
+      // the rows actually updated, so an empty result means the token was
+      // already used (or just consumed by a racing request) -> we must NOT
+      // create the user. This closes the TOCTOU window left by the previous
+      // "select-then-update-at-the-end" approach.
+      const { data: consumedRows, error: consumeError } = await supabaseAdmin
+        .from("invite_tokens")
+        .update({ used_at: new Date().toISOString() })
+        .eq("id", tokenData.id)
+        .is("used_at", null)
+        .select("id");
+
+      if (consumeError) {
+        console.error("Token consume error:", consumeError);
+        return jsonResponse(
+          { error: "Errore durante la validazione dell'invito" },
+          500
+        );
+      }
+
+      // 0 rows updated -> token already consumed / lost the race -> stop here.
+      if (!consumedRows || consumedRows.length === 0) {
+        return jsonResponse(
+          { error: "Token non valido o scaduto" },
+          409
+        );
+      }
+
+      // From here on we "own" the token. If user creation fails for a technical
+      // reason we roll `used_at` back to NULL so a transient error does not burn
+      // the invite. This does NOT reopen the TOCTOU window: a concurrent request
+      // already lost the race (got 0 rows) and bailed out above, so only this
+      // single winning request can revert the token.
+      const rollbackToken = async () => {
+        const { error: rollbackError } = await supabaseAdmin
+          .from("invite_tokens")
+          .update({ used_at: null })
+          .eq("id", tokenData.id);
+        if (rollbackError) {
+          console.error("Token rollback error:", rollbackError);
+        }
+      };
+
       // --- Create Supabase Auth user ---
       const { data: authUser, error: authError } =
         await supabaseAdmin.auth.admin.createUser({
@@ -129,6 +174,7 @@ Deno.serve(async (req: Request) => {
 
       if (authError) {
         console.error("Auth error:", authError);
+        await rollbackToken();
         return jsonResponse(
           { error: authError.message || "Errore nella creazione dell'utente" },
           400
@@ -146,27 +192,19 @@ Deno.serve(async (req: Request) => {
 
       if (adminInsertError) {
         console.error("Admin insert error:", adminInsertError);
-        // Attempt cleanup: delete auth user if admin_users insert fails
+        // Cleanup: delete the auth user we just created, then free the token.
         if (authUser?.user?.id) {
           await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
         }
+        await rollbackToken();
         return jsonResponse(
           { error: "Errore durante la registrazione dell'utente" },
           500
         );
       }
 
-      // --- Mark token as used ---
-      const { error: tokenUpdateError } = await supabaseAdmin
-        .from("invite_tokens")
-        .update({ used_at: new Date().toISOString() })
-        .eq("id", tokenData.id);
-
-      if (tokenUpdateError) {
-        console.error("Token update error:", tokenUpdateError);
-        // Non-fatal: registration succeeded, just log the error
-      }
-
+      // Success: the token is already consumed (used_at set above), so there is
+      // nothing left to mark — the registration cannot be replayed.
       return jsonResponse(
         { success: true, message: "Registrazione completata" },
         201

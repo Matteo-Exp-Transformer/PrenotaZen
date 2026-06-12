@@ -4,6 +4,10 @@ import { supabasePublic } from '../lib/supabasePublic'
 import type { TenantEdition } from '@/types/edition'
 import { setDevHealth, printDevHealth } from '@/lib/devConsole'
 
+function normalizeTenantEdition(value: string | null | undefined, fallback: TenantEdition): TenantEdition {
+  return value === 'classic' || value === 'pro' || value === 'enterprise' ? value : fallback
+}
+
 interface TenantContextType {
   tenantId: string | null
   tenantSlug: string | null
@@ -35,8 +39,8 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try {
       // organizations_public espone feature_overrides (da tenant_features) oltre ai campi base.
       // Dopo la migrazione 026 anon non può leggere organizations direttamente.
-      const { data, error } = await (supabasePublic
-        .from('organizations_public') as any)
+      const { data, error } = await supabasePublic
+        .from('organizations_public')
         .select('id, name, slug, edition, feature_overrides')
         .eq('slug', slug)
         .eq('is_active', true)
@@ -50,13 +54,13 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return
       }
 
-      setTenantId(data.id)
-      setTenantSlug(data.slug)
-      setOrganizationName(data.name)
-      setEdition((data.edition as TenantEdition) || 'classic')
+      setTenantId(data.id ?? null)
+      setTenantSlug(data.slug ?? null)
+      setOrganizationName(data.name ?? null)
+      setEdition(normalizeTenantEdition(data.edition, 'classic'))
       setFeatureOverrides(Array.isArray(data.feature_overrides) ? data.feature_overrides : [])
       // Dev console: fotografia salute (pagina pubblica — non admin).
-      setDevHealth({ tenant: data.name, isAdmin: false, edition: (data.edition as string) || 'classic' })
+      setDevHealth({ tenant: data.name ?? null, isAdmin: false, edition: data.edition || 'classic' })
       printDevHealth('STATO (pagina pubblica)')
     } catch (err) {
       setTenantId(null)
@@ -73,10 +77,9 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const setTenantFromAdmin = useCallback(async (email: string) => {
     setIsLoading(true)
     try {
-      const { data: adminData, error } = await (supabase
-        .rpc as any)('check_admin_email', { check_email: email })
+      const { data: adminData, error } = await supabase.rpc('check_admin_email', { check_email: email })
 
-      if (error || !adminData || (adminData as any[]).length === 0) {
+      if (error || !adminData || adminData.length === 0) {
         setTenantId(null)
         setTenantSlug(null)
         setOrganizationName(null)
@@ -84,11 +87,11 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return
       }
 
-      const adminInfo = (adminData as any[])[0]
-      setTenantId(adminInfo.tenant_id as string)
+      const adminInfo = adminData[0]
+      setTenantId(adminInfo.tenant_id)
       setTenantSlug(adminInfo.slug || null)
       setOrganizationName(adminInfo.org_name || null)
-      setEdition((adminInfo.edition as TenantEdition) || 'pro')
+      setEdition(normalizeTenantEdition(adminInfo.edition, 'pro'))
       setFeatureOverrides(Array.isArray(adminInfo.feature_overrides) ? adminInfo.feature_overrides : [])
       // Dev console: fotografia salute (sei loggato come admin).
       setDevHealth({ tenant: adminInfo.org_name || null, isAdmin: true, edition: (adminInfo.edition as string) || 'pro' })

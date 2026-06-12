@@ -450,6 +450,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   
   // Ref per prevenire doppi submit (anche con React StrictMode)
   const isSubmittingRef = useRef(false)
+  const submitLockIdRef = useRef<string | null>(null)
   
   // Protezione globale usando sessionStorage - lock atomico per prevenire race condition
   const GLOBAL_LOCK_KEY = 'booking-submit-global-lock'
@@ -976,7 +977,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     }
     
     // Salva lockId immediatamente nel ref
-    ;(isSubmittingRef as any).currentLockId = lockId
+    submitLockIdRef.current = lockId
     
     
     // ✅ PROTEZIONE MULTI-LIVELLO CONTRO DOPPI SUBMIT
@@ -1070,8 +1071,9 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
         setPrivacyAccepted(false)
         
         // Reset tutti i flag di submit e rilascia lock
-        const savedLockId = (isSubmittingRef as any).currentLockId
+        const savedLockId = submitLockIdRef.current
         isSubmittingRef.current = false
+        submitLockIdRef.current = null
         setIsSubmitting(false)
         if (savedLockId) {
           releaseGlobalLock(savedLockId)
@@ -1084,8 +1086,9 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
         onError: (error) => {
           logger.error('[BookingForm] Mutation error:', error)
           // Reset tutti i flag in caso di errore per permettere nuovo tentativo
-          const savedLockId = (isSubmittingRef as any).currentLockId
+          const savedLockId = submitLockIdRef.current
           isSubmittingRef.current = false
+          submitLockIdRef.current = null
           setIsSubmitting(false)
           if (savedLockId) {
             releaseGlobalLock(savedLockId)

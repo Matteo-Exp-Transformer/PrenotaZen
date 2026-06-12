@@ -191,6 +191,29 @@ describe('useAdminAuth', () => {
     expect(result.current.user?.email).toBe('admin@test.it')
   })
 
+  it('restore sessione admin revocata da admin_users fa signOut e pulisce tenant', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        session: {
+          user: { id: 'user-1', email: 'admin@test.it' },
+        },
+      },
+      error: null,
+    })
+    mockFrom.mockReturnValueOnce(
+      buildChain({ data: null, error: { message: 'PGRST116: The result contains 0 rows' } })
+    )
+
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper('/admin') })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(mockSignOut).toHaveBeenCalledOnce()
+    expect(mockClearTenant).toHaveBeenCalledOnce()
+    expect(mockSetTenantFromAdmin).not.toHaveBeenCalled()
+    expect(result.current.user).toBeNull()
+  })
+
   it('restore sessione admin su /prenota/:slug non chiama setTenantFromAdmin', async () => {
     mockStoredAdminSession()
 

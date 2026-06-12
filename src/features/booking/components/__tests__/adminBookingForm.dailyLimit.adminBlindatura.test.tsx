@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { BookingRequest } from '@/types/booking'
 
 const mutateSpy = vi.fn()
+const FUTURE_BOOKING_DATE = '2099-06-12'
 const restaurantSettings = vi.hoisted(() => ({
   daily_guest_limit: 24 as number | null,
   booking_staff_presets_visible: true,
@@ -66,8 +67,8 @@ vi.mock('../../hooks/useBookingQueries', () => ({
         status: 'accepted',
         no_show: false,
         num_guests: 22,
-        confirmed_start: '2026-06-12T20:00:00+00:00',
-        confirmed_end: '2026-06-12T23:00:00+00:00',
+        confirmed_start: `${FUTURE_BOOKING_DATE}T20:00:00+00:00`,
+        confirmed_end: `${FUTURE_BOOKING_DATE}T23:00:00+00:00`,
       } as BookingRequest,
     ],
   }),
@@ -103,7 +104,7 @@ describe('@admin-blindatura calendario — AdminBookingForm avviso limite giorna
 
   it('mostra CapacityWarningModal su sforo giornaliero ma consente submit', async () => {
     const user = userEvent.setup()
-    render(<AdminBookingForm initialDate="2026-06-12" />, { wrapper })
+    render(<AdminBookingForm initialDate={FUTURE_BOOKING_DATE} />, { wrapper })
 
     await user.type(screen.getByPlaceholderText(/nome completo/i), 'Nuovo Cliente')
     await user.type(screen.getByPlaceholderText(/telefono/i), '3331234567')

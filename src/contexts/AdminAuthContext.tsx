@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, handleSupabaseError, isInvalidStoredRefreshTokenError } from '@/lib/supabase'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
+import type { Tables } from '@/types/database'
 
 const AUTH_REVOKED_REASON_KEY = 'auth_revoked_reason'
 const SUBSCRIPTION_INACTIVE_REASON = 'subscription_inactive'
@@ -22,6 +23,7 @@ interface AdminAuthContextValue {
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
+type AdminUserAuthRow = Pick<Tables<'admin_users'>, 'name' | 'tenant_id'>
 
 const isPublicTenantRoutePath = (pathname: string): boolean =>
   pathname === '/prenota' ||
@@ -45,8 +47,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return false
     }
 
-    const { data: organization, error } = await (supabase
-      .from('organizations') as any)
+    const { data: organization, error } = await supabase
+      .from('organizations')
       .select('is_active')
       .eq('id', tenantId)
       .single()
@@ -83,19 +85,23 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return
       }
 
-      const { data: adminUser, error: adminError } = await (supabase
-        .from('admin_users') as any)
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
         .select('name, tenant_id')
         .eq('email', session.user.email)
-        .single()
+        .single<AdminUserAuthRow>()
 
       if (adminError || !adminUser) {
+        await supabase.auth.signOut()
+        if (!isPublicTenantRoute) {
+          clearTenant()
+        }
         setUser(null)
         setIsLoading(false)
         return
       }
 
-      const hasActiveSubscription = await ensureActiveSubscription((adminUser as any).tenant_id)
+      const hasActiveSubscription = await ensureActiveSubscription(adminUser.tenant_id)
       if (!hasActiveSubscription) {
         if (!isPublicTenantRoute) {
           clearTenant()
@@ -112,7 +118,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUser({
         id: session.user.id,
         email: session.user.email,
-        name: (adminUser as any).name || undefined,
+        name: adminUser.name || undefined,
       })
     } catch (error) {
       logger.error('Error checking session:', error)
@@ -149,11 +155,11 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
-      const { data: adminUser, error: adminError } = await (supabase
-        .from('admin_users') as any)
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
         .select('name, tenant_id')
         .eq('email', authData.user.email || '')
-        .single()
+        .single<AdminUserAuthRow>()
 
       if (adminError || !adminUser) {
         await supabase.auth.signOut()
@@ -163,7 +169,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
-      const hasActiveSubscription = await ensureActiveSubscription((adminUser as any).tenant_id)
+      const hasActiveSubscription = await ensureActiveSubscription(adminUser.tenant_id)
       if (!hasActiveSubscription) {
         clearTenant()
         setUser(null)
@@ -178,7 +184,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUser({
         id: authData.user.id,
         email: authData.user.email || '',
-        name: (adminUser as any).name || undefined,
+        name: adminUser.name || undefined,
       })
 
       return { success: true }
