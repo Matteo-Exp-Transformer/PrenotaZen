@@ -42,15 +42,84 @@ const FULL_PAGE_PHOTO_LAYER_CLASS =
 
 export const BookingRequestPage: React.FC = () => {
   useBookingPublicViewport()
-  const { tenantSlug } = useParams<{ tenantSlug: string }>()
-  const { tenantId, isLoading: isTenantLoading, setTenantFromSlug } = useTenantContext()
-  const restaurantName = useRestaurantName()
+  const { tenantSlug: routeTenantSlug } = useParams<{ tenantSlug: string }>()
+  const {
+    tenantId,
+    tenantSlug: resolvedTenantSlug,
+    isLoading: isTenantLoading,
+    setTenantFromSlug,
+  } = useTenantContext()
+  const [resolvedRouteSlug, setResolvedRouteSlug] = useState<string | null>(null)
 
   useEffect(() => {
-    if (tenantSlug) {
-      setTenantFromSlug(tenantSlug)
+    let cancelled = false
+
+    if (!routeTenantSlug) {
+      setResolvedRouteSlug(null)
+      return undefined
     }
-  }, [tenantSlug, setTenantFromSlug])
+
+    setResolvedRouteSlug(null)
+    void setTenantFromSlug(routeTenantSlug).finally(() => {
+      if (!cancelled) {
+        setResolvedRouteSlug(routeTenantSlug)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [routeTenantSlug, setTenantFromSlug])
+
+  const tenantLookupFinished = !!routeTenantSlug && resolvedRouteSlug === routeTenantSlug && !isTenantLoading
+  const tenantReady =
+    tenantLookupFinished &&
+    !!tenantId &&
+    resolvedTenantSlug === routeTenantSlug
+  const tenantStale =
+    !!routeTenantSlug &&
+    !!tenantId &&
+    resolvedTenantSlug !== routeTenantSlug
+
+  if (!routeTenantSlug) {
+    return <BookingTenantUnavailable />
+  }
+
+  if (!tenantLookupFinished || isTenantLoading || tenantStale) {
+    return <BookingTenantLoading />
+  }
+
+  if (!tenantReady) {
+    return <BookingTenantUnavailable />
+  }
+
+  return <BookingRequestPageContent tenantSlug={routeTenantSlug} />
+}
+
+interface BookingRequestPageContentProps {
+  tenantSlug?: string
+}
+
+const BookingTenantLoading: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-600 border-r-transparent" />
+      <p className="mt-4 text-gray-600">Caricamento...</p>
+    </div>
+  </div>
+)
+
+const BookingTenantUnavailable: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">Prenotazioni temporaneamente non disponibili</h1>
+      <p className="text-gray-600">Il ristorante richiesto non esiste, e&apos;inattivo o l&apos;indirizzo non e&apos;corretto.</p>
+    </div>
+  </div>
+)
+
+const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ tenantSlug }) => {
+  const restaurantName = useRestaurantName()
 
   const { data: businessHours, isLoading } = useBusinessHours()
   const [mobileInfoOpen, setMobileInfoOpen] = useState<'hours' | 'contacts'>('hours')
@@ -168,28 +237,6 @@ export const BookingRequestPage: React.FC = () => {
             }
           : null
       : null
-
-  if (isTenantLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-600 border-r-transparent" />
-          <p className="mt-4 text-gray-600">Caricamento...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!tenantId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Prenotazioni temporaneamente non disponibili</h1>
-          <p className="text-gray-600">Il ristorante richiesto non esiste, e&apos;inattivo o l&apos;indirizzo non e&apos;corretto.</p>
-        </div>
-      </div>
-    )
-  }
 
   const summaryFormData = {
     desired_date: sharedFormData.desired_date,

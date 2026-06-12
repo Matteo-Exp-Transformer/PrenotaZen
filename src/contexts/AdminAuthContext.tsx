@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, handleSupabaseError, isInvalidStoredRefreshTokenError } from '@/lib/supabase'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
@@ -23,10 +23,17 @@ interface AdminAuthContextValue {
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 
+const isPublicTenantRoutePath = (pathname: string): boolean =>
+  pathname === '/prenota' ||
+  pathname.startsWith('/prenota/') ||
+  pathname === '/menu' ||
+  pathname.startsWith('/menu/')
+
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AdminAuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
+  const location = useLocation()
   const { setTenantFromAdmin, clearTenant } = useTenantContext()
 
   const setSubscriptionRevokedReason = () => {
@@ -55,6 +62,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const checkSession = async () => {
     try {
+      setIsLoading(true)
+      const isPublicTenantRoute = isPublicTenantRoutePath(location.pathname)
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
       if (sessionError) {
@@ -88,13 +97,17 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const hasActiveSubscription = await ensureActiveSubscription((adminUser as any).tenant_id)
       if (!hasActiveSubscription) {
-        clearTenant()
+        if (!isPublicTenantRoute) {
+          clearTenant()
+        }
         setUser(null)
         setIsLoading(false)
         return
       }
 
-      await setTenantFromAdmin(session.user.email)
+      if (!isPublicTenantRoute) {
+        await setTenantFromAdmin(session.user.email)
+      }
 
       setUser({
         id: session.user.id,
@@ -111,7 +124,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     void checkSession()
-  }, [])
+  }, [location.pathname])
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {

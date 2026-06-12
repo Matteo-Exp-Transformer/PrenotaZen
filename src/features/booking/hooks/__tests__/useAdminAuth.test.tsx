@@ -1,15 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import React from 'react'
 
 // Crea mock condivisi prima dell'hoisting
-const { mockSignInWithPassword, mockGetSession, mockSignOut, mockFrom, mockNavigate } = vi.hoisted(() => ({
+const {
+  mockSignInWithPassword,
+  mockGetSession,
+  mockSignOut,
+  mockFrom,
+  mockNavigate,
+  mockSetTenantFromAdmin,
+  mockClearTenant,
+} = vi.hoisted(() => ({
   mockSignInWithPassword: vi.fn(),
   mockGetSession: vi.fn(),
   mockSignOut: vi.fn(),
   mockFrom: vi.fn(),
   mockNavigate: vi.fn(),
+  mockSetTenantFromAdmin: vi.fn(),
+  mockClearTenant: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase', () => ({
@@ -31,8 +41,8 @@ vi.mock('@/lib/supabase', () => ({
 // TenantContext mockato: evita le chiamate a supabasePublic
 vi.mock('@/contexts/TenantContext', () => ({
   useTenantContext: vi.fn(() => ({
-    setTenantFromAdmin: vi.fn().mockResolvedValue(undefined),
-    clearTenant: vi.fn(),
+    setTenantFromAdmin: mockSetTenantFromAdmin,
+    clearTenant: mockClearTenant,
   })),
   TenantProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -53,11 +63,28 @@ function buildChain(result: { data: unknown; error: unknown }) {
   return chain
 }
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <MemoryRouter>
+const createWrapper = (initialPath = '/') => ({ children }: { children: React.ReactNode }) => (
+  <MemoryRouter initialEntries={[initialPath]}>
     <AdminAuthProvider>{children}</AdminAuthProvider>
   </MemoryRouter>
 )
+
+function mockStoredAdminSession() {
+  mockGetSession.mockResolvedValueOnce({
+    data: {
+      session: {
+        user: { id: 'user-1', email: 'admin@test.it' },
+      },
+    },
+    error: null,
+  })
+  mockFrom.mockReturnValueOnce(
+    buildChain({ data: { name: 'Admin Test', tenant_id: 'tenant-1' }, error: null })
+  )
+  mockFrom.mockReturnValueOnce(
+    buildChain({ data: { is_active: true }, error: null })
+  )
+}
 
 describe('useAdminAuth', () => {
   beforeEach(() => {
@@ -65,10 +92,11 @@ describe('useAdminAuth', () => {
     vi.clearAllMocks()
     mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
     mockSignOut.mockResolvedValue({ error: null })
+    mockSetTenantFromAdmin.mockResolvedValue(undefined)
   })
 
   it('user è null all\'avvio senza sessione attiva', async () => {
-    const { result } = renderHook(() => useAdminAuth(), { wrapper })
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper() })
 
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0))
@@ -94,7 +122,7 @@ describe('useAdminAuth', () => {
       buildChain({ data: { is_active: true }, error: null })
     )
 
-    const { result } = renderHook(() => useAdminAuth(), { wrapper })
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper() })
     await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 
     let loginResult!: { success: boolean; error?: string }
@@ -112,7 +140,7 @@ describe('useAdminAuth', () => {
       error: { message: 'Invalid login credentials' },
     })
 
-    const { result } = renderHook(() => useAdminAuth(), { wrapper })
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper() })
     await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 
     let loginResult!: { success: boolean; error?: string }
@@ -139,7 +167,7 @@ describe('useAdminAuth', () => {
       buildChain({ data: { is_active: true }, error: null })
     )
 
-    const { result } = renderHook(() => useAdminAuth(), { wrapper })
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper() })
     await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
     await act(async () => { await result.current.login('admin@test.it', 'password123') })
 
@@ -150,5 +178,42 @@ describe('useAdminAuth', () => {
     expect(result.current.user).toBeNull()
     expect(mockSignOut).toHaveBeenCalledOnce()
     expect(mockNavigate).toHaveBeenCalledWith('/login')
+  })
+
+  it('restore sessione admin su /admin chiama setTenantFromAdmin', async () => {
+    mockStoredAdminSession()
+
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper('/admin') })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(mockSetTenantFromAdmin).toHaveBeenCalledWith('admin@test.it')
+    expect(result.current.user?.email).toBe('admin@test.it')
+  })
+
+  it('restore sessione admin su /prenota/:slug non chiama setTenantFromAdmin', async () => {
+    mockStoredAdminSession()
+
+    const { result } = renderHook(() => useAdminAuth(), {
+      wrapper: createWrapper('/prenota/some-slug'),
+    })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(mockSetTenantFromAdmin).not.toHaveBeenCalled()
+    expect(result.current.user?.email).toBe('admin@test.it')
+  })
+
+  it('restore sessione admin su /menu/:slug non chiama setTenantFromAdmin', async () => {
+    mockStoredAdminSession()
+
+    const { result } = renderHook(() => useAdminAuth(), {
+      wrapper: createWrapper('/menu/some-slug'),
+    })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(mockSetTenantFromAdmin).not.toHaveBeenCalled()
+    expect(result.current.user?.email).toBe('admin@test.it')
   })
 })
