@@ -1305,54 +1305,27 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                           ))}
                         </div>
                       ) : (
-                        <>
-                          <div className="hidden min-[1390px]:grid grid-cols-3 gap-2">
-                            {digestSlots.map((s: SlotConfig) => (
-                              <DigestSlotHeader key={s.id} label={getSlotLabel(s)} />
-                            ))}
-                          </div>
-                          <div className="mt-2 hidden min-[1390px]:grid grid-cols-3 gap-2 auto-rows-[minmax(0,auto)] items-start">
-                              {digestSlots.map((s: SlotConfig) => (
-                                <div key={s.id} className="grid min-w-0 w-full grid-cols-1 sm:grid-cols-2 gap-2 items-start">
-                                  {filterByTurn(digestWithMenuBySlot[s.id] ?? []).map((booking) => (
-                                    <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                                      <DigestBookingListRow
-                                        booking={booking}
-                                        onOpen={openDigestBooking}
-                                        showMenuPricing
-                                        compactGrid
-                                        unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                        assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                        hasTurns={hasTurnsFeature}
-                                        onDotClick={handleDotClick}
-                                      />
-                                    </div>
-                                  ))}
+                        <div className="space-y-3">
+                          {digestSlots.map((s: SlotConfig) => (
+                            <div key={s.id} className="space-y-2">
+                              <DigestSlotHeader label={getSlotLabel(s)} />
+                              {filterByTurn(digestWithMenuBySlot[s.id] ?? []).map((booking) => (
+                                <div key={booking.id} className="flex min-w-0 w-full flex-col">
+                                  <DigestBookingListRow
+                                    booking={booking}
+                                    onOpen={openDigestBooking}
+                                    showMenuPricing
+                                    compactGrid
+                                    unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
+                                    assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
+                                    hasTurns={hasTurnsFeature}
+                                    onDotClick={handleDotClick}
+                                  />
                                 </div>
                               ))}
-                          </div>
-                          <div className="min-[1390px]:hidden space-y-3">
-                            {digestSlots.map((s: SlotConfig) => (
-                              <div key={s.id} className="space-y-2">
-                                <DigestSlotHeader label={getSlotLabel(s)} />
-                                {filterByTurn(digestWithMenuBySlot[s.id] ?? []).map((booking) => (
-                                  <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                                    <DigestBookingListRow
-                                      booking={booking}
-                                      onOpen={openDigestBooking}
-                                      showMenuPricing
-                                      compactGrid
-                                      unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                      assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                      hasTurns={hasTurnsFeature}
-                                      onDotClick={handleDotClick}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        </>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -1392,52 +1365,26 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                           ))}
                         </div>
                       ) : (
-                        <>
-                          <div className="hidden min-[1390px]:grid grid-cols-3 gap-2">
-                            {digestSlots.map((s: SlotConfig) => (
-                              <DigestSlotHeader key={s.id} label={getSlotLabel(s)} />
-                            ))}
-                          </div>
-                          <div className="mt-2 hidden min-[1390px]:grid grid-cols-3 gap-2 auto-rows-[minmax(0,auto)] items-start">
-                              {digestSlots.map((s: SlotConfig) => (
-                                <div key={s.id} className="grid min-w-0 w-full grid-cols-1 sm:grid-cols-2 gap-2 items-start">
-                                  {filterByTurn(digestTableOnlyBySlot[s.id] ?? []).map((booking) => (
-                                    <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                                      <DigestBookingListRow
-                                        booking={booking}
-                                        onOpen={openDigestBooking}
-                                        compactGrid
-                                        unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                        assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                        hasTurns={hasTurnsFeature}
-                                        onDotClick={handleDotClick}
-                                      />
-                                    </div>
-                                  ))}
+                        <div className="space-y-3">
+                          {digestSlots.map((s: SlotConfig) => (
+                            <div key={s.id} className="space-y-2">
+                              <DigestSlotHeader label={getSlotLabel(s)} />
+                              {filterByTurn(digestTableOnlyBySlot[s.id] ?? []).map((booking) => (
+                                <div key={booking.id} className="flex min-w-0 w-full flex-col">
+                                  <DigestBookingListRow
+                                    booking={booking}
+                                    onOpen={openDigestBooking}
+                                    compactGrid
+                                    unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
+                                    assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
+                                    hasTurns={hasTurnsFeature}
+                                    onDotClick={handleDotClick}
+                                  />
                                 </div>
                               ))}
-                          </div>
-                          <div className="min-[1390px]:hidden space-y-3">
-                            {digestSlots.map((s: SlotConfig) => (
-                              <div key={s.id} className="space-y-2">
-                                <DigestSlotHeader label={getSlotLabel(s)} />
-                                {filterByTurn(digestTableOnlyBySlot[s.id] ?? []).map((booking) => (
-                                  <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                                    <DigestBookingListRow
-                                      booking={booking}
-                                      onOpen={openDigestBooking}
-                                      compactGrid
-                                      unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                      assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                      hasTurns={hasTurnsFeature}
-                                      onDotClick={handleDotClick}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        </>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   ) : (
