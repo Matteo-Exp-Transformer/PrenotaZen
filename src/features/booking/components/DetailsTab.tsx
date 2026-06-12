@@ -46,7 +46,6 @@ const FROSTED_CONTROL_SURFACE: React.CSSProperties = {
 
 const FROSTED_TEXT_INPUT_CLASS_NAME =
   'block w-full border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 transition-colors duration-150 !border-black/20 text-center !text-[18px] sm:!text-[16px] !font-medium text-warm-wood placeholder:text-warm-wood/50 rounded-[12px] focus:!border-warm-wood focus:!ring-2 focus:!ring-warm-wood/40'
-const DEFAULT_PLACEMENT_AREAS = ['Sala A', 'Sala B', 'Deorr'] as const
 
 // Label colonna fissa | valore (allineati come tabella; niente wrap dell'etichetta sotto al valore)
 const InfoRow: React.FC<{
@@ -73,14 +72,12 @@ export const DetailsTab: React.FC<Props> = ({
   const features = useFeatures()
   const { data: menuPromos = [] } = useRestaurantSetting('booking_menu_promos')
   const menuPromoLabels = resolveMenuPromoLabelsForBooking(booking, menuPromos)
-  const { data: placementAreasSetting = DEFAULT_PLACEMENT_AREAS } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
-  const placementAreas = Array.isArray(placementAreasSetting)
+  const { data: placementAreasSetting = [] } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
+  const normalizedPlacementAreas = Array.isArray(placementAreasSetting)
     ? placementAreasSetting
         .map((item) => String(item ?? '').trim())
         .filter((item) => item.length > 0)
-    : [...DEFAULT_PLACEMENT_AREAS]
-  const normalizedPlacementAreas =
-    placementAreas.length > 0 ? placementAreas : [...DEFAULT_PLACEMENT_AREAS]
+    : []
   const currentPlacement =
     features.servizio &&
     formData.placement &&

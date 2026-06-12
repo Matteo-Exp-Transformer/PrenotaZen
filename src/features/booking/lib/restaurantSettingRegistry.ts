@@ -325,9 +325,8 @@ const bookingPlacementAreasSchema = z.array(placementAreaLabelSchema).min(1).max
 
 function parseBookingPlacementAreasFromDb(raw: unknown): string[] {
   const parsed = bookingPlacementAreasSchema.safeParse(raw)
-  if (!parsed.success) return ['Sala A', 'Sala B', 'Deorr']
-  const unique = parsed.data.filter((item, index, arr) => arr.indexOf(item) === index)
-  return unique.length > 0 ? unique : ['Sala A', 'Sala B', 'Deorr']
+  if (!parsed.success) return []
+  return parsed.data.filter((item, index, arr) => arr.indexOf(item) === index)
 }
 
 export type RestaurantSettingValueMap = {

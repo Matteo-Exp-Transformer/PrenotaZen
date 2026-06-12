@@ -69,8 +69,6 @@ interface AdminBookingFormProps {
 
 const ADMIN_FROSTED_TEXT_INPUT_CLASS_NAME =
   '!border-black/20 text-center !text-[18px] sm:!text-[16px] !font-medium text-warm-wood placeholder:text-warm-wood/50 rounded-[12px] focus:!border-warm-wood focus:!ring-2 focus:!ring-warm-wood/40'
-const DEFAULT_PLACEMENT_AREAS = ['Sala A', 'Sala B', 'Deorr'] as const
-
 export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   onSubmit,
   initialDate,
@@ -127,16 +125,14 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   const { data: menuItems = [] } = useMenuItems()
   const { data: staffPresetsDropdownVisible = true } = useRestaurantSetting('booking_staff_presets_visible')
   const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets')
-  const { data: placementAreasSetting = DEFAULT_PLACEMENT_AREAS } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
+  const { data: placementAreasSetting = [] } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
 
   const normalizedPlacementAreas = useMemo(() => {
     if (!features.servizio) return []
-    const placementAreas = Array.isArray(placementAreasSetting)
-      ? placementAreasSetting
-          .map((item) => String(item ?? '').trim())
-          .filter((item) => item.length > 0)
-      : [...DEFAULT_PLACEMENT_AREAS]
-    return placementAreas.length > 0 ? placementAreas : [...DEFAULT_PLACEMENT_AREAS]
+    if (!Array.isArray(placementAreasSetting)) return []
+    return placementAreasSetting
+      .map((item) => String(item ?? '').trim())
+      .filter((item) => item.length > 0)
   }, [features.servizio, placementAreasSetting])
 
   const { data: acceptedBookings = [] } = useAcceptedBookings()

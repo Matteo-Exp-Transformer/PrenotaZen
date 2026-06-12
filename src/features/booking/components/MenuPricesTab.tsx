@@ -11,6 +11,7 @@ import { toast } from 'react-toastify'
 import { ADMIN_WARM_GRADIENT_SURFACE } from '@/lib/adminWarmGradientSurface'
 import { Button, CollapsibleCard, Input, Textarea } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
+import { DiscardChangesConfirmModal } from './settings/SettingsSaveUi'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
 import { Plus, Edit, Trash2, Save, X, Eye, EyeOff, QrCode, ImageIcon } from 'lucide-react'
 import {
@@ -485,6 +486,15 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   const categoryFormTitleRef = useRef<HTMLDivElement>(null)
   const scrollProductFormIntoViewAfterEditRef = useRef(false)
   const scrollCategoryFormIntoViewAfterEditRef = useRef(false)
+  const categoryFormBaselineRef = useRef({
+    label: '',
+    description: '',
+    imageUrl: null as string | null,
+    hasPhotoFile: false,
+    hasPhotoPreview: false,
+  })
+  const [categoryDiscardConfirmOpen, setCategoryDiscardConfirmOpen] = useState(false)
+  const [categoryDiscardAction, setCategoryDiscardAction] = useState<'overlay' | 'form' | null>(null)
 
   const ADMIN_MENU_FORM_SCROLL_MARGIN = 132
   const scrollAdminMenuFormTitleIntoView = (element: HTMLElement | null) => {
@@ -1025,6 +1035,13 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     setNewCategoryDescription(dbCategory.description ?? '')
     resetCategoryPhotoState()
     setCategoryCurrentImageUrl(dbCategory.image_url ?? null)
+    categoryFormBaselineRef.current = {
+      label: currentLabel.trim(),
+      description: (dbCategory.description ?? '').trim(),
+      imageUrl: dbCategory.image_url ?? null,
+      hasPhotoFile: false,
+      hasPhotoPreview: false,
+    }
     scrollCategoryFormIntoViewAfterEditRef.current = true
   }
 
@@ -1064,6 +1081,13 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     setNewCategoryLabel('')
     setNewCategoryDescription('')
     resetCategoryPhotoState()
+    categoryFormBaselineRef.current = {
+      label: '',
+      description: '',
+      imageUrl: null,
+      hasPhotoFile: false,
+      hasPhotoPreview: false,
+    }
   }
 
   const cancelCategoryForm = () => {
@@ -1072,6 +1096,64 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     setNewCategoryDescription('')
     setEditingCategoryId(null)
     resetCategoryPhotoState()
+    categoryFormBaselineRef.current = {
+      label: '',
+      description: '',
+      imageUrl: null,
+      hasPhotoFile: false,
+      hasPhotoPreview: false,
+    }
+  }
+
+  const isCategoryFormDirty = useMemo(() => {
+    if (!isAddingCategory) return false
+    const baseline = categoryFormBaselineRef.current
+    return (
+      newCategoryLabel.trim() !== baseline.label ||
+      newCategoryDescription.trim() !== baseline.description ||
+      categoryCurrentImageUrl !== baseline.imageUrl ||
+      Boolean(categoryPhotoFile) !== baseline.hasPhotoFile ||
+      Boolean(categoryPhotoPreviewUrl) !== baseline.hasPhotoPreview
+    )
+  }, [
+    isAddingCategory,
+    newCategoryLabel,
+    newCategoryDescription,
+    categoryCurrentImageUrl,
+    categoryPhotoFile,
+    categoryPhotoPreviewUrl,
+  ])
+
+  const closeCategoriesOverlay = () => {
+    setViewMode('menu')
+    cancelCategoryForm()
+  }
+
+  const requestCloseCategoriesOverlay = () => {
+    if (isCategoryFormDirty) {
+      setCategoryDiscardAction('overlay')
+      setCategoryDiscardConfirmOpen(true)
+      return
+    }
+    closeCategoriesOverlay()
+  }
+
+  const requestCancelCategoryForm = () => {
+    if (isCategoryFormDirty) {
+      setCategoryDiscardAction('form')
+      setCategoryDiscardConfirmOpen(true)
+      return
+    }
+    cancelCategoryForm()
+  }
+
+  const confirmDiscardCategoryDraft = () => {
+    setCategoryDiscardConfirmOpen(false)
+    if (categoryDiscardAction === 'overlay') {
+      setViewMode('menu')
+    }
+    setCategoryDiscardAction(null)
+    cancelCategoryForm()
   }
 
   useImperativeHandle(
@@ -1833,10 +1915,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         >
           <button
             type="button"
-            onClick={() => {
-              setViewMode('menu')
-              cancelCategoryForm()
-            }}
+            onClick={requestCloseCategoriesOverlay}
             className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-warm-wood/40 bg-white/90 text-warm-wood shadow-sm transition hover:bg-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-warm-wood/40"
             aria-label="Chiudi gestione categorie"
           >
@@ -1991,7 +2070,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                   </button>
                   <button
                     type="button"
-                    onClick={cancelCategoryForm}
+                    onClick={requestCancelCategoryForm}
                     className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-semibold rounded-xl transition-all duration-300 shadow-md hover:shadow-lg hover:bg-red-600 hover:text-white focus:outline-none focus:ring-4 focus:ring-red-500/30"
                   >
                     <X className="h-4 w-4 shrink-0" />
@@ -2011,6 +2090,13 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                     setNewCategoryLabel('')
                     setNewCategoryDescription('')
                     resetCategoryPhotoState()
+                    categoryFormBaselineRef.current = {
+                      label: '',
+                      description: '',
+                      imageUrl: null,
+                      hasPhotoFile: false,
+                      hasPhotoPreview: false,
+                    }
                   }}
                   disabled={categoriesAtLimit}
                   className="h-9 shrink-0 gap-1.5 px-4 py-0 text-xs"
@@ -2216,6 +2302,16 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
           </div>
         )}
       </Modal>
+
+      <DiscardChangesConfirmModal
+        isOpen={categoryDiscardConfirmOpen}
+        onStay={() => {
+          setCategoryDiscardConfirmOpen(false)
+          setCategoryDiscardAction(null)
+        }}
+        onDiscard={confirmDiscardCategoryDraft}
+        message="Hai modifiche non salvate alla categoria. Vuoi annullarle?"
+      />
     </div>
   )
 })

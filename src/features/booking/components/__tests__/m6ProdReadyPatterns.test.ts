@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { restaurantSettingRegistry } from '@/features/booking/lib/restaurantSettingRegistry'
 
 const repoRoot = process.cwd()
 
@@ -34,5 +35,12 @@ describe('M6 prod-ready patterns', () => {
     for (const file of files) {
       expect(readRepoFile(file), file).not.toContain('as any')
     }
+  })
+
+  it('non inietta aree posizionamento demo quando il DB non ha valore', () => {
+    const parse = restaurantSettingRegistry.booking_placement_areas.parseFromDb
+    expect(parse(null)).toEqual([])
+    expect(parse(undefined)).toEqual([])
+    expect(parse([])).toEqual([])
   })
 })

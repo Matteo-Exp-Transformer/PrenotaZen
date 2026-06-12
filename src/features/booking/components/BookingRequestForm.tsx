@@ -1437,8 +1437,6 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
               setPrivacyAccepted(false)
               setErrors({})
               setSelectedPreset(null)
-              // Redirect disabilitato su richiesta:
-              // window.location.href = 'https://alritrovobologna.wixsite.com/alritrovobologna'
             }}
             className="py-3 px-8 text-lg font-bold text-white bg-green-500 rounded-full cursor-pointer border-none"
           >

@@ -178,11 +178,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const activeTab: Tab = resolveAdminDashboardTabFromPath(location.pathname) ?? 'calendar'
   const [calendarTargetDate, setCalendarTargetDate] = useState<string | null>(null)
   const [showNewBookingPanel, setShowNewBookingPanel] = useState(false)
+  const [newBookingDirty, setNewBookingDirty] = useState(false)
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('all')
   const [archiveSortOrder, setArchiveSortOrder] = useState<SortOrder>('booking_date')
   const menuPricesTabRef = useRef<MenuPricesTabHandle>(null)
   const features = useFeatures()
-  const { confirmNavigation, hasUnsavedChanges } = useUnsavedChangesGuard()
+  const { confirmNavigation, hasUnsavedChanges, registerUnsavedSource, clearUnsavedSource } =
+    useUnsavedChangesGuard()
   const dashboardRootRef = useRef<HTMLDivElement>(null)
   const { data: stats } = useBookingStats()
 
@@ -209,6 +211,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     if (activeTab !== 'pending') setShowNewBookingPanel(false)
   }, [activeTab])
+
+  useEffect(() => {
+    if (showNewBookingPanel) {
+      registerUnsavedSource('admin-new-booking', 'Nuova prenotazione', newBookingDirty)
+      return () => clearUnsavedSource('admin-new-booking')
+    }
+    clearUnsavedSource('admin-new-booking')
+    return undefined
+  }, [clearUnsavedSource, newBookingDirty, registerUnsavedSource, showNewBookingPanel])
+
+  const toggleNewBookingPanel = () => {
+    if (showNewBookingPanel) {
+      void confirmNavigation().then((ok) => {
+        if (ok) setShowNewBookingPanel(false)
+      })
+      return
+    }
+    setShowNewBookingPanel(true)
+  }
 
   const { user, logout } = useAdminAuth()
   const { tenantSlug } = useTenantContext()
@@ -383,7 +404,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="w-full overflow-hidden rounded-xl border-2 border-[var(--color-border)] bg-[var(--color-surface)] shadow-md min-h-0">
                 <button
                   type="button"
-                  onClick={() => setShowNewBookingPanel((p) => !p)}
+                  onClick={toggleNewBookingPanel}
                   className="admin-new-booking-collapse-trigger flex w-full items-center justify-between gap-3 rounded-t-xl px-4 py-[1.333rem] text-white transition-[background-image,transform] duration-200 md:gap-4 md:px-6 md:py-[1.667rem]"
                 >
                   <div
@@ -403,7 +424,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 {showNewBookingPanel && (
                   <div className="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-5">
-                    <AdminBookingForm />
+                    <AdminBookingForm onDirtyChange={setNewBookingDirty} />
                   </div>
                 )}
                 </div>

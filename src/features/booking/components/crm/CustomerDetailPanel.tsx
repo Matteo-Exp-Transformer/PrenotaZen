@@ -1,11 +1,12 @@
 import type { FC } from 'react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { Button, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { CustomerProfile } from '@/types/customer'
 import type { BookingRequest } from '@/types/booking'
 import { useUpdateCustomer } from '@/features/booking/hooks/useCustomerMutations'
+import { DiscardChangesConfirmModal } from '@/features/booking/components/settings/SettingsSaveUi'
 
 const STATUS_BADGE: Record<
   string,
@@ -38,10 +39,30 @@ export const CustomerDetailPanel: FC<CustomerDetailPanelProps> = ({
 }) => {
   const updateCustomer = useUpdateCustomer()
   const [notesDraft, setNotesDraft] = useState('')
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (profile) setNotesDraft(profile.notes ?? '')
   }, [profile])
+
+  const notesDirty = useMemo(() => {
+    if (!profile) return false
+    return notesDraft.trim() !== (profile.notes ?? '').trim()
+  }, [notesDraft, profile])
+
+  const requestClose = useCallback(() => {
+    if (notesDirty) {
+      setDiscardConfirmOpen(true)
+      return
+    }
+    onClose()
+  }, [notesDirty, onClose])
+
+  const confirmDiscardClose = useCallback(() => {
+    setDiscardConfirmOpen(false)
+    if (profile) setNotesDraft(profile.notes ?? '')
+    onClose()
+  }, [onClose, profile])
 
   if (!profile) return null
 
@@ -65,7 +86,7 @@ export const CustomerDetailPanel: FC<CustomerDetailPanelProps> = ({
           'fixed inset-0 z-[8999] bg-black/30 transition-opacity',
           open ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
-        onClick={onClose}
+        onClick={requestClose}
       />
       <aside
         className={cn(
@@ -79,7 +100,7 @@ export const CustomerDetailPanel: FC<CustomerDetailPanelProps> = ({
             <h2 className="truncate text-title-modal font-semibold text-primary-900">{profile.name || profile.email}</h2>
             <p className="truncate text-sm text-[var(--color-text-muted)]">{profile.email}</p>
           </div>
-          <Button type="button" variant="ghost" size="icon" aria-label="Chiudi" onClick={onClose}>
+          <Button type="button" variant="ghost" size="icon" aria-label="Chiudi" onClick={requestClose}>
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -116,7 +137,7 @@ export const CustomerDetailPanel: FC<CustomerDetailPanelProps> = ({
               variant="secondary"
               size="sm"
               className="mt-2"
-              disabled={updateCustomer.isPending}
+              disabled={updateCustomer.isPending || !notesDirty}
               onClick={saveNotes}
             >
               Salva note
@@ -175,6 +196,13 @@ export const CustomerDetailPanel: FC<CustomerDetailPanelProps> = ({
           </section>
         </div>
       </aside>
+
+      <DiscardChangesConfirmModal
+        isOpen={discardConfirmOpen}
+        onStay={() => setDiscardConfirmOpen(false)}
+        onDiscard={confirmDiscardClose}
+        message="Hai note non salvate. Chiudendo il pannello perderai le modifiche."
+      />
     </>
   )
 }
