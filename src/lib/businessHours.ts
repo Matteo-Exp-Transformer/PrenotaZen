@@ -124,9 +124,6 @@ export function formatHours(slots: BusinessHourSlot[]): string {
     .join(', ')
 }
 
-/**
- * Get default hardcoded business hours (fallback)
- */
 const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export const BUSINESS_HOURS_DAY_LABELS: Record<keyof BusinessHours, string> = {
@@ -214,16 +211,29 @@ export function validateBusinessHours(hours: BusinessHours): string | null {
   return null
 }
 
+/**
+ * Stato neutro quando `business_hours` non è ancora in DB (admin) o non è parsabile.
+ * Tutti i giorni chiusi — nessun orario demo da ristorante reale.
+ * L'editor admin usa slot locali solo quando l'operatore apre un giorno.
+ */
 export function getDefaultBusinessHours(): BusinessHours {
   return {
-    monday: [{ open: '11:00', close: '00:00' }],
-    tuesday: [{ open: '11:00', close: '00:00' }],
-    wednesday: [{ open: '11:00', close: '00:00' }],
-    thursday: [{ open: '11:00', close: '00:00' }],
-    friday: [{ open: '11:00', close: '01:00' }],
-    saturday: [{ open: '17:00', close: '01:00' }],
-    sunday: null
+    monday: null,
+    tuesday: null,
+    wednesday: null,
+    thursday: null,
+    friday: null,
+    saturday: null,
+    sunday: null,
   }
+}
+
+/** Almeno un giorno con fasce salvate/configurate. */
+export function hasAnyBusinessHoursConfigured(hours: BusinessHours): boolean {
+  return BUSINESS_HOURS_DAY_ORDER.some((day) => {
+    const slots = hours[day]
+    return slots != null && slots.length > 0
+  })
 }
 
 /**

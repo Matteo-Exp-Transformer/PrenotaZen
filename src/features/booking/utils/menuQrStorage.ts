@@ -159,7 +159,7 @@ export async function importCatalogCategoryImagesToQrStorage(
 }
 
 async function copyStorageObject(fromPath: string, toPath: string): Promise<void> {
-  const { error } = await (supabase.storage.from(BUCKET) as any).copy(fromPath, toPath)
+  const { error } = await supabase.storage.from(BUCKET).copy(fromPath, toPath)
   if (error) throw error
 }
 
@@ -182,8 +182,8 @@ export async function tryCopyQrCategoryPhotoOnRename(
 }
 
 function publicUrlForPath(path: string): string {
-  const { data } = (supabase.storage.from(BUCKET) as any).getPublicUrl(path)
-  return (data as { publicUrl: string }).publicUrl
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return data.publicUrl
 }
 
 /** Dopo il primo insert, sposta file da `qr/draft/{shortCode}/` a `qr/{savedId}/`. */

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { parseBookingPageBackgroundFromDb } from '@/features/booking/constants/bookingPageBackground'
+import { getDefaultBusinessHours } from '@/lib/businessHours'
 import { restaurantSettingRegistry } from '@/features/booking/lib/restaurantSettingRegistry'
 
 const repoRoot = process.cwd()
@@ -42,5 +44,25 @@ describe('M6 prod-ready patterns', () => {
     expect(parse(null)).toEqual([])
     expect(parse(undefined)).toEqual([])
     expect(parse([])).toEqual([])
+  })
+
+  it('non inietta orari demo quando business_hours manca in DB', () => {
+    const parse = restaurantSettingRegistry.business_hours.parseFromDb
+    expect(parse(null)).toEqual(getDefaultBusinessHours())
+    expect(parse(undefined)).toEqual(getDefaultBusinessHours())
+    expect(parse('invalid')).toEqual(getDefaultBusinessHours())
+  })
+
+  it('non inietta sfondo pagina demo quando public_booking_page_background manca in DB', () => {
+    const parse = restaurantSettingRegistry.public_booking_page_background.parseFromDb
+    expect(parse(null)).toBeNull()
+    expect(parse(undefined)).toBeNull()
+    expect(parse('')).toBeNull()
+    expect(parse('   ')).toBeNull()
+    expect(parseBookingPageBackgroundFromDb(null)).toBeNull()
+  })
+
+  it('menuQrStorage non usa cast as any su storage', () => {
+    expect(readRepoFile('src/features/booking/utils/menuQrStorage.ts')).not.toContain('as any')
   })
 })

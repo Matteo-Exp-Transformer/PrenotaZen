@@ -122,7 +122,7 @@ export type BookingPageTileId = (typeof BOOKING_PAGE_TILE_IDS)[number]
  * (es. «Texture 11»), ma il file PNG non e piu in `public/booking/tiles/`.
  * In admin la card viene mostrata vuota e disabilitata.
  * Sulla pagina pubblica un eventuale valore salvato come placeholder ricade
- * automaticamente sullo sfondo di default (vedi `parseBookingPageBackgroundFromDb`).
+ * su sfondo neutro (nessuna texture demo — vedi `parseBookingPageBackgroundFromDb`).
  */
 export const BOOKING_PAGE_TILE_PLACEHOLDER_IDS: readonly BookingPageTileId[] = [
   'tile-04',
@@ -264,8 +264,13 @@ export type BookingPageBackgroundId = BookingFullPageBackgroundId | BookingPageT
 export const DEFAULT_BOOKING_PAGE_TILE: BookingPageTileId = 'tile-01'
 export const DEFAULT_BOOKING_PAGE_BACKGROUND: BookingPageBackgroundId = DEFAULT_BOOKING_FULL_PAGE_BACKGROUND
 
+/** First-paint neutro (crema) quando il tenant non ha configurato sfondo/striscia. */
+export const BOOKING_PAGE_NEUTRAL_BACKGROUND_COLOR = '#faf7f1'
+
+/** Radice tecnica sotto gradienti/tile già scelti dal tenant (non sfondo demo pubblico). */
 export const BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR = '#2d2013'
 
+/** Solo anteprima admin se un id gradiente non ha CSS — non usato sulla pagina pubblica senza config tenant. */
 const FALLBACK_GRADIENT =
   'linear-gradient(135deg, #2d2013 0%, #5a3923 45%, #8b5f3c 100%)'
 /**
@@ -286,21 +291,22 @@ export function isBookingPageBackgroundId(value: string): value is BookingPageBa
   return isBookingFullPageBackgroundId(value) || isBookingPageTileId(value) || isBookingPageGradientId(value)
 }
 
-export function parseBookingPageBackgroundFromDb(raw: unknown): BookingPageBackgroundId {
-  if (typeof raw !== 'string' || raw.trim() === '') return DEFAULT_BOOKING_PAGE_BACKGROUND
+export function parseBookingPageBackgroundFromDb(raw: unknown): BookingPageBackgroundId | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null
   const v = raw.trim().toLowerCase()
-  if (!isBookingPageBackgroundId(v)) return DEFAULT_BOOKING_PAGE_BACKGROUND
+  if (!isBookingPageBackgroundId(v)) return null
   /**
    * Se il valore salvato e ora un placeholder (immagine spostata in
-   * «Immagini da sistemare/»), evita un 404 sulla pagina pubblica usando il default.
+   * «Immagini da sistemare/»), evita un 404 sulla pagina pubblica — sfondo neutro.
    */
-  if (isBookingPageTilePlaceholder(v)) return DEFAULT_BOOKING_PAGE_BACKGROUND
+  if (isBookingPageTilePlaceholder(v)) return null
   return v as BookingPageBackgroundId
 }
 
 /** @deprecated Usa parseBookingPageBackgroundFromDb */
 export function parseBookingPageTileFromDb(raw: unknown): BookingPageTileId {
   const bg = parseBookingPageBackgroundFromDb(raw)
+  if (bg == null) return DEFAULT_BOOKING_PAGE_TILE
   return isBookingPageTileId(bg) ? bg : DEFAULT_BOOKING_PAGE_TILE
 }
 

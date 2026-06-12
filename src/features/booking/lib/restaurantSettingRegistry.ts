@@ -339,7 +339,7 @@ export type RestaurantSettingValueMap = {
   contact_email: string
   contact_phone: string
   contact_address: string
-  public_booking_page_background: BookingPageBackgroundId
+  public_booking_page_background: BookingPageBackgroundId | null
   public_booking_strip_photo: BookingStripPhotoId | null
   booking_staff_presets_visible: boolean
   booking_custom_staff_presets: CustomStaffPreset[]

@@ -13,8 +13,8 @@ import { useTenantContext } from '@/contexts/TenantContext'
 import { useRestaurantSetting } from '@/features/booking/hooks/useRestaurantSetting'
 import { cn } from '@/lib/utils'
 import {
+  BOOKING_PAGE_NEUTRAL_BACKGROUND_COLOR,
   BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR,
-  DEFAULT_BOOKING_PAGE_BACKGROUND,
   bookingFullPageBackgroundPublicHref,
   bookingPageGradientCss,
   bookingPageTilePublicHref,
@@ -177,19 +177,26 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
       setMobileInfoOpen('contacts')
     }
   }, [mobileInfoOpen, showContactSection, showHoursSection])
-  const bookingPageBackground: BookingPageBackgroundId =
-    publicBookingBg ?? DEFAULT_BOOKING_PAGE_BACKGROUND
+  const bookingPageBackground: BookingPageBackgroundId | null = publicBookingBg ?? null
   const showPhotoStrip = stripPhotoId != null
+  const hasTenantPageBackground = bookingPageBackground != null
   const contentColumnPad = showPhotoStrip ? BOOKING_PAGE_CONTENT_PAD_STRIP : BOOKING_PAGE_CONTENT_PAD_FULL
   // Quando la striscia laterale è attiva, il resto della pagina deve restare uniforme
   // chiaro (crema/avorio): l'immagine full-page o legacy viene applicata SOLO senza striscia.
-  const STRIP_MODE_PAGE_BG = '#faf7f1'
-  const fullPagePhotoId = !showPhotoStrip && isBookingFullPageBackgroundId(bookingPageBackground)
-    ? bookingPageBackground
-    : null
-  const legacyTileId = !showPhotoStrip && !isBookingFullPageBackgroundId(bookingPageBackground) && !isBookingPageGradientId(bookingPageBackground)
-    ? bookingPageBackground
-    : null
+  const STRIP_MODE_PAGE_BG = BOOKING_PAGE_NEUTRAL_BACKGROUND_COLOR
+  const fullPagePhotoId =
+    hasTenantPageBackground &&
+    !showPhotoStrip &&
+    isBookingFullPageBackgroundId(bookingPageBackground)
+      ? bookingPageBackground
+      : null
+  const legacyTileId =
+    hasTenantPageBackground &&
+    !showPhotoStrip &&
+    !isBookingFullPageBackgroundId(bookingPageBackground) &&
+    !isBookingPageGradientId(bookingPageBackground)
+      ? bookingPageBackground
+      : null
   const isFullPagePhoto = fullPagePhotoId != null
   /** Cap form + riepilogo esterno: solo full-page senza striscia, desktop ≥1256px (CSS). */
   const useFullPageDesktopFreezeLayout = !showPhotoStrip && isFullPagePhoto
@@ -209,15 +216,16 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     backgroundRepeat: 'no-repeat',
     // `position:fixed` sul div (non `background-attachment:fixed`) — equivalente robusto su iOS.
   })
-  // Colore di fallback sul root (primo paint). Tile/gradiente su layer `absolute` scrollabile.
-  const pageRootFallbackStyle: React.CSSProperties = showPhotoStrip
-    ? { backgroundColor: STRIP_MODE_PAGE_BG }
-    : isFullPagePhoto
-      ? { backgroundColor: FULL_PAGE_FALLBACK_BG }
-      : { backgroundColor: BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR }
+  // Colore di fallback sul root (primo paint). Senza config tenant → crema neutra, niente asset demo.
+  const pageRootFallbackStyle: React.CSSProperties =
+    showPhotoStrip || !hasTenantPageBackground
+      ? { backgroundColor: STRIP_MODE_PAGE_BG }
+      : isFullPagePhoto
+        ? { backgroundColor: FULL_PAGE_FALLBACK_BG }
+        : { backgroundColor: BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR }
 
   const scrollablePageBackgroundStyle: React.CSSProperties | null =
-    !showPhotoStrip && !isFullPagePhoto
+    hasTenantPageBackground && !showPhotoStrip && !isFullPagePhoto
       ? isBookingPageGradientId(bookingPageBackground)
         ? {
             backgroundColor: BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR,

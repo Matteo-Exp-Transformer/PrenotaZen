@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { BusinessHourSlot } from '@/lib/businessHours'
 import {
+  getDefaultBusinessHours,
+  hasAnyBusinessHoursConfigured,
   sortBusinessHourSlots,
   validateBusinessHourSlots,
   validateBusinessHours,
@@ -9,6 +11,24 @@ import {
 function slots(...pairs: [string, string][]): BusinessHourSlot[] {
   return pairs.map(([open, close]) => ({ open, close }))
 }
+
+describe('getDefaultBusinessHours', () => {
+  it('restituisce tutti i giorni chiusi (nessun orario demo)', () => {
+    const hours = getDefaultBusinessHours()
+    for (const day of [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ] as const) {
+      expect(hours[day]).toBeNull()
+    }
+    expect(hasAnyBusinessHoursConfigured(hours)).toBe(false)
+  })
+})
 
 describe('sortBusinessHourSlots', () => {
   it('ordina per orario di apertura', () => {
