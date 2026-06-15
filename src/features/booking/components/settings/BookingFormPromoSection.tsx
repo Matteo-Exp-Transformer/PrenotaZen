@@ -699,20 +699,22 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
               promos.map((row) => (
                 <div
                   key={row.id}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3"
+                  className="menu-prices-item-row flex-col items-stretch gap-2 py-2.5 px-3"
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="menu-prices-item-text min-w-0 flex-1">
                     <p className="font-semibold text-slate-900">{getMenuPromoAdminLabel(row)}</p>
                     {row.message.trim() ? (
                       <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{row.message.trim()}</p>
                     ) : null}
-                    <p className="mt-1 text-xs text-slate-500">{formatPromoPlacementSummary(row, subTabOptions, bookingTypeOptions)}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatPromoPlacementSummary(row, subTabOptions, bookingTypeOptions)}
+                    </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="menu-prices-item-actions flex w-full shrink-0 justify-end gap-1.5">
                     <button
                       type="button"
                       onClick={() => startEditPromo(row)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                      className="menu-prices-icon-btn menu-prices-icon-btn--edit"
                       aria-label="Modifica promo"
                     >
                       <Edit className="h-4 w-4" />
@@ -723,10 +725,10 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
                       disabled={upsert.isPending}
                       onClick={() => toggleVisibility(row.id)}
                       className={cn(
-                        'inline-flex h-9 w-9 items-center justify-center rounded-lg border',
+                        'menu-prices-icon-btn',
                         isMenuPromoVisibleOnBooking(row)
-                          ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-                          : 'border-slate-200 text-slate-400 hover:bg-slate-50',
+                          ? 'menu-prices-icon-btn--visibility-visible'
+                          : 'menu-prices-icon-btn--visibility-hidden',
                       )}
                       aria-label={
                         isMenuPromoVisibleOnBooking(row)
@@ -743,7 +745,7 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
                     <button
                       type="button"
                       onClick={() => handleDeletePromo(row.id, getMenuPromoAdminLabel(row))}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                      className="menu-prices-icon-btn menu-prices-icon-btn--delete"
                       aria-label="Elimina promo"
                     >
                       <Trash2 className="h-4 w-4" />

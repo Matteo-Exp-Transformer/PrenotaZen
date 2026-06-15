@@ -1767,8 +1767,9 @@ button.booking-request-reject-booking-btn:focus-visible {
 
 .menu-prices-category-label-card__actions {
   flex: 0 0 auto;
-  justify-content: center;
+  justify-content: flex-end;
   margin-top: auto;
+  margin-left: auto;
   padding-bottom: 0.125rem;
 }
 

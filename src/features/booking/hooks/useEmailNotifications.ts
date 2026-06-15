@@ -3,39 +3,83 @@ import {
   getBookingAcceptedEmail,
   getBookingRejectedEmail,
   getBookingCancelledEmail,
+  type BookingEmailSummaryContext,
   type TenantInfo,
 } from '@/lib/emailTemplates'
 import type { BookingRequest } from '@/types/booking'
 import { logger } from '@/lib/logger'
+import { restaurantSettingRegistry } from '@/features/booking/lib/restaurantSettingRegistry'
+import type { CustomStaffPreset } from '@/features/booking/constants/presetMenus'
+
+interface TenantEmailBundle {
+  tenantInfo: TenantInfo
+  summaryContext: BookingEmailSummaryContext
+}
 
 /**
- * Recupera nome ristorante e contatti dal tenant per personalizzare la firma email.
- * Fallisce silenziosamente — l'email viene inviata anche senza dati di contatto.
+ * Recupera nome ristorante, contatti e contesto riepilogo (config Prenota + preset + categorie).
+ * Fallisce parzialmente — l'email usa solo campi booking certi se manca il contesto.
  */
-async function fetchTenantInfo(tenantId: string): Promise<TenantInfo> {
+async function fetchTenantEmailBundle(tenantId: string): Promise<TenantEmailBundle> {
+  const empty: TenantEmailBundle = {
+    tenantInfo: {},
+    summaryContext: { modes: [], customStaffPresets: [], menuCategories: [] },
+  }
+
   try {
     const { supabase } = await import('@/lib/supabase')
-    const { data } = await supabase
+    const { data: settings } = await supabase
       .from('restaurant_settings')
       .select('setting_key, setting_value')
       .eq('tenant_id', tenantId)
-      .in('setting_key', ['restaurant_name', 'contact_phone', 'contact_email'])
+      .in('setting_key', [
+        'restaurant_name',
+        'contact_phone',
+        'contact_email',
+        'booking_public_form_config',
+        'booking_custom_staff_presets',
+      ])
 
-    const map: Record<string, string> = {}
-    for (const row of data ?? []) {
-      const v = row.setting_value
-      if (typeof v === 'string' && v.trim()) {
-        map[row.setting_key] = v.trim()
-      }
+    const map: Record<string, unknown> = {}
+    for (const row of settings ?? []) {
+      map[row.setting_key] = row.setting_value
     }
+
+    const tenantInfo: TenantInfo = {
+      name: typeof map.restaurant_name === 'string' ? map.restaurant_name.trim() : undefined,
+      phone: typeof map.contact_phone === 'string' ? map.contact_phone.trim() : undefined,
+      email: typeof map.contact_email === 'string' ? map.contact_email.trim() : undefined,
+    }
+
+    const formConfig = restaurantSettingRegistry.booking_public_form_config.parseFromDb(
+      map.booking_public_form_config,
+    )
+    const presetsRaw = map.booking_custom_staff_presets
+    const customStaffPresets = Array.isArray(presetsRaw)
+      ? (presetsRaw as CustomStaffPreset[])
+      : []
+
+    const { data: categories } = await supabase
+      .from('menu_categories')
+      .select('key, label, sort_order')
+      .eq('tenant_id', tenantId)
+      .order('sort_order')
 
     return {
-      name: map['restaurant_name'],
-      phone: map['contact_phone'],
-      email: map['contact_email'],
+      tenantInfo,
+      summaryContext: {
+        modes: formConfig?.booking_modes ?? [],
+        customStaffPresets,
+        menuCategories: (categories ?? []).map((c) => ({
+          key: c.key,
+          label: c.label,
+          sort_order: c.sort_order,
+        })),
+      },
     }
-  } catch {
-    return {}
+  } catch (error) {
+    logger.warn('[Email] Impossibile caricare contesto tenant per riepilogo:', error)
+    return empty
   }
 }
 
@@ -48,8 +92,8 @@ export const sendBookingAcceptedEmail = async (booking: BookingRequest): Promise
       return { success: false }
     }
 
-    const tenantInfo = await fetchTenantInfo(booking.tenant_id)
-    const { subject, html } = getBookingAcceptedEmail(booking, tenantInfo)
+    const { tenantInfo, summaryContext } = await fetchTenantEmailBundle(booking.tenant_id)
+    const { subject, html } = getBookingAcceptedEmail(booking, tenantInfo, summaryContext)
 
     const result = await sendAndLogEmail(
       {
@@ -78,8 +122,8 @@ export const sendBookingRejectedEmail = async (booking: BookingRequest): Promise
       return { success: false }
     }
 
-    const tenantInfo = await fetchTenantInfo(booking.tenant_id)
-    const { subject, html } = getBookingRejectedEmail(booking, tenantInfo)
+    const { tenantInfo, summaryContext } = await fetchTenantEmailBundle(booking.tenant_id)
+    const { subject, html } = getBookingRejectedEmail(booking, tenantInfo, summaryContext)
 
     const result = await sendAndLogEmail(
       {
@@ -108,8 +152,8 @@ export const sendBookingCancelledEmail = async (booking: BookingRequest): Promis
       return { success: false }
     }
 
-    const tenantInfo = await fetchTenantInfo(booking.tenant_id)
-    const { subject, html } = getBookingCancelledEmail(booking, tenantInfo)
+    const { tenantInfo, summaryContext } = await fetchTenantEmailBundle(booking.tenant_id)
+    const { subject, html } = getBookingCancelledEmail(booking, tenantInfo, summaryContext)
 
     const result = await sendAndLogEmail(
       {

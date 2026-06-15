@@ -29,6 +29,11 @@ import { PastStartTimeWarningModal } from './PastStartTimeWarningModal'
 import { isWallClockStartBeforeNow, trimTimeToHHmm } from '../utils/dateUtils'
 import { logger } from '@/lib/logger'
 import { useFeatures } from '@/hooks/useFeatures'
+import { useFormValidationAttention } from '../hooks/useFormValidationAttention'
+import {
+  ADMIN_BOOKING_ERROR_FIELD_IDS,
+  getFormFieldAttentionProps,
+} from '../utils/formValidationAttention'
 
 
 export type AdminBookingFormNavigationGuardHandle = {
@@ -93,6 +98,14 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   } | null>(null)
   const [showPastStartWarning, setShowPastStartWarning] = useState(false)
   const [touchCrossBurst, setTouchCrossBurst] = useState(0)
+
+  const { attentionFieldKey, clearAttentionField, focusFirstValidationIssue } =
+    useFormValidationAttention({
+      errorFieldIds: ADMIN_BOOKING_ERROR_FIELD_IDS,
+    })
+
+  const fieldAttention = (fieldKey: string) =>
+    getFormFieldAttentionProps(fieldKey, attentionFieldKey, clearAttentionField)
 
   const navigationSaveResolveRef = useRef<(() => void) | null>(null)
   const navigationSaveRejectRef = useRef<((error: Error) => void) | null>(null)
@@ -257,29 +270,34 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
     let isValid = true
+    let firstErrorKey: string | null = null
 
     // Name validation
     if (!formData.client_name.trim()) {
       newErrors.client_name = 'Nome obbligatorio'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'client_name'
     }
 
     // Email validation - optional but must be valid if provided
     if (formData.client_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.client_email)) {
       newErrors.client_email = 'Email non valida'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'client_email'
     }
 
     // Phone validation - required
     if (!formData.client_phone || !formData.client_phone.trim()) {
       newErrors.client_phone = 'Numero di telefono obbligatorio'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'client_phone'
     }
 
     // Date validation
     if (!formData.desired_date) {
       newErrors.desired_date = 'Data obbligatoria'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'desired_date'
     } else {
       const selectedDate = new Date(formData.desired_date)
       const today = new Date()
@@ -288,6 +306,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
       if (selectedDate < today) {
         newErrors.desired_date = 'La data non può essere nel passato'
         isValid = false
+        if (!firstErrorKey) firstErrorKey = 'desired_date'
       }
     }
 
@@ -295,18 +314,21 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
     if (!formData.desired_time) {
       newErrors.desired_time = 'Orario obbligatorio'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'desired_time'
     }
 
     // Num guests validation
     if (!formData.num_guests || formData.num_guests < 1) {
       newErrors.num_guests = 'Numero ospiti obbligatorio (min 1)'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'num_guests'
     }
 
     // Booking type validation
     if (!formData.booking_type) {
       newErrors.booking_type = 'Tipologia di prenotazione obbligatoria'
       isValid = false
+      if (!firstErrorKey) firstErrorKey = 'booking_type'
     }
 
     // Menu validation (Rinfresco / menù a prezzo fisso)
@@ -314,14 +336,29 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
       if (!formData.menu_selection || !formData.menu_selection.items || formData.menu_selection.items.length === 0) {
         newErrors.menu = 'Seleziona almeno un prodotto dal menù'
         isValid = false
+        if (!firstErrorKey) firstErrorKey = 'menu'
       }
       if (!formData.menu_total_per_person || formData.menu_total_per_person <= 0) {
         newErrors.menu = 'Il totale a persona deve essere maggiore di 0'
         isValid = false
+        if (!firstErrorKey) firstErrorKey = 'menu'
       }
     }
 
     setErrors(newErrors)
+
+    if (!isValid) {
+      const errorCount = Object.keys(newErrors).length
+      toast.error(
+        `Compilazione non valida: ${errorCount} ${errorCount === 1 ? 'campo da correggere' : 'campi da correggere'}`,
+        {
+          position: 'top-center',
+          autoClose: 4000,
+        },
+      )
+      focusFirstValidationIssue(firstErrorKey)
+    }
+
     return isValid
   }
 
@@ -499,7 +536,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form noValidate onSubmit={handleSubmit} className="space-y-8">
       {/* Layout a 2 Colonne su schermi grandi */}
       <div className="grid md:grid-cols-2 gap-6 md:gap-8">
         {/* COLONNA SINISTRA: Dati Personali */}
@@ -510,9 +547,12 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
           </h2>
 
           {/* Nome */}
-          <div className="space-y-3">
+          <div
+            id="client_name"
+            className={cn('space-y-3', fieldAttention('client_name').className)}
+            onPointerDown={fieldAttention('client_name').onPointerDown}
+          >
             <Input
-              id="client_name"
               value={formData.client_name}
               onChange={(e) => {
                 setFormData({ ...formData, client_name: e.target.value })
@@ -528,9 +568,12 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
           </div>
 
           {/* Email */}
-          <div className="space-y-3">
+          <div
+            id="client_email"
+            className={cn('space-y-3', fieldAttention('client_email').className)}
+            onPointerDown={fieldAttention('client_email').onPointerDown}
+          >
             <Input
-              id="client_email"
               type="email"
               value={formData.client_email}
               onChange={(e) => {
@@ -546,9 +589,12 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
           </div>
 
           {/* Telefono */}
-          <div className="space-y-3">
+          <div
+            id="client_phone"
+            className={cn('space-y-3', fieldAttention('client_phone').className)}
+            onPointerDown={fieldAttention('client_phone').onPointerDown}
+          >
             <Input
-              id="client_phone"
               type="tel"
               value={formData.client_phone}
               onChange={(e) => {
@@ -565,9 +611,12 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
           </div>
 
           {/* Numero ospiti — stesso gruppo dei dati cliente, sotto il telefono */}
-          <div className="space-y-3 pt-2">
+          <div
+            id="num_guests"
+            className={cn('space-y-3 pt-2', fieldAttention('num_guests').className)}
+            onPointerDown={fieldAttention('num_guests').onPointerDown}
+          >
             <Input
-              id="num_guests"
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -612,15 +661,19 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
             Dettagli Prenotazione
           </h2>
 
-          <div className="space-y-3">
+          <div
+            id="booking_type"
+            className={cn('space-y-3', fieldAttention('booking_type').className)}
+            onPointerDown={fieldAttention('booking_type').onPointerDown}
+          >
             <label
-              htmlFor="booking_type"
+              htmlFor="booking_type-control"
               className="inline-block text-base md:text-lg font-bold text-warm-wood bg-white/85 backdrop-blur-[1px] px-4 py-2 rounded-xl mb-2"
             >
               Tipologia di Prenotazione *
             </label>
             <select
-              id="booking_type"
+              id="booking_type-control"
               value={formData.booking_type}
               onChange={(e) => {
                 const booking_type = e.target.value as BookingType
@@ -660,15 +713,19 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
             )}
           </div>
 
-          <div className="space-y-3">
+          <div
+            id="desired_date"
+            className={cn('space-y-3', fieldAttention('desired_date').className)}
+            onPointerDown={fieldAttention('desired_date').onPointerDown}
+          >
             <label
-              htmlFor="desired_date"
+              htmlFor="desired_date-control"
               className="inline-block text-base md:text-lg font-bold text-warm-wood bg-white/85 backdrop-blur-[1px] px-4 py-2 rounded-xl mb-2"
             >
               Data *
             </label>
             <Input
-              id="desired_date"
+              id="desired_date-control"
               type="date"
               value={formData.desired_date}
               onChange={(e) => {
@@ -683,15 +740,19 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
             )}
           </div>
 
-          <div className="space-y-3">
+          <div
+            id="desired_time"
+            className={cn('space-y-3', fieldAttention('desired_time').className)}
+            onPointerDown={fieldAttention('desired_time').onPointerDown}
+          >
             <label
-              htmlFor="desired_time"
+              htmlFor="desired_time-control"
               className="inline-block text-base md:text-lg font-bold text-warm-wood bg-white/85 backdrop-blur-[1px] px-4 py-2 rounded-xl mb-2"
             >
               Ora *
             </label>
             <TimePicker24h
-              id="desired_time"
+              id="desired_time-control"
               value={formData.desired_time || ''}
               onChange={(v) => {
                 setFormData({ ...formData, desired_time: v })
@@ -788,7 +849,11 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
       {bookingTypeUsesMenuSelections(formData.booking_type) && (
         <div
           id="menu-section"
-          className="space-y-6 rounded-xl border px-3 py-4 shadow-sm md:px-5 md:py-5 admin-warm-surface box-border"
+          className={cn(
+            'space-y-6 rounded-xl border px-3 py-4 shadow-sm md:px-5 md:py-5 admin-warm-surface box-border',
+            fieldAttention('menu').className,
+          )}
+          onPointerDown={fieldAttention('menu').onPointerDown}
         >
           <div className="w-full min-w-0 space-y-6">
             <MenuSelection

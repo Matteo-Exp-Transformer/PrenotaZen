@@ -11,7 +11,8 @@ const ADMIN_EMAIL = 'classic@c.com'
 const ADMIN_PASSWORD = 'TestEmail2026!'
 const TENANT_ID = '46d6d683-55dd-4cd1-91e9-b8b91420c908'
 
-const RECIPIENT_EMAIL = process.env.TEST_RECIPIENT_EMAIL || ADMIN_EMAIL
+const TEST_RECIPIENT_DEFAULT = 'matteo.cavallaro.work@gmail.com'
+const RECIPIENT_EMAIL = process.env.TEST_RECIPIENT_EMAIL || TEST_RECIPIENT_DEFAULT
 
 async function main() {
   console.log('=== Test send-email edge function ===')
@@ -47,11 +48,6 @@ async function main() {
       label: 'booking_rejected',
       subject: '[TEST] Prenotazione non disponibile',
       html: `<p>Ciao <strong>Mario Rossi</strong>,</p><p>Purtroppo la tua richiesta per il <strong>20 Giugno 2026</strong> non può essere confermata.</p><p>Cordiali saluti,<br><strong>Lo staff</strong></p>`,
-    },
-    {
-      label: 'booking_cancelled',
-      subject: '[TEST] Prenotazione cancellata',
-      html: `<p>Ciao <strong>Mario Rossi</strong>,</p><p>La tua prenotazione del <strong>20 Giugno 2026</strong> è stata cancellata.</p><p>Cordiali saluti,<br><strong>Lo staff</strong></p>`,
     },
   ]
 
@@ -99,7 +95,7 @@ async function main() {
 
   console.log('=== Risultato ===')
   if (allOk) {
-    console.log('✅ Tutti e 3 i template inviati con successo.')
+    console.log('✅ Tutti e 2 i template inviati con successo (conferma + rifiuto).')
     console.log('   Controlla la casella di posta:', RECIPIENT_EMAIL)
     console.log('   Poi imposta VITE_ENABLE_SEND_EMAIL=false in .env.local')
   } else {

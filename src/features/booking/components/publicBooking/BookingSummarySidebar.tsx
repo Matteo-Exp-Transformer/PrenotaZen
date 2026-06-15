@@ -282,7 +282,7 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
             </p>
             {formData.num_guests > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-warm-wood-dark/70 font-semibold">Totale stimato</span>
+                <span className="text-sm text-warm-wood-dark/70 font-semibold">Totale</span>
                 <span className="text-lg font-bold text-warm-orange">{formatCurrency(totalBooking)}</span>
               </div>
             )}

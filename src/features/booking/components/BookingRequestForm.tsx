@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { BookingRequestInput } from '@/types/booking'
 import { activeSubTabShowsMenu, modeUsesDietary } from '../utils/bookingCapabilities'
 import { useCreateBookingRequest } from '../hooks/useBookingRequests'
@@ -56,12 +56,13 @@ import {
   publicFormSectionErrorClass,
 } from '../constants/bookingPublicFieldStyles'
 import {
+  BOOKING_PUBLIC_ERROR_FIELD_IDS,
   BOOKING_PUBLIC_FIELD_ATTENTION_CLASS,
   BOOKING_PUBLIC_FIELD_SCROLL_MARGIN,
   dispatchBookingMenuComposeCollapse,
-  scrollToBookingPublicError,
   shouldDismissBookingPublicAttention,
 } from '../utils/bookingPublicFormAttention'
+import { useFormValidationAttention } from '../hooks/useFormValidationAttention'
 
 interface BookingRequestFormProps {
   onSubmit?: () => void
@@ -296,8 +297,16 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   const [selectedPreset, setSelectedPreset] = useState<PresetMenuType>(null)
   const [activeSubTabId, setActiveSubTabId] = useState<string | null>(null)
   const [touchCrossBurst, setTouchCrossBurst] = useState(0)
-  const [composeCollapseNonce, setComposeCollapseNonce] = useState(0)
-  const [attentionFieldKey, setAttentionFieldKey] = useState<string | null>(null)
+
+  const {
+    attentionFieldKey,
+    clearAttentionField,
+    focusFirstValidationIssue,
+    composeCollapseNonce,
+  } = useFormValidationAttention({
+    errorFieldIds: BOOKING_PUBLIC_ERROR_FIELD_IDS,
+    onCollapsePanels: dispatchBookingMenuComposeCollapse,
+  })
 
   const enabledBookingModes = useMemo(
     () => formConfig.booking_modes.filter((m) => m.enabled),
@@ -750,31 +759,6 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   })
 
   const menuPromoBannerMessages = resolvedPromo?.message?.trim() ? [resolvedPromo.message.trim()] : []
-
-  const clearAttentionField = useCallback(() => {
-    setAttentionFieldKey(null)
-  }, [])
-
-  const runAfterComposeCardsCollapsed = useCallback((callback: () => void) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(callback)
-      })
-    })
-  }, [])
-
-  const focusFirstValidationIssue = useCallback(
-    (firstErrorKey: string | null) => {
-      setComposeCollapseNonce((value) => value + 1)
-      setAttentionFieldKey(firstErrorKey)
-      dispatchBookingMenuComposeCollapse()
-      if (!firstErrorKey) return
-      runAfterComposeCardsCollapsed(() => {
-        scrollToBookingPublicError(firstErrorKey)
-      })
-    },
-    [runAfterComposeCardsCollapsed],
-  )
 
   // Fetch business hours (non-blocking - form works even if loading/fails)
   const { data: businessHours, isLoading: isLoadingHours, error: hoursError } = useBusinessHours()

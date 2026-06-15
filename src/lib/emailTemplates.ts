@@ -1,38 +1,18 @@
 // Email templates for booking notifications
 
 import type { BookingRequest } from '@/types/booking'
-import { format } from 'date-fns'
-import { it } from 'date-fns/locale'
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  drink_caraffe: 'Drink/Caraffe',
-  drink_rinfresco_leggero: 'Drink/Caraffe + rinfresco leggero',
-  drink_rinfresco_completo: 'Drink/Caraffe + rinfresco completo',
-  drink_rinfresco_completo_primo: 'Drink/Caraffe + rinfresco completo + primo piatto',
-  menu_pranzo_cena: 'Menu Pranzo / Menù Cena',
-}
-
-const formatDateTime = (dateStr: string) => {
-  try {
-    return format(new Date(dateStr), 'dd MMMM yyyy alle ore HH:mm', { locale: it })
-  } catch {
-    return dateStr
-  }
-}
-
-const formatDateOnly = (dateStr: string) => {
-  try {
-    return format(new Date(dateStr), 'dd/MM/yyyy', { locale: it })
-  } catch {
-    return dateStr
-  }
-}
+import {
+  buildBookingEmailSummaryHtml,
+  type BookingEmailSummaryContext,
+} from '@/features/booking/utils/buildBookingEmailSummary'
 
 export interface TenantInfo {
   name?: string
   phone?: string
   email?: string
 }
+
+export type { BookingEmailSummaryContext }
 
 const BASE_STYLE = `
   body {
@@ -67,6 +47,81 @@ const BASE_STYLE = `
   }
 `
 
+const SUMMARY_BOX_STYLE = `
+        .info-box {
+          background: white;
+          border-left: 4px solid #8B0000;
+          padding: 20px;
+          margin: 20px 0;
+          border-radius: 4px;
+        }
+        .info-row {
+          display: flex;
+          margin: 10px 0;
+          gap: 8px;
+        }
+        .info-label {
+          font-weight: bold;
+          min-width: 120px;
+          color: #666;
+        }
+        .info-value {
+          color: #333;
+          flex: 1;
+        }
+        .info-value.strike {
+          text-decoration: line-through;
+          color: #9ca3af;
+        }
+        .info-value.total-booking {
+          color: #c2410c;
+        }
+        .summary-block {
+          margin: 14px 0;
+          padding-top: 12px;
+          border-top: 1px solid #e5e7eb;
+        }
+        .summary-heading {
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #6b7280;
+          margin: 0 0 8px;
+        }
+        .summary-list {
+          margin: 0;
+          padding-left: 18px;
+        }
+        .summary-list.menu-list {
+          list-style: none;
+          padding-left: 0;
+        }
+        .menu-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          margin: 6px 0;
+          font-size: 14px;
+        }
+        .menu-item .cat {
+          color: #6b7280;
+        }
+        .menu-price {
+          color: #4b5563;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+        .total-line {
+          margin: 12px 0 4px;
+        }
+        .promo-chips {
+          margin: 0;
+          font-weight: 600;
+          color: #374151;
+        }
+`
+
 /** Blocco firma — "Lo staff" + nome tenant + contatti opzionali. */
 function buildSignature(tenantInfo?: TenantInfo): string {
   const name = tenantInfo?.name?.trim()
@@ -86,15 +141,46 @@ function buildSignature(tenantInfo?: TenantInfo): string {
   return `<strong>Lo staff</strong>${tenantLine}${contactBlock}`
 }
 
+function buildSummaryBlock(
+  booking: BookingRequest,
+  summaryContext: BookingEmailSummaryContext | undefined,
+  timing: 'accepted' | 'rejected',
+): string {
+  if (timing === 'rejected') {
+    return ''
+  }
+
+  const html = buildBookingEmailSummaryHtml(booking, summaryContext, timing)
+  if (html) return html
+
+  const fallbackRows: string[] = []
+  if (booking.client_name) {
+    fallbackRows.push(`
+          <div class="info-row">
+            <span class="info-label">Nome:</span>
+            <span class="info-value"><strong>${booking.client_name}</strong></span>
+          </div>`)
+  }
+  if (booking.num_guests > 0) {
+    fallbackRows.push(`
+          <div class="info-row">
+            <span class="info-label">Ospiti:</span>
+            <span class="info-value"><strong>${booking.num_guests}</strong></span>
+          </div>`)
+  }
+  return fallbackRows.length > 0 ? `<div class="info-box">${fallbackRows.join('')}</div>` : ''
+}
+
 /**
  * Email template: Booking Accepted
  */
-export const getBookingAcceptedEmail = (booking: BookingRequest, tenantInfo?: TenantInfo) => {
-  const eventDate = booking.confirmed_start
-    ? formatDateTime(booking.confirmed_start)
-    : formatDateOnly(booking.desired_date)
-
+export const getBookingAcceptedEmail = (
+  booking: BookingRequest,
+  tenantInfo?: TenantInfo,
+  summaryContext?: BookingEmailSummaryContext,
+) => {
   const subject = 'Prenotazione confermata'
+  const summaryBlock = buildSummaryBlock(booking, summaryContext, 'accepted')
 
   const html = `
     <!DOCTYPE html>
@@ -120,25 +206,7 @@ export const getBookingAcceptedEmail = (booking: BookingRequest, tenantInfo?: Te
           margin: 20px 0;
           font-weight: bold;
         }
-        .info-box {
-          background: white;
-          border-left: 4px solid #8B0000;
-          padding: 20px;
-          margin: 20px 0;
-          border-radius: 4px;
-        }
-        .info-row {
-          display: flex;
-          margin: 10px 0;
-        }
-        .info-label {
-          font-weight: bold;
-          width: 150px;
-          color: #666;
-        }
-        .info-value {
-          color: #333;
-        }
+        ${SUMMARY_BOX_STYLE}
       </style>
     </head>
     <body>
@@ -156,22 +224,7 @@ export const getBookingAcceptedEmail = (booking: BookingRequest, tenantInfo?: Te
 
         <p>Siamo felici di confermare la tua prenotazione.</p>
 
-        <div class="info-box">
-          <div class="info-row">
-            <span class="info-label">📅 Data & Ora:</span>
-            <span class="info-value"><strong>${eventDate}</strong></span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">🎉 Tipo Evento:</span>
-            <span class="info-value"><strong>${EVENT_TYPE_LABELS[booking.event_type || 'drink_caraffe']}</strong></span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">👥 Numero Ospiti:</span>
-            <span class="info-value"><strong>${booking.num_guests}</strong></span>
-          </div>
-        </div>
-
-        ${booking.special_requests ? `<p><strong>📝 Note:</strong> ${booking.special_requests}</p>` : ''}
+        ${summaryBlock}
 
         <p>Non vediamo l'ora di ospitarti.<br>In caso di necessità non esitare a contattarci.</p>
 
@@ -191,8 +244,13 @@ export const getBookingAcceptedEmail = (booking: BookingRequest, tenantInfo?: Te
 /**
  * Email template: Booking Rejected
  */
-export const getBookingRejectedEmail = (booking: BookingRequest, tenantInfo?: TenantInfo) => {
+export const getBookingRejectedEmail = (
+  booking: BookingRequest,
+  tenantInfo?: TenantInfo,
+  summaryContext?: BookingEmailSummaryContext,
+) => {
   const subject = 'Prenotazione non disponibile'
+  const summaryBlock = buildSummaryBlock(booking, summaryContext, 'rejected')
 
   const html = `
     <!DOCTYPE html>
@@ -209,9 +267,9 @@ export const getBookingRejectedEmail = (booking: BookingRequest, tenantInfo?: Te
           text-align: center;
           border-radius: 8px 8px 0 0;
         }
+        ${SUMMARY_BOX_STYLE}
         .info-box {
           border: 1px solid #e5e7eb;
-          border-radius: 4px;
         }
       </style>
     </head>
@@ -226,12 +284,7 @@ export const getBookingRejectedEmail = (booking: BookingRequest, tenantInfo?: Te
 
         <p>Ci dispiace informarti che la tua richiesta di prenotazione non può essere confermata per la data richiesta.</p>
 
-        <div class="info-box">
-          <p><strong>Richiesta per:</strong></p>
-          <p>📅 ${formatDateOnly(booking.desired_date)}</p>
-          <p>🎉 ${EVENT_TYPE_LABELS[booking.event_type || 'drink_caraffe']}</p>
-          <p>👥 ${booking.num_guests} ospiti</p>
-        </div>
+        ${summaryBlock}
 
         <p>Ti invitiamo a scegliere un'altra data contattandoci direttamente.</p>
 
@@ -251,14 +304,15 @@ export const getBookingRejectedEmail = (booking: BookingRequest, tenantInfo?: Te
 }
 
 /**
- * Email template: Booking Cancelled
+ * Email template: Booking Cancelled (non inviata in produzione — allineato al builder riepilogo)
  */
-export const getBookingCancelledEmail = (booking: BookingRequest, tenantInfo?: TenantInfo) => {
-  const eventDate = booking.confirmed_start
-    ? formatDateTime(booking.confirmed_start)
-    : formatDateOnly(booking.desired_date)
-
+export const getBookingCancelledEmail = (
+  booking: BookingRequest,
+  tenantInfo?: TenantInfo,
+  summaryContext?: BookingEmailSummaryContext,
+) => {
   const subject = 'Prenotazione cancellata'
+  const summaryBlock = buildSummaryBlock(booking, summaryContext, 'accepted')
 
   const html = `
     <!DOCTYPE html>
@@ -275,9 +329,9 @@ export const getBookingCancelledEmail = (booking: BookingRequest, tenantInfo?: T
           text-align: center;
           border-radius: 8px 8px 0 0;
         }
+        ${SUMMARY_BOX_STYLE}
         .info-box {
           border-left: 4px solid #991B1B;
-          border-radius: 4px;
         }
       </style>
     </head>
@@ -292,11 +346,7 @@ export const getBookingCancelledEmail = (booking: BookingRequest, tenantInfo?: T
 
         <p>Ti informiamo che la tua prenotazione è stata cancellata.</p>
 
-        <div class="info-box">
-          <p><strong>📅 Prenotazione:</strong> ${eventDate}</p>
-          <p><strong>🎉 Evento:</strong> ${EVENT_TYPE_LABELS[booking.event_type || 'drink_caraffe']}</p>
-          <p><strong>👥 Ospiti:</strong> ${booking.num_guests}</p>
-        </div>
+        ${summaryBlock}
 
         <p>Se desideri riprogrammare o hai domande, non esitare a contattarci.</p>
 

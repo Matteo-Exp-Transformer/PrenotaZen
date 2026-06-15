@@ -45,7 +45,6 @@ import {
   MENU_CARD_MAX_WIDTH_PX,
   MENU_CATEGORY_COLLAPSIBLE_CLASS,
   MENU_CATEGORY_COLLAPSIBLE_HEADER_CLASS,
-  MENU_CATEGORY_LABEL_CARD_SHELL_CLASS,
   MENU_CATEGORY_LABEL_TITLE_CLASS,
   MENU_CATEGORY_LABEL_TITLE_STYLE,
   MENU_INGREDIENT_DESC_CLASS,
@@ -275,8 +274,8 @@ const AdminMenuIngredientCard: React.FC<AdminMenuIngredientCardProps> = ({
     >
       <div
         className={cn(
-          'menu-prices-item-row flex-col items-stretch gap-1 py-2.5 px-3',
-          !hasDesc && 'min-h-0 items-center',
+          'menu-prices-item-row flex-col items-stretch gap-2 py-2.5 px-3',
+          !hasDesc && 'min-h-0',
         )}
         style={{
           width: '100%',
@@ -284,47 +283,47 @@ const AdminMenuIngredientCard: React.FC<AdminMenuIngredientCardProps> = ({
           minHeight: hasDesc ? undefined : '3rem',
         }}
       >
-        <div className="flex w-full min-w-0 items-center justify-between gap-2">
+        <div className="flex w-full min-w-0 items-start justify-between gap-2">
           <p className={cn(MENU_INGREDIENT_NAME_CLASS, 'menu-prices-item-text break-words')}>
             {item.name}
           </p>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className={MENU_INGREDIENT_PRICE_CLASS}>€{item.price.toFixed(2)}</span>
-            <div className="menu-prices-item-actions flex gap-1.5">
-              {onToggleAvailability ? (
-                <MenuMagazzinoAvailabilityToggle
-                  available={available}
-                  disabled={availabilityToggleDisabled}
-                  onToggle={onToggleAvailability}
-                  entityLabel={item.name}
-                  compact
-                />
-              ) : null}
-              {showActions ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onEdit}
-                    className="menu-prices-icon-btn menu-prices-icon-btn--edit"
-                    aria-label={`Modifica ${item.name}`}
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onDelete}
-                    className="menu-prices-icon-btn menu-prices-icon-btn--delete"
-                    aria-label={`Elimina ${item.name}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </div>
+          <span className={MENU_INGREDIENT_PRICE_CLASS}>€{item.price.toFixed(2)}</span>
         </div>
         {hasDesc ? (
           <p className={cn(MENU_INGREDIENT_DESC_CLASS, 'break-words')}>{item.description}</p>
+        ) : null}
+        {onToggleAvailability || showActions ? (
+          <div className="menu-prices-item-actions flex w-full shrink-0 justify-end gap-1.5">
+            {onToggleAvailability ? (
+              <MenuMagazzinoAvailabilityToggle
+                available={available}
+                disabled={availabilityToggleDisabled}
+                onToggle={onToggleAvailability}
+                entityLabel={item.name}
+                compact
+              />
+            ) : null}
+            {showActions ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="menu-prices-icon-btn menu-prices-icon-btn--edit"
+                  aria-label={`Modifica ${item.name}`}
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="menu-prices-icon-btn menu-prices-icon-btn--delete"
+                  aria-label={`Elimina ${item.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : null}
+          </div>
         ) : null}
       </div>
       {footer}
@@ -356,7 +355,7 @@ const AdminMenuCategoryLabelCard: React.FC<AdminMenuCategoryLabelCardProps> = ({
   return (
     <div
       className={cn(
-        'flex w-full min-w-0 max-w-full flex-col items-stretch gap-2',
+        'flex w-full min-w-0 max-w-full flex-col items-stretch',
         !available && 'opacity-60',
       )}
       style={{
@@ -368,55 +367,49 @@ const AdminMenuCategoryLabelCard: React.FC<AdminMenuCategoryLabelCardProps> = ({
       <div
         className={cn(
           MENU_CARD_INNER_SHELL_CLASS,
-          MENU_CATEGORY_LABEL_CARD_SHELL_CLASS,
-          'w-full min-h-[80px]',
+          'menu-prices-item-row w-full min-w-0 flex-col items-stretch gap-2 py-2.5 px-3',
         )}
         style={{
-          paddingTop: '6px',
-          paddingBottom: '6px',
-          paddingLeft: '8px',
-          paddingRight: '8px',
-          marginBottom: '4px',
-          width: '100%',
           maxWidth: `${MENU_CARD_MAX_WIDTH_PX}px`,
-          boxSizing: 'border-box',
+          minHeight: '72px',
+          marginBottom: '4px',
         }}
       >
-        {categoryThumbSrc ? (
-          <div className="menu-prices-category-label-card__thumb hidden min-[1050px]:block">
-            <img src={categoryThumbSrc} alt="" />
-          </div>
-        ) : null}
-        <div className="menu-prices-category-label-card__body">
-          <div className="menu-prices-category-label-card__title">
+        <div className="flex w-full min-w-0 items-start gap-3">
+          {categoryThumbSrc ? (
+            <div className="menu-prices-category-label-card__thumb hidden min-[1050px]:block shrink-0">
+              <img src={categoryThumbSrc} alt="" />
+            </div>
+          ) : null}
+          <div className="menu-prices-item-text min-w-0 flex-1">
             <span
               className={cn(
                 MENU_CATEGORY_LABEL_TITLE_CLASS,
-                'block w-full max-w-full min-w-0 text-center break-words',
+                'block w-full max-w-full min-w-0 text-center break-words sm:text-left',
               )}
               style={MENU_CATEGORY_LABEL_TITLE_STYLE}
             >
               {label}
             </span>
           </div>
-          <div className="menu-prices-category-label-card__actions menu-prices-item-actions flex gap-2">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="menu-prices-icon-btn menu-prices-icon-btn--edit"
-              aria-label={`Modifica ${label}`}
-            >
-              <Edit className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="menu-prices-icon-btn menu-prices-icon-btn--delete"
-              aria-label={`Elimina ${label}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
+        </div>
+        <div className="menu-prices-item-actions flex w-full shrink-0 justify-end gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="menu-prices-icon-btn menu-prices-icon-btn--edit"
+            aria-label={`Modifica ${label}`}
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="menu-prices-icon-btn menu-prices-icon-btn--delete"
+            aria-label={`Elimina ${label}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>
