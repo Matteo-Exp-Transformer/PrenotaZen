@@ -32,6 +32,10 @@ import {
   BOOKING_FULL_PAGE_FORM_MAX_WIDTH_PX,
   BOOKING_FULL_PAGE_SUMMARY_WIDTH_PX,
 } from '@/features/booking/constants/bookingPageLayout'
+import {
+  resolvePublicBookingSurface,
+  surfaceUsesLightText,
+} from '@/features/booking/constants/bookingPublicFieldStyles'
 
 /** Padding colonna contenuto — header e form condividono lo stesso inset (no -mx bleed). */
 const BOOKING_PAGE_CONTENT_PAD_FULL = 'px-8 md:px-10 lg:px-10'
@@ -199,6 +203,8 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
       ? bookingPageBackground
       : null
   const isFullPagePhoto = fullPagePhotoId != null
+  // FU-014: superficie visiva tipizzata (un punto solo) → palette testo/errori derivata da qui.
+  const publicBookingSurface = resolvePublicBookingSurface({ showPhotoStrip, isFullPagePhoto })
   /** Cap form + riepilogo esterno: solo full-page senza striscia, desktop ≥1256px (CSS). */
   const useFullPageDesktopFreezeLayout = !showPhotoStrip && isFullPagePhoto
   const fullPagePhotoLandscapeUrl = fullPagePhotoId
@@ -328,7 +334,7 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     <BookingRequestForm
       tenantSlug={tenantSlug}
       formConfig={formConfig}
-      publicFormLightTextOnDarkBackground={!showPhotoStrip && isFullPagePhoto}
+      publicFormLightTextOnDarkBackground={surfaceUsesLightText(publicBookingSurface)}
       onFormDataChange={setSharedFormData}
       onActiveSubTabChange={setActiveSubTab}
       onIsDisabledChange={setIsSubmitDisabled}

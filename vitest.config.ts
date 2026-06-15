@@ -8,7 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    exclude: ['node_modules', 'dist', 'e2e/**', '.claude/**', 'agenti-locali/**'],
+    // supabase/functions/** sono test Deno (import https://…), si eseguono con `deno test`, non Vitest.
+    exclude: ['node_modules', 'dist', 'e2e/**', '.claude/**', 'agenti-locali/**', 'supabase/functions/**'],
     env: {
       VITE_SUPABASE_URL: 'https://test.supabase.co',
       VITE_SUPABASE_ANON_KEY: 'test-anon-key-xxxxxxxxxxxxxxxxxxxxxxxxxxx',

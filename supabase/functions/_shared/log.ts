@@ -11,7 +11,18 @@ export interface EdgeLogger {
   info(message: string, meta?: Record<string, unknown>): void;
 }
 
+/** Chiavi il cui *nome* è già PII → si redige il valore puntuale. */
 const PII_KEY_PATTERN = /email|phone|token|password|authorization|secret|apikey|bearer/i;
+
+/**
+ * Chiavi-contenitore che tipicamente racchiudono PII a blocco (es. `customer`,
+ * `payload`, `body`). Non sappiamo cosa contengono → redigiamo l'intero valore
+ * invece di ricorrere e rischiare di stampare dati personali. Difesa preventiva
+ * (FU-LOG-1-H): oggi i call site edge usano per lo più `{ err }`, ma questo chiude
+ * il gap se in futuro qualcuno logga `{ customer }` o `{ payload }`.
+ */
+const SENSITIVE_VALUE_KEY_PATTERN =
+  /customer|payload|body|guest|recipient|profile|contact|address|booking/i;
 
 function shouldLogInfo(): boolean {
   const env = Deno.env.get("ENVIRONMENT") ?? Deno.env.get("SUPABASE_ENV") ?? "";
@@ -45,6 +56,10 @@ function sanitizeMeta(meta: Record<string, unknown>): Record<string, unknown> {
     }
     if (key === "err" || key === "error") {
       out[key] = serializeError(value);
+      continue;
+    }
+    if (SENSITIVE_VALUE_KEY_PATTERN.test(key)) {
+      out[key] = value == null ? value : "[redacted]";
       continue;
     }
     if (value && typeof value === "object" && !Array.isArray(value)) {

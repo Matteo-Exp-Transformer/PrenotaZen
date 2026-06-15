@@ -84,6 +84,31 @@ export function bookingPublicSubTabScrollCardWidthClass(): string {
   ].join(' ')
 }
 
+/**
+ * Superficie visiva della Pagina Prenota — decide la palette di testo/errori (FU-014).
+ * Un solo punto tipizzato invece dei booleani sparsi (`!showPhotoStrip && isFullPagePhoto`):
+ * - `strip` — striscia foto laterale: il resto pagina è crema/avorio → palette scura su chiaro.
+ * - `full-page-photo` — foto a pagina intera senza striscia → testo bianco su sfondo scuro.
+ * - `light` — sfondo chiaro/gradiente/tile o nessuno sfondo tenant → palette scura su chiaro.
+ * - `dark` — riservato a un futuro tema scuro (oggi non emesso dal resolver).
+ */
+export type PublicBookingSurface = 'strip' | 'full-page-photo' | 'light' | 'dark'
+
+/** Mappa gli input layout di `BookingRequestPage` alla superficie. XOR striscia/full-page. */
+export function resolvePublicBookingSurface(input: {
+  showPhotoStrip: boolean
+  isFullPagePhoto: boolean
+}): PublicBookingSurface {
+  if (input.showPhotoStrip) return 'strip'
+  if (input.isFullPagePhoto) return 'full-page-photo'
+  return 'light'
+}
+
+/** Testo chiaro (bianco) solo sulle superfici scure: foto full-page e futuro tema `dark`. */
+export function surfaceUsesLightText(surface: PublicBookingSurface): boolean {
+  return surface === 'full-page-photo' || surface === 'dark'
+}
+
 /** Messaggio errore campo singolo — bianco solo con sfondo full-page (`public_booking_page_background` senza striscia). */
 export function publicFormFieldErrorClass(lightTextOnDarkBackground: boolean): string {
   return cn(
