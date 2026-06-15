@@ -13,9 +13,9 @@ import {
   dedupeSubTabRefs,
   findMenuPromoPlacementConflicts,
   getMenuPromoAdminLabel,
+  getMenuPromoBookingTypeOptions,
   hasMenuPromoPlacementConflicts,
   isMenuPromoVisibleOnBooking,
-  MENU_PROMO_BOOKING_TYPE_OPTIONS,
   MENU_PROMO_PLACEHOLDER,
   normalizeMenuPromoPlacement,
   normalizeMenuPromosList,
@@ -89,10 +89,14 @@ function SubTabPromoPickerGroup({
   )
 }
 
-function formatPromoPlacementSummary(promo: MenuPromo, subTabOptions: SubTabOption[]): string {
+function formatPromoPlacementSummary(
+  promo: MenuPromo,
+  subTabOptions: SubTabOption[],
+  bookingTypeOptions: { value: BookingType; label: string }[],
+): string {
   if (promo.placement === 'booking_type' && promo.booking_types?.length) {
     const labels = promo.booking_types.map((bt) => {
-      const opt = MENU_PROMO_BOOKING_TYPE_OPTIONS.find((o) => o.value === bt)
+      const opt = bookingTypeOptions.find((o) => o.value === bt)
       return opt?.label ?? bt
     })
     return labels.join(', ')
@@ -117,12 +121,14 @@ function formatPromoPlacementSummary(promo: MenuPromo, subTabOptions: SubTabOpti
 function PromoPlacementConflictDialog({
   draft,
   conflicts,
+  bookingTypeOptions,
   resolveSubTabLabel,
   onCancel,
   onConfirm,
 }: {
   draft: MenuPromo
   conflicts: MenuPromoPlacementConflicts
+  bookingTypeOptions: { value: BookingType; label: string }[]
   resolveSubTabLabel: (ref: MenuPromoSubTabRef) => string
   onCancel: () => void
   onConfirm: () => void
@@ -151,7 +157,7 @@ function PromoPlacementConflictDialog({
         <ul className="space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-slate-800">
           {conflicts.bookingTypes.map((conflict) => {
             const typeLabel =
-              MENU_PROMO_BOOKING_TYPE_OPTIONS.find((o) => o.value === conflict.type)?.label ??
+              bookingTypeOptions.find((o) => o.value === conflict.type)?.label ??
               conflict.type
             return (
               <li key={conflict.type}>
@@ -238,6 +244,11 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
       [subTabOptions],
     )
 
+    const bookingTypeOptions = useMemo(
+      () => getMenuPromoBookingTypeOptions(bookingModes),
+      [bookingModes],
+    )
+
     useEffect(() => {
       if (!dirty) {
         setPromos(savedPromos)
@@ -308,7 +319,7 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
 
     const selectAllBookingTypes = () => {
       setDraftSubTabRefs([])
-      setDraftBookingTypes(MENU_PROMO_BOOKING_TYPE_OPTIONS.map((o) => o.value))
+      setDraftBookingTypes(bookingTypeOptions.map((o) => o.value))
     }
 
     const clearAllBookingTypes = () => {
@@ -469,6 +480,7 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
           <PromoPlacementConflictDialog
             draft={conflictDialog.row}
             conflicts={conflictDialog.conflicts}
+            bookingTypeOptions={bookingTypeOptions}
             resolveSubTabLabel={resolveSubTabLabel}
             onCancel={cancelConflictReplacement}
             onConfirm={confirmConflictReplacement}
@@ -586,7 +598,7 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
                   </button>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  {MENU_PROMO_BOOKING_TYPE_OPTIONS.map(({ value, label }) => (
+                  {bookingTypeOptions.map(({ value, label }) => (
                     <label
                       key={value}
                       className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -694,7 +706,7 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
                     {row.message.trim() ? (
                       <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{row.message.trim()}</p>
                     ) : null}
-                    <p className="mt-1 text-xs text-slate-500">{formatPromoPlacementSummary(row, subTabOptions)}</p>
+                    <p className="mt-1 text-xs text-slate-500">{formatPromoPlacementSummary(row, subTabOptions, bookingTypeOptions)}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <button

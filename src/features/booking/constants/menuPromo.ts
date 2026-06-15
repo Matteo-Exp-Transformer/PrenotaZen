@@ -1,3 +1,5 @@
+import type { BookingMode } from '@/features/booking/constants/bookingPublicFormConfig'
+import { getModeLabelByType } from '@/features/booking/utils/bookingModeLabels'
 import type { BookingType } from '@/types/booking'
 
 /** Placeholder textarea editor promo in Personalizza form. */
@@ -82,12 +84,12 @@ export function getMenuPromoAdminLabel(promo: MenuPromo): string {
   return menuPromoMessageSummary(promo.message)
 }
 
-/** Opzioni allineate al `<select booking_type>` del form pubblico. */
-export const MENU_PROMO_BOOKING_TYPE_OPTIONS: { value: BookingType; label: string }[] = [
-  { value: 'tavolo', label: 'Prenota un tavolo' },
-  { value: 'rinfresco_laurea', label: 'Rinfresco di Laurea' },
-  { value: 'menu_prezzo_fisso', label: 'Menu a prezzo fisso' },
-]
+/** Opzioni promo per tipologia: solo le modalità abilitate con la label configurata dal ristorante. */
+export function getMenuPromoBookingTypeOptions(modes: BookingMode[]): { value: BookingType; label: string }[] {
+  return modes
+    .filter((m) => m.enabled)
+    .map((m) => ({ value: m.booking_type, label: getModeLabelByType(modes, m.booking_type) }))
+}
 
 export function isMenuPromoVisibleOnBooking(p: MenuPromo): boolean {
   return p.visible_on_booking !== false
@@ -251,10 +253,9 @@ export function validateMenuPromoUniqueness(promos: MenuPromo[]): MenuPromoUniqu
       for (const bt of types) {
         const existing = globalBookingTypes.get(bt)
         if (existing && existing !== promo.id) {
-          const label = MENU_PROMO_BOOKING_TYPE_OPTIONS.find((o) => o.value === bt)?.label
           return {
             ok: false,
-            message: `Esiste già una promo abbinata a «${label ?? bt}». Modifica o rimuovi l'abbinamento duplicato.`,
+            message: `Esiste già una promo abbinata a «${bt}». Modifica o rimuovi l'abbinamento duplicato.`,
           }
         }
         globalBookingTypes.set(bt, promo.id)

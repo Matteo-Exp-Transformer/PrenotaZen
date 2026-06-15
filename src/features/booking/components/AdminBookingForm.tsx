@@ -14,6 +14,8 @@ import { useMenuItems } from '../hooks/useMenuItems'
 import type { PresetMenuType } from '../constants/presetMenus'
 import { BOOKING_PUBLIC_CLIENT_TEXT_LIMITS } from '../constants/bookingPrenotaTextLimits'
 import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
+import { DEFAULT_BOOKING_FORM_CONFIG } from '../constants/bookingPublicFormConfig'
+import { getModeLabelByType } from '../utils/bookingModeLabels'
 import {
   applyPresetTypeToBookingFormPayload,
   computeMenuTotalsFromItems,
@@ -124,6 +126,11 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   const { mutate, isPending } = useCreateAdminBooking()
   const queryClient = useQueryClient()
   const { data: menuItems = [] } = useMenuItems()
+  const { data: bookingFormConfig } = useRestaurantSetting('booking_public_form_config')
+  const bookingModes = useMemo(
+    () => bookingFormConfig?.booking_modes ?? DEFAULT_BOOKING_FORM_CONFIG.booking_modes,
+    [bookingFormConfig],
+  )
   const { data: staffPresetsDropdownVisible = true } = useRestaurantSetting('booking_staff_presets_visible')
   const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets')
   const { data: placementAreasSetting = [] } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
@@ -640,9 +647,13 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
                 errors.booking_type && 'border-red-500!'
               )}
             >
-              <option value="tavolo">Prenota un tavolo</option>
-              <option value="rinfresco_laurea">Rinfresco di Laurea</option>
-              <option value="menu_prezzo_fisso">Menu a prezzo fisso</option>
+              {bookingModes
+                .filter((m) => m.enabled || m.booking_type === formData.booking_type)
+                .map((m) => (
+                  <option key={m.booking_type} value={m.booking_type}>
+                    {getModeLabelByType(bookingModes, m.booking_type)}
+                  </option>
+                ))}
             </select>
             {errors.booking_type && (
               <p className="text-sm text-red-500">{errors.booking_type}</p>

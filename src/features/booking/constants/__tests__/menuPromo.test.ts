@@ -3,6 +3,7 @@ import {
   applyMenuPromoWithReplacement,
   collectMenuPromoLabelsForSubmit,
   findMenuPromoPlacementConflicts,
+  getMenuPromoBookingTypeOptions,
   listMenuPromoLabelsForBookingType,
   listMenuPromoMessagesForBookingType,
   migrateMenuPromosFromLegacy,
@@ -13,6 +14,25 @@ import {
   validateMenuPromoUniqueness,
   type MenuPromo,
 } from '../menuPromo'
+import type { BookingMode } from '../bookingPublicFormConfig'
+
+function makeMode(
+  type: BookingMode['booking_type'],
+  enabled: boolean,
+  label: string,
+): BookingMode {
+  return {
+    id: type,
+    booking_type: type,
+    enabled,
+    label,
+    description: '',
+    icon: 'fork_knife',
+    sub_tabs_enabled: false,
+    sub_tabs_presentation: null,
+    sub_tabs: [],
+  }
+}
 
 const promoA: MenuPromo = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -388,5 +408,26 @@ describe('collectMenuPromoLabelsForSubmit', () => {
       promos,
     })
     expect(labels).toEqual(['Promo Laurea', 'Promo Card 1'])
+  })
+})
+
+describe('getMenuPromoBookingTypeOptions', () => {
+  it('restituisce solo le tipologie abilitate con la label configurata', () => {
+    const modes = [
+      makeMode('tavolo', true, 'Tavolo Estivo'),
+      makeMode('rinfresco_laurea', false, 'Rinfresco'),
+      makeMode('menu_prezzo_fisso', true, 'Menu Degustazione'),
+    ]
+    const opts = getMenuPromoBookingTypeOptions(modes)
+    expect(opts).toEqual([
+      { value: 'tavolo', label: 'Tavolo Estivo' },
+      { value: 'menu_prezzo_fisso', label: 'Menu Degustazione' },
+    ])
+  })
+
+  it('mostra il nuovo nome se la modalità viene rinominata', () => {
+    const modes = [makeMode('rinfresco_laurea', true, 'Evento Speciale')]
+    const opts = getMenuPromoBookingTypeOptions(modes)
+    expect(opts).toEqual([{ value: 'rinfresco_laurea', label: 'Evento Speciale' }])
   })
 })

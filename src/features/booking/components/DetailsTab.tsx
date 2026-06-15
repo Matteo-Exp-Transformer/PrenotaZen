@@ -1,6 +1,7 @@
 import React from 'react'
 import type { BookingRequest, BookingType } from '@/types/booking'
-import { BOOKING_TYPE_EVENT_LABELS } from '../utils/eventTypeLabels'
+import { DEFAULT_BOOKING_FORM_CONFIG } from '../constants/bookingPublicFormConfig'
+import { getModeLabelByType } from '../utils/bookingModeLabels'
 import { formatBookingDateTime } from '../utils/formatDateTime'
 import { MapPin } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
@@ -72,6 +73,8 @@ export const DetailsTab: React.FC<Props> = ({
   onBookingTypeChange
 }) => {
   const features = useFeatures()
+  const { data: bookingFormConfig } = useRestaurantSetting('booking_public_form_config')
+  const modes = bookingFormConfig?.booking_modes ?? DEFAULT_BOOKING_FORM_CONFIG.booking_modes
   const { data: menuPromos = [] } = useRestaurantSetting('booking_menu_promos')
   const menuPromoLabels = resolveMenuPromoLabelsForBooking(booking, menuPromos)
   const { data: placementAreasSetting = [] } = useRestaurantSetting('booking_placement_areas', { authenticated: true })
@@ -121,14 +124,18 @@ export const DetailsTab: React.FC<Props> = ({
               className={FROSTED_TEXT_INPUT_CLASS_NAME}
               style={FROSTED_CONTROL_SURFACE}
             >
-              <option value="tavolo">Prenota un Tavolo</option>
-              <option value="rinfresco_laurea">Rinfresco di Laurea</option>
-              <option value="menu_prezzo_fisso">Menu a prezzo fisso</option>
+              {modes
+                .filter((m) => m.enabled || m.booking_type === formData.booking_type)
+                .map((m) => (
+                  <option key={m.booking_type} value={m.booking_type}>
+                    {getModeLabelByType(modes, m.booking_type)}
+                  </option>
+                ))}
             </select>
           </div>
         ) : (
           <p className="font-medium text-gray-900 md:text-lg">
-            {BOOKING_TYPE_EVENT_LABELS[formData.booking_type] ?? formData.booking_type}
+            {getModeLabelByType(modes, formData.booking_type)}
           </p>
         )}
         {/* FU-001: promo viste dal cliente come chip distinti (non stringa unica). */}
