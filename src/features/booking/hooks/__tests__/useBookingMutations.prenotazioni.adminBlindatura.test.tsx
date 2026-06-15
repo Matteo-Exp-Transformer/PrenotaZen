@@ -46,6 +46,7 @@ function buildUpdateChain(result: { data: unknown; error: null | { message: stri
   const chain: Record<string, unknown> = {}
   chain['update'] = vi.fn(() => chain)
   chain['eq'] = vi.fn(() => chain)
+  chain['neq'] = vi.fn(() => chain)
   chain['select'] = vi.fn().mockResolvedValue(result)
   return chain
 }
@@ -54,6 +55,7 @@ function buildUpdateSingleChain(result: { data: unknown; error: null | { message
   const chain: Record<string, unknown> = {}
   chain['update'] = vi.fn(() => chain)
   chain['eq'] = vi.fn(() => chain)
+  chain['neq'] = vi.fn(() => chain)
   chain['select'] = vi.fn(() => chain)
   chain['single'] = vi.fn().mockResolvedValue(result)
   return chain
@@ -121,7 +123,7 @@ describe('@admin-blindatura prenotazioni — useAcceptBooking', () => {
           desiredTime: '20:00',
           numGuests: 6,
         }),
-      ).rejects.toThrow('BOOKING_ALREADY_HANDLED')
+      ).rejects.toThrow(/non è più disponibile/)
     })
 
     expect(toast.warn).toHaveBeenCalledWith('Questa prenotazione è già stata gestita')
@@ -154,7 +156,7 @@ describe('@admin-blindatura prenotazioni — useRejectBooking', () => {
     const { result } = renderHook(() => useRejectBooking(), { wrapper: makeWrapper() })
 
     await act(async () => {
-      await expect(result.current.mutateAsync({ bookingId: 'b1' })).rejects.toThrow('BOOKING_ALREADY_HANDLED')
+      await expect(result.current.mutateAsync({ bookingId: 'b1' })).rejects.toThrow(/non è più disponibile/)
     })
 
     expect(toast.warn).toHaveBeenCalledWith('Questa prenotazione è già stata gestita')
@@ -165,7 +167,7 @@ describe('@admin-blindatura prenotazioni — useCancelBooking soft-delete', () =
   beforeEach(() => vi.clearAllMocks())
 
   it('elimina → deleted + cancelled_at + motivo (no hard-delete)', async () => {
-    const chain = buildUpdateSingleChain({ data: { id: 'b1', status: 'deleted' }, error: null })
+    const chain = buildUpdateChain({ data: [{ id: 'b1', status: 'deleted' }], error: null })
     mockFrom.mockReturnValue(chain)
 
     const { result } = renderHook(() => useCancelBooking(), { wrapper: makeWrapper() })
@@ -182,6 +184,23 @@ describe('@admin-blindatura prenotazioni — useCancelBooking soft-delete', () =
     expect(updateArg.cancellation_reason).toBe('Cliente ha disdetto')
     expect(updateArg.cancelled_at).toBeTruthy()
     expect(typeof updateArg.cancelled_at).toBe('string')
+    // D6: guard di stato — non ri-eliminare una già 'deleted'.
+    expect((chain['neq'] as ReturnType<typeof vi.fn>).mock.calls.some((c) => c[0] === 'status' && c[1] === 'deleted')).toBe(true)
+  })
+
+  it('D6 race: elimina su record già deleted → no-op + toast warn', async () => {
+    const chain = buildUpdateChain({ data: [], error: null })
+    mockFrom.mockReturnValue(chain)
+
+    const { result } = renderHook(() => useCancelBooking(), { wrapper: makeWrapper() })
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ bookingId: 'b1', cancellationReason: 'x' }),
+      ).rejects.toThrow(/non è più disponibile/)
+    })
+
+    expect(toast.warn).toHaveBeenCalled()
   })
 })
 
@@ -197,7 +216,7 @@ describe('@admin-blindatura prenotazioni — useRestoreBooking', () => {
       },
       error: null,
     })
-    const updateChain = buildUpdateSingleChain({ data: { id: 'b1', status: 'accepted' }, error: null })
+    const updateChain = buildUpdateChain({ data: [{ id: 'b1', status: 'accepted' }], error: null })
     mockFrom.mockReturnValueOnce(selectChain).mockReturnValueOnce(updateChain)
 
     const { result } = renderHook(() => useRestoreBooking(), { wrapper: makeWrapper() })
@@ -210,10 +229,12 @@ describe('@admin-blindatura prenotazioni — useRestoreBooking', () => {
     expect(updateArg.status).toBe('accepted')
     expect(updateArg.cancellation_reason).toBeNull()
     expect(updateArg.cancelled_at).toBeNull()
+    // D6: guard di stato — si reinserisce solo una prenotazione 'deleted'.
+    expect((updateChain['eq'] as ReturnType<typeof vi.fn>).mock.calls.some((c) => c[0] === 'status' && c[1] === 'deleted')).toBe(true)
   })
 
   it('reinserisci con orario fornito — scrive slot e salta fetch orari', async () => {
-    const updateChain = buildUpdateSingleChain({ data: { id: 'b1', status: 'accepted' }, error: null })
+    const updateChain = buildUpdateChain({ data: [{ id: 'b1', status: 'accepted' }], error: null })
     mockFrom.mockReturnValueOnce(updateChain)
 
     const { result } = renderHook(() => useRestoreBooking(), { wrapper: makeWrapper() })
@@ -261,7 +282,7 @@ describe('@admin-blindatura prenotazioni — useMarkNoShow', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('no-show → no_show=true, riga resta in DB', async () => {
-    const chain = buildUpdateSingleChain({ data: { id: 'b1', no_show: true }, error: null })
+    const chain = buildUpdateChain({ data: [{ id: 'b1', no_show: true }], error: null })
     mockFrom.mockReturnValue(chain)
 
     const { result } = renderHook(() => useMarkNoShow(), { wrapper: makeWrapper() })
@@ -272,6 +293,8 @@ describe('@admin-blindatura prenotazioni — useMarkNoShow', () => {
 
     const updateArg = (chain['update'] as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(updateArg.no_show).toBe(true)
+    // D6: guard di stato — no-show solo su 'accepted'.
+    expect((chain['eq'] as ReturnType<typeof vi.fn>).mock.calls.some((c) => c[0] === 'status' && c[1] === 'accepted')).toBe(true)
   })
 })
 
@@ -296,7 +319,7 @@ describe('@admin-blindatura prenotazioni — LIMIT mutation payload', () => {
   })
 
   it('L9: cancellazione con motivo lunghissimo — pass-through a cancellation_reason', async () => {
-    const chain = buildUpdateSingleChain({ data: { id: 'b1', status: 'deleted' }, error: null })
+    const chain = buildUpdateChain({ data: [{ id: 'b1', status: 'deleted' }], error: null })
     mockFrom.mockReturnValue(chain)
 
     const { result } = renderHook(() => useCancelBooking(), { wrapper: makeWrapper() })

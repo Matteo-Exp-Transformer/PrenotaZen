@@ -9,6 +9,8 @@ import { useRestaurantSetting } from '@/features/booking/hooks/useRestaurantSett
 import {
   resolveMenuPromoLabelsForBooking,
 } from '@/features/booking/constants/menuPromo'
+import { BOOKING_PUBLIC_CLIENT_TEXT_LIMITS } from '@/features/booking/constants/bookingPrenotaTextLimits'
+import { Tag } from 'lucide-react'
 import { useFeatures } from '@/hooks/useFeatures'
 
 interface Props {
@@ -129,8 +131,24 @@ export const DetailsTab: React.FC<Props> = ({
             {BOOKING_TYPE_EVENT_LABELS[formData.booking_type] ?? formData.booking_type}
           </p>
         )}
+        {/* FU-001: promo viste dal cliente come chip distinti (non stringa unica). */}
         {!isEditMode && menuPromoLabels.length > 0 && (
-          <InfoRow label="Promo visualizzate da cliente" value={menuPromoLabels.join(', ')} />
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 md:text-base">
+              <Tag className="h-4 w-4 shrink-0 text-primary-500" aria-hidden />
+              Promo visualizzate dal cliente
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {menuPromoLabels.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex max-w-full items-center break-words rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium leading-snug text-primary-700 ring-1 ring-inset ring-primary-100 md:text-sm"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -275,7 +293,9 @@ export const DetailsTab: React.FC<Props> = ({
                 autoComplete="off"
                 value={formData.numGuests > 0 ? formData.numGuests.toString() : ''}
                 onChange={(e) => {
-                  const value = e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                  // L12: cap a video — clamp al massimo ospiti consentito.
+                  const raw = e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                  const value = Math.min(raw, BOOKING_PUBLIC_CLIENT_TEXT_LIMITS.numGuestsMax)
                   onFormDataChange('numGuests', value)
                 }}
                 className={FROSTED_TEXT_INPUT_CLASS_NAME}

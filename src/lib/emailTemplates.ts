@@ -28,10 +28,68 @@ const formatDateOnly = (dateStr: string) => {
   }
 }
 
+export interface TenantInfo {
+  name?: string
+  phone?: string
+  email?: string
+}
+
+const BASE_STYLE = `
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .content {
+    background: #f9fafb;
+    padding: 30px;
+    border: 1px solid #e5e7eb;
+  }
+  .info-box {
+    background: white;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 4px;
+  }
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-size: 14px;
+  }
+  .contacts {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #555;
+  }
+`
+
+/** Blocco firma — "Lo staff" + nome tenant + contatti opzionali. */
+function buildSignature(tenantInfo?: TenantInfo): string {
+  const name = tenantInfo?.name?.trim()
+  const phone = tenantInfo?.phone?.trim()
+  const email = tenantInfo?.email?.trim()
+
+  const contactLines: string[] = []
+  if (phone) contactLines.push(`📞 ${phone}`)
+  if (email) contactLines.push(`✉️ ${email}`)
+
+  const tenantLine = name ? `<br><strong>${name}</strong>` : ''
+  const contactBlock =
+    contactLines.length > 0
+      ? `<div class="contacts">${contactLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;')}</div>`
+      : ''
+
+  return `<strong>Lo staff</strong>${tenantLine}${contactBlock}`
+}
+
 /**
  * Email template: Booking Accepted
  */
-export const getBookingAcceptedEmail = (booking: BookingRequest) => {
+export const getBookingAcceptedEmail = (booking: BookingRequest, tenantInfo?: TenantInfo) => {
   const eventDate = booking.confirmed_start
     ? formatDateTime(booking.confirmed_start)
     : formatDateOnly(booking.desired_date)
@@ -45,25 +103,13 @@ export const getBookingAcceptedEmail = (booking: BookingRequest) => {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
+        ${BASE_STYLE}
         .header {
           background: linear-gradient(135deg, #8B0000 0%, #A52A2A 100%);
           color: white;
           padding: 30px;
           text-align: center;
           border-radius: 8px 8px 0 0;
-        }
-        .content {
-          background: #f9fafb;
-          padding: 30px;
-          border: 1px solid #e5e7eb;
         }
         .success-badge {
           background: #10b981;
@@ -93,21 +139,6 @@ export const getBookingAcceptedEmail = (booking: BookingRequest) => {
         .info-value {
           color: #333;
         }
-        .footer {
-          text-align: center;
-          padding: 20px;
-          color: #666;
-          font-size: 14px;
-        }
-        .button {
-          display: inline-block;
-          background: #8B0000;
-          color: white;
-          padding: 12px 30px;
-          text-decoration: none;
-          border-radius: 6px;
-          margin: 20px 0;
-        }
       </style>
     </head>
     <body>
@@ -115,7 +146,7 @@ export const getBookingAcceptedEmail = (booking: BookingRequest) => {
         <h1>Prenotazione</h1>
         <p>La tua prenotazione è stata confermata!</p>
       </div>
-      
+
       <div class="content">
         <center>
           <div class="success-badge">✅ PRENOTAZIONE CONFERMATA</div>
@@ -140,15 +171,11 @@ export const getBookingAcceptedEmail = (booking: BookingRequest) => {
           </div>
         </div>
 
-        ${booking.special_requests ? `
-        <p><strong>📝 Note:</strong> ${booking.special_requests}</p>
-        ` : ''}
+        ${booking.special_requests ? `<p><strong>📝 Note:</strong> ${booking.special_requests}</p>` : ''}
 
-        <p>Non vediamo l'ora di ospitarti.</p>
+        <p>Non vediamo l'ora di ospitarti.<br>In caso di necessità non esitare a contattarci.</p>
 
-        <p>In caso di necessità, contatta lo staff.</p>
-
-        <p>A presto,<br><strong>Lo staff</strong></p>
+        <p>A presto,<br>${buildSignature(tenantInfo)}</p>
       </div>
 
       <div class="footer">
@@ -164,7 +191,7 @@ export const getBookingAcceptedEmail = (booking: BookingRequest) => {
 /**
  * Email template: Booking Rejected
  */
-export const getBookingRejectedEmail = (booking: BookingRequest) => {
+export const getBookingRejectedEmail = (booking: BookingRequest, tenantInfo?: TenantInfo) => {
   const subject = 'Prenotazione non disponibile'
 
   const html = `
@@ -174,14 +201,7 @@ export const getBookingRejectedEmail = (booking: BookingRequest) => {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
+        ${BASE_STYLE}
         .header {
           background: linear-gradient(135deg, #DC143C 0%, #FF6B6B 100%);
           color: white;
@@ -189,30 +209,9 @@ export const getBookingRejectedEmail = (booking: BookingRequest) => {
           text-align: center;
           border-radius: 8px 8px 0 0;
         }
-        .content {
-          background: #f9fafb;
-          padding: 30px;
-          border: 1px solid #e5e7eb;
-        }
-        .warning-box {
-          background: #FEF3C7;
-          border-left: 4px solid #F59E0B;
-          padding: 15px;
-          margin: 20px 0;
-          border-radius: 4px;
-        }
         .info-box {
-          background: white;
-          padding: 20px;
-          margin: 20px 0;
-          border-radius: 4px;
           border: 1px solid #e5e7eb;
-        }
-        .footer {
-          text-align: center;
-          padding: 20px;
-          color: #666;
-          font-size: 14px;
+          border-radius: 4px;
         }
       </style>
     </head>
@@ -221,16 +220,11 @@ export const getBookingRejectedEmail = (booking: BookingRequest) => {
         <h1>Prenotazione</h1>
         <p>Prenotazione non disponibile</p>
       </div>
-      
+
       <div class="content">
         <p>Ciao <strong>${booking.client_name}</strong>,</p>
 
         <p>Ci dispiace informarti che la tua richiesta di prenotazione non può essere confermata per la data richiesta.</p>
-
-        <div class="warning-box">
-          <p><strong>⚠️ Motivo:</strong></p>
-          <p>${booking.rejection_reason || 'Sala già completamente prenotata in quella data.'}</p>
-        </div>
 
         <div class="info-box">
           <p><strong>Richiesta per:</strong></p>
@@ -243,7 +237,7 @@ export const getBookingRejectedEmail = (booking: BookingRequest) => {
 
         <p>Ci scusiamo per l'inconveniente.</p>
 
-        <p>Cordiali saluti,<br><strong>Lo staff</strong></p>
+        <p>Cordiali saluti,<br>${buildSignature(tenantInfo)}</p>
       </div>
 
       <div class="footer">
@@ -259,7 +253,7 @@ export const getBookingRejectedEmail = (booking: BookingRequest) => {
 /**
  * Email template: Booking Cancelled
  */
-export const getBookingCancelledEmail = (booking: BookingRequest) => {
+export const getBookingCancelledEmail = (booking: BookingRequest, tenantInfo?: TenantInfo) => {
   const eventDate = booking.confirmed_start
     ? formatDateTime(booking.confirmed_start)
     : formatDateOnly(booking.desired_date)
@@ -273,14 +267,7 @@ export const getBookingCancelledEmail = (booking: BookingRequest) => {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
+        ${BASE_STYLE}
         .header {
           background: linear-gradient(135deg, #991B1B 0%, #DC143C 100%);
           color: white;
@@ -288,23 +275,9 @@ export const getBookingCancelledEmail = (booking: BookingRequest) => {
           text-align: center;
           border-radius: 8px 8px 0 0;
         }
-        .content {
-          background: #f9fafb;
-          padding: 30px;
-          border: 1px solid #e5e7eb;
-        }
         .info-box {
-          background: white;
           border-left: 4px solid #991B1B;
-          padding: 20px;
-          margin: 20px 0;
           border-radius: 4px;
-        }
-        .footer {
-          text-align: center;
-          padding: 20px;
-          color: #666;
-          font-size: 14px;
         }
       </style>
     </head>
@@ -313,7 +286,7 @@ export const getBookingCancelledEmail = (booking: BookingRequest) => {
         <h1>Prenotazione</h1>
         <p>Prenotazione Cancellata</p>
       </div>
-      
+
       <div class="content">
         <p>Ciao <strong>${booking.client_name}</strong>,</p>
 
@@ -325,13 +298,9 @@ export const getBookingCancelledEmail = (booking: BookingRequest) => {
           <p><strong>👥 Ospiti:</strong> ${booking.num_guests}</p>
         </div>
 
-        ${booking.cancellation_reason ? `
-        <p><strong>📝 Motivo:</strong> ${booking.cancellation_reason}</p>
-        ` : ''}
+        <p>Se desideri riprogrammare o hai domande, non esitare a contattarci.</p>
 
-        <p>Se desideri riprogrammare o hai domande, contattaci.</p>
-
-        <p>Cordiali saluti,<br><strong>Lo staff</strong></p>
+        <p>Cordiali saluti,<br>${buildSignature(tenantInfo)}</p>
       </div>
 
       <div class="footer">
@@ -343,3 +312,6 @@ export const getBookingCancelledEmail = (booking: BookingRequest) => {
 
   return { subject, html }
 }
+
+/** @deprecated Alias — usare getBookingAcceptedEmail. */
+export const getBookingConfirmationEmail = getBookingAcceptedEmail

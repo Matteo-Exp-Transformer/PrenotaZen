@@ -242,6 +242,64 @@ export function DiscardChangesConfirmModal({
   )
 }
 
+export type PublicDataSaveConfirmModalProps = {
+  isOpen: boolean
+  onConfirm: () => void | Promise<void>
+  onCancel: () => void
+  pending?: boolean
+}
+
+/**
+ * Modale di conferma prima di salvare dati visibili in Pagina Prenota (FU-005).
+ * Appare quando il footer «Salva modifiche» viene premuto su campi pubblici.
+ */
+export function PublicDataSaveConfirmModal({
+  isOpen,
+  onConfirm,
+  onCancel,
+  pending = false,
+}: PublicDataSaveConfirmModalProps) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={pending ? () => undefined : onCancel}
+      title="Salva modifiche pubbliche?"
+      size="md"
+      showCloseButton={!pending}
+      closeOnOverlayClick={!pending}
+      closeOnEscape={!pending}
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600">
+          Le modifiche che stai salvando saranno{' '}
+          <strong className="font-semibold text-slate-800">immediatamente visibili ai clienti</strong>{' '}
+          nella Pagina Prenota pubblica.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+          <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onCancel}>
+            Annulla
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending}
+            onClick={() => void Promise.resolve(onConfirm())}
+          >
+            {pending ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Salvataggio…
+              </span>
+            ) : (
+              'Salva'
+            )}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export type UnsavedNavigationGuardModalProps = {
   isOpen: boolean
   dirtyLabels: string[]

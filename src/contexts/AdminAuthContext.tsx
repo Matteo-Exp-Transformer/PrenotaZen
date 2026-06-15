@@ -112,7 +112,17 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       if (!isPublicTenantRoute) {
-        await setTenantFromAdmin(session.user.email)
+        // FU-AUTH-3: se la RPC tenant fallisce, mai lasciare un admin loggato con
+        // tenant nullo → signOut + pulizia, l'utente riprova il login.
+        const tenantResolved = await setTenantFromAdmin(session.user.email)
+        if (!tenantResolved) {
+          logger.error('[checkSession] risoluzione tenant admin fallita: signOut di sicurezza')
+          await supabase.auth.signOut()
+          clearTenant()
+          setUser(null)
+          setIsLoading(false)
+          return
+        }
       }
 
       setUser({
@@ -179,7 +189,17 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
-      await setTenantFromAdmin(authData.user.email || '')
+      // FU-AUTH-3: tenant non risolto → non completare il login con tenant nullo.
+      const tenantResolved = await setTenantFromAdmin(authData.user.email || '')
+      if (!tenantResolved) {
+        await supabase.auth.signOut()
+        clearTenant()
+        setUser(null)
+        return {
+          success: false,
+          error: 'Impossibile caricare i dati del locale. Riprova o contatta il supporto.',
+        }
+      }
 
       setUser({
         id: authData.user.id,

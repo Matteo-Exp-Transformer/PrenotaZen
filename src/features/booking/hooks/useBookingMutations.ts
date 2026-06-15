@@ -5,6 +5,7 @@ import { toast } from 'react-toastify'
 import {
   sendBookingAcceptedEmail,
   sendBookingRejectedEmail,
+  sendBookingCancelledEmail,
   areEmailNotificationsEnabled,
 } from './useEmailNotifications'
 import { ANALYTICS_QUERY_ROOT } from './useAnalytics'
@@ -14,8 +15,12 @@ import { logger } from '@/lib/logger'
 import { extractTimeFromISO } from '@/features/booking/utils/dateUtils'
 import type { Json, TablesUpdate } from '@/types/database'
 
-/** Race guard: update con 0 righe (record non più pending). */
-const BOOKING_ALREADY_HANDLED = 'BOOKING_ALREADY_HANDLED'
+/**
+ * Race guard: update con 0 righe (lo stato del record è cambiato sotto i piedi —
+ * es. eliminata/gestita in un'altra scheda). Il valore è un messaggio leggibile:
+ * se affiora in un banner (es. salvataggio dettagli) resta comprensibile.
+ */
+const BOOKING_ALREADY_HANDLED = 'Questa prenotazione non è più disponibile: aggiorna la pagina e riprova.'
 
 async function invalidateAllBookingQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -257,20 +262,26 @@ export const useUpdateBooking = () => {
       }
 
 
+      // D6: guard di stato — non aggiornare silenziosamente una prenotazione
+      // già eliminata (cambio stato sotto i piedi in un'altra scheda/sessione).
       const { data, error } = await supabase
         .from('booking_requests')
         .update(updateData)
         .eq('id', input.bookingId)
         .eq('tenant_id', tenantId!)
+        .neq('status', 'deleted')
         .select()
-        .single()
 
       if (error) {
         logger.error('[useUpdateBooking] DB error', error)
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as unknown as BookingRequest
+      if (!data?.length) {
+        throw new Error(BOOKING_ALREADY_HANDLED)
+      }
+
+      return data[0] as unknown as BookingRequest
     },
     onSuccess: async (data) => {
       
@@ -325,7 +336,12 @@ export const useUpdateBooking = () => {
       await queryClient.invalidateQueries({ queryKey: [HOME_STATS_QUERY_KEY, tenantId] })
       toast.success('Prenotazione aggiornata con successo!')
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
+      if (error.message === BOOKING_ALREADY_HANDLED) {
+        toast.warn(BOOKING_ALREADY_HANDLED)
+        await invalidateAllBookingQueries(queryClient, tenantId)
+        return
+      }
       logger.error('[useUpdateBooking] mutation error', error)
       toast.error(error.message || 'Errore nell\'aggiornamento della prenotazione')
     },
@@ -379,20 +395,26 @@ export const useRestoreBooking = () => {
         }
       }
 
+      // D6: guard di stato — si reinserisce solo una prenotazione effettivamente
+      // eliminata; se non è più 'deleted' (già reinserita altrove) → 0 righe.
       const { data, error } = await supabase
         .from('booking_requests')
         .update(updatePayload)
         .eq('id', bookingId)
         .eq('tenant_id', tenantId!)
+        .eq('status', 'deleted')
         .select()
-        .single()
 
       if (error) {
         logger.error('[useRestoreBooking] DB error', error)
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as unknown as BookingRequest
+      if (!data?.length) {
+        throw new Error(BOOKING_ALREADY_HANDLED)
+      }
+
+      return data[0] as unknown as BookingRequest
     },
     onSuccess: async () => {
       // Invalida tutte le queries per refresh automatico completo
@@ -403,7 +425,12 @@ export const useRestoreBooking = () => {
       await queryClient.invalidateQueries({ queryKey: [HOME_STATS_QUERY_KEY, tenantId] })
       toast.success('Prenotazione reinserita con successo!')
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
+      if (error.message === BOOKING_ALREADY_HANDLED) {
+        toast.warn(BOOKING_ALREADY_HANDLED)
+        await invalidateAllBookingQueries(queryClient, tenantId)
+        return
+      }
       toast.error(error.message || 'Errore nel reinserimento della prenotazione')
     },
   })
@@ -460,20 +487,25 @@ export const useMarkNoShow = () => {
 
   return useMutation({
     mutationFn: async (bookingId: string) => {
+      // D6: guard di stato — il no-show ha senso solo su una prenotazione 'accepted'.
       const { data, error } = await supabase
         .from('booking_requests')
         .update({ no_show: true, updated_at: new Date().toISOString() })
         .eq('id', bookingId)
         .eq('tenant_id', tenantId!)
+        .eq('status', 'accepted')
         .select()
-        .single()
 
       if (error) {
         logger.error('[useMarkNoShow] DB error', error)
         throw new Error(error.message)
       }
 
-      return data
+      if (!data?.length) {
+        throw new Error(BOOKING_ALREADY_HANDLED)
+      }
+
+      return data[0]
     },
     onSuccess: async () => {
       await Promise.all([
@@ -484,7 +516,12 @@ export const useMarkNoShow = () => {
       ])
       toast.success('Prenotazione segnata come no-show')
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
+      if (error.message === BOOKING_ALREADY_HANDLED) {
+        toast.warn(BOOKING_ALREADY_HANDLED)
+        await invalidateAllBookingQueries(queryClient, tenantId)
+        return
+      }
       logger.error('[useMarkNoShow] mutation error', error)
       toast.error(error.message || 'Errore nel segnare come no-show')
     },
@@ -506,31 +543,51 @@ export const useCancelBooking = () => {
           updated_at: new Date().toISOString(),
         }
 
+      // D6: guard di stato — non ri-eliminare una prenotazione già 'deleted'
+      // (doppio click / azione concorrente in un'altra scheda).
       const { data, error } = await supabase
         .from('booking_requests')
         .update(updateData)
         .eq('id', bookingId)
         .eq('tenant_id', tenantId!)
+        .neq('status', 'deleted')
         .select()
-        .single()
 
       if (error) {
         logger.error('[useCancelBooking] DB error', error)
         throw new Error(handleSupabaseError(error))
       }
 
-      return data as unknown as BookingRequest
+      if (!data?.length) {
+        throw new Error(BOOKING_ALREADY_HANDLED)
+      }
+
+      return data[0] as unknown as BookingRequest
     },
-    onSuccess: async () => {
+    onSuccess: async (booking: BookingRequest) => {
       // Invalida tutte le queries per refresh automatico completo
       await queryClient.invalidateQueries({ queryKey: ['bookings'] })
       await queryClient.invalidateQueries({ queryKey: ['bookings', 'pending'] })
       await queryClient.invalidateQueries({ queryKey: ['bookings', 'accepted'] })
       await queryClient.invalidateQueries({ queryKey: [ANALYTICS_QUERY_ROOT, tenantId] })
       await queryClient.invalidateQueries({ queryKey: [HOME_STATS_QUERY_KEY, tenantId] })
+
+      if (areEmailNotificationsEnabled()) {
+        try {
+          await sendBookingCancelledEmail(booking)
+        } catch (error) {
+          logger.warn('[useCancelBooking] Email cancellazione non inviata:', error)
+        }
+      }
+
       toast.success('Prenotazione cancellata con successo!')
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
+      if (error.message === BOOKING_ALREADY_HANDLED) {
+        toast.warn(BOOKING_ALREADY_HANDLED)
+        await invalidateAllBookingQueries(queryClient, tenantId)
+        return
+      }
       toast.error(error.message || 'Errore nella cancellazione della prenotazione')
     },
   })

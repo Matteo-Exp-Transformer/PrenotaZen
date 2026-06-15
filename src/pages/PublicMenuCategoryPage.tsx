@@ -5,7 +5,8 @@ import { useTenantContext } from '@/contexts/TenantContext'
 import { supabasePublic } from '@/lib/supabasePublic'
 import { usePublicMenuViewport } from '@/hooks/usePublicMenuViewport'
 import { usePublicMenuQr } from '@/features/booking/hooks/useMenuQrCodes'
-import { isCategoryInQrFilter } from '@/features/booking/utils/menuQrAppearance'
+import { usePublicMenuQrcodeCategories } from '@/features/booking/hooks/useMenuQrcodeCategories'
+import { isCategoryInQrFilter, applyQrItemSortOverride } from '@/features/booking/utils/menuQrAppearance'
 import { categoryHeaderBackgroundStyle } from '@/features/public-menu/categoryHeaderBackgroundStyle'
 import { getMenuTheme } from '@/features/public-menu/menuThemes'
 import { PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS } from '@/features/public-menu/publicMenuLayout'
@@ -42,11 +43,7 @@ function usePublicCategoryItems(tenantId: string | null, categoryKey: string | u
         .order('name', { ascending: true })
 
       if (error) throw error
-      const items = (data ?? []) as MenuItem[]
-      return [
-        ...items.filter((i) => i.image_url),
-        ...items.filter((i) => !i.image_url),
-      ]
+      return (data ?? []) as MenuItem[]
     },
     enabled: !!tenantId && !!categoryKey,
   })
@@ -122,6 +119,12 @@ export function PublicMenuCategoryPage() {
     tenantReady ? tenantId : null,
     shortCode ?? null,
   )
+  const { data: qrCatOverrides = [] } = usePublicMenuQrcodeCategories(qr?.id ?? null)
+  const categoryOverride = useMemo(
+    () => qrCatOverrides.find((o) => o.category_key === categoryKey),
+    [qrCatOverrides, categoryKey],
+  )
+
   const categoryInQrFilter =
     !!categoryKey && !!qr && isCategoryInQrFilter(qr.category_filter, categoryKey)
 
@@ -142,17 +145,27 @@ export function PublicMenuCategoryPage() {
 
   const theme = getMenuTheme(qr?.theme_key)
   const headerBgStyle = categoryHeaderBackgroundStyle(theme.headerImage, theme.headerFallbackBg)
+  const categoryPhotoUrl = qr?.category_images?.[categoryKey ?? ''] ?? null
 
   const items = useMemo(() => {
     if (!categoryKey || !categoryMeta) return []
-    return filterMenuItemsForPublicQr(
+    const filtered = filterMenuItemsForPublicQr(
       rawItems,
       [{ key: categoryKey, label: categoryMeta.label, is_available: categoryMeta.is_available }],
       qr?.hidden_menu_item_ids ?? [],
     )
-  }, [rawItems, categoryKey, categoryMeta, qr?.hidden_menu_item_ids])
+    const sortOverrideIds = qr?.item_sort_overrides?.[categoryKey] ?? null
+    if (sortOverrideIds) {
+      return applyQrItemSortOverride(filtered, sortOverrideIds)
+    }
+    // Default: foto prima del testo
+    return [
+      ...filtered.filter((i) => i.image_url),
+      ...filtered.filter((i) => !i.image_url),
+    ]
+  }, [rawItems, categoryKey, categoryMeta, qr?.hidden_menu_item_ids, qr?.item_sort_overrides])
 
-  const categoryLabel = categoryMeta?.label ?? ''
+  const categoryLabel = categoryOverride?.title || categoryMeta?.label || ''
 
   const backHref = `/menu/${tenantSlug}/qr/${shortCode}`
 
@@ -191,6 +204,17 @@ export function PublicMenuCategoryPage() {
             </h1>
           </div>
         </header>
+
+        {categoryAllowed && categoryPhotoUrl && (
+          <div className="w-full overflow-hidden bg-stone-200">
+            <img
+              src={categoryPhotoUrl}
+              alt={categoryLabel}
+              loading="lazy"
+              className="h-44 w-full object-cover"
+            />
+          </div>
+        )}
 
         <main className="flex flex-col gap-3 px-4 py-6">
         {loading && (

@@ -19,17 +19,7 @@ function toMenuQrJson(value: unknown): Json {
   return value as unknown as Json
 }
 
-function buildMenuQrCodeFields(input: MenuQrCodeInput): Pick<
-  TablesUpdate<'menu_qr_codes'>,
-  | 'name'
-  | 'category_filter'
-  | 'is_active'
-  | 'sort_order'
-  | 'theme_key'
-  | 'carousel_items'
-  | 'category_images'
-  | 'hidden_menu_item_ids'
-> {
+function buildMenuQrCodeFields(input: MenuQrCodeInput): Record<string, unknown> {
   return {
     name: input.name,
     category_filter: input.category_filter ?? null,
@@ -39,11 +29,12 @@ function buildMenuQrCodeFields(input: MenuQrCodeInput): Pick<
     carousel_items: toMenuQrJson(input.carousel_items ?? []),
     category_images: toMenuQrJson(input.category_images ?? {}),
     hidden_menu_item_ids: toMenuQrJson(input.hidden_menu_item_ids ?? []),
+    item_sort_overrides: toMenuQrJson(input.item_sort_overrides ?? null),
   }
 }
 
-function buildMenuQrCodeUpdate(input: Partial<MenuQrCodeInput>): TablesUpdate<'menu_qr_codes'> {
-  const patch: TablesUpdate<'menu_qr_codes'> = {
+function buildMenuQrCodeUpdate(input: Partial<MenuQrCodeInput>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
 
@@ -56,6 +47,9 @@ function buildMenuQrCodeUpdate(input: Partial<MenuQrCodeInput>): TablesUpdate<'m
   if (input.category_images !== undefined) patch.category_images = toMenuQrJson(input.category_images)
   if (input.hidden_menu_item_ids !== undefined) {
     patch.hidden_menu_item_ids = toMenuQrJson(input.hidden_menu_item_ids)
+  }
+  if (input.item_sort_overrides !== undefined) {
+    patch.item_sort_overrides = toMenuQrJson(input.item_sort_overrides)
   }
 
   return patch
@@ -107,10 +101,10 @@ export const useSaveMenuQrSettings = () => {
         )
       }
 
-      const row: TablesUpdate<'menu_qr_codes'> = {
+      const row = {
         ...buildMenuQrCodeFields({ ...input, category_images: categoryImages }),
         updated_at: new Date().toISOString(),
-      }
+      } as unknown as TablesUpdate<'menu_qr_codes'>
 
       let savedId = qrId
 
@@ -123,18 +117,20 @@ export const useSaveMenuQrSettings = () => {
 
         if (error) throw new Error(handleSupabaseError(error))
       } else {
-        const insertData: TablesInsert<'menu_qr_codes'> = {
+        const r = row as unknown as Record<string, unknown>
+        const insertData = {
           tenant_id: tenantId!,
           short_code: shortCode,
-          name: row.name!,
-          category_filter: row.category_filter ?? null,
-          is_active: row.is_active ?? true,
-          sort_order: row.sort_order ?? 0,
-          theme_key: row.theme_key ?? DEFAULT_THEME_KEY,
-          carousel_items: row.carousel_items ?? toMenuQrJson([]),
-          category_images: row.category_images ?? toMenuQrJson({}),
-          hidden_menu_item_ids: row.hidden_menu_item_ids ?? toMenuQrJson([]),
-        }
+          name: r.name,
+          category_filter: r.category_filter ?? null,
+          is_active: r.is_active ?? true,
+          sort_order: r.sort_order ?? 0,
+          theme_key: r.theme_key ?? DEFAULT_THEME_KEY,
+          carousel_items: r.carousel_items ?? toMenuQrJson([]),
+          category_images: r.category_images ?? toMenuQrJson({}),
+          hidden_menu_item_ids: r.hidden_menu_item_ids ?? toMenuQrJson([]),
+          item_sort_overrides: r.item_sort_overrides ?? null,
+        } as unknown as TablesInsert<'menu_qr_codes'>
 
         const { data, error } = await supabase
           .from('menu_qr_codes')
@@ -208,18 +204,11 @@ export const useCreateMenuQrCode = () => {
   return useMutation({
     mutationFn: async ({ shortCode, input }: { shortCode: string; input: MenuQrCodeInput }) => {
       const fields = buildMenuQrCodeFields(input)
-      const insertData: TablesInsert<'menu_qr_codes'> = {
+      const insertData = {
         tenant_id: tenantId!,
         short_code: shortCode,
-        name: input.name,
-        category_filter: fields.category_filter ?? null,
-        is_active: fields.is_active ?? true,
-        sort_order: fields.sort_order ?? 0,
-        theme_key: fields.theme_key ?? DEFAULT_THEME_KEY,
-        carousel_items: fields.carousel_items ?? toMenuQrJson([]),
-        category_images: fields.category_images ?? toMenuQrJson({}),
-        hidden_menu_item_ids: fields.hidden_menu_item_ids ?? toMenuQrJson([]),
-      }
+        ...fields,
+      } as unknown as TablesInsert<'menu_qr_codes'>
 
       const { data, error } = await supabase
         .from('menu_qr_codes')
@@ -250,7 +239,7 @@ export const useUpdateMenuQrCode = () => {
     mutationFn: async ({ id, input }: { id: string; input: Partial<MenuQrCodeInput> }) => {
       const { data, error } = await supabase
         .from('menu_qr_codes')
-        .update(buildMenuQrCodeUpdate(input))
+        .update(buildMenuQrCodeUpdate(input) as unknown as TablesUpdate<'menu_qr_codes'>)
         .eq('id', id)
         .eq('tenant_id', tenantId!)
         .select()

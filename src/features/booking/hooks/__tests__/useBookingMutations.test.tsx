@@ -36,16 +36,8 @@ function buildUpdateChain(result: { data: unknown; error: null | { message: stri
   const chain: Record<string, unknown> = {}
   chain['update'] = vi.fn(() => chain)
   chain['eq'] = vi.fn(() => chain)
+  chain['neq'] = vi.fn(() => chain)
   chain['select'] = vi.fn().mockResolvedValue(result)
-  return chain
-}
-
-function buildUpdateSingleChain(result: { data: unknown; error: null | { message: string } }) {
-  const chain: Record<string, unknown> = {}
-  chain['update'] = vi.fn(() => chain)
-  chain['eq'] = vi.fn(() => chain)
-  chain['select'] = vi.fn(() => chain)
-  chain['single'] = vi.fn().mockResolvedValue(result)
   return chain
 }
 
@@ -134,7 +126,7 @@ describe('useCancelBooking — soft-delete', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('chiama supabase.update con status deleted', async () => {
-    const chain = buildUpdateSingleChain({ data: { ...BOOKING_BASE, status: 'deleted' }, error: null })
+    const chain = buildUpdateChain({ data: [{ ...BOOKING_BASE, status: 'deleted' }], error: null })
     mockFrom.mockReturnValue(chain)
 
     const { result } = renderHook(() => useCancelBooking(), { wrapper: makeWrapper() })

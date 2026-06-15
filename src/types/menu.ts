@@ -63,6 +63,12 @@ export interface MenuQrCode {
   category_images: Record<string, string>
   /** UUID ingredienti da non mostrare in questo Menù QR (occhio chiuso). */
   hidden_menu_item_ids: string[]
+  /**
+   * Override ordine piatti per categoria, per questo QR.
+   * Format: { category_key: [item_uuid, ...] }
+   * null o chiave assente = ordine magazzino (sort_order + name).
+   */
+  item_sort_overrides: Record<string, string[]> | null
   created_at: string
   updated_at: string
 }
@@ -76,6 +82,7 @@ export interface MenuQrCodeInput {
   carousel_items?: CarouselItem[]
   category_images?: Record<string, string>
   hidden_menu_item_ids?: string[]
+  item_sort_overrides?: Record<string, string[]> | null
 }
 
 export interface MenuQrcodeCategoryOverrideDraft {

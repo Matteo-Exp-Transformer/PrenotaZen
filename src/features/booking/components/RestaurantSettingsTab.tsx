@@ -53,6 +53,7 @@ import { SETTINGS_AUTOSAVE_ENABLED } from '@/config/settingsAutosave'
 import { useDebouncedSettingsAutosave } from '@/features/booking/hooks/useDebouncedSettingsAutosave'
 import {
   FieldAutosaveIndicator,
+  PublicDataSaveConfirmModal,
   SettingsSaveFooter,
 } from './settings/SettingsSaveUi'
 import { BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS } from '@/features/booking/constants/bookingPrenotaTextLimits'
@@ -329,6 +330,7 @@ export const RestaurantSettingsTab: React.FC = () => {
   const appThemeQuery = useRestaurantSetting('app_theme', { authenticated: true })
   const upsert = useUpsertRestaurantSetting()
 
+  const [publicSaveConfirmOpen, setPublicSaveConfirmOpen] = useState(false)
   const [anagraficaDirty, setAnagraficaDirty] = useState(false)
   const [hoursDirty, setHoursDirty] = useState(false)
   const [themeDirty, setThemeDirty] = useState(false)
@@ -1440,12 +1442,22 @@ export const RestaurantSettingsTab: React.FC = () => {
       {settingsTab === 'anagrafica' && dirty && (
         <SettingsSaveFooter
           onCancel={handleCancelChanges}
-          onSave={handleSave}
+          onSave={() => setPublicSaveConfirmOpen(true)}
           pending={upsert.isPending}
           cancelDisabled={upsert.isPending || !dirty}
           saveDisabled={upsert.isPending || !tenantId || businessHoursValidationError != null}
         />
       )}
+
+      <PublicDataSaveConfirmModal
+        isOpen={publicSaveConfirmOpen}
+        pending={upsert.isPending}
+        onConfirm={async () => {
+          await handleSave()
+          setPublicSaveConfirmOpen(false)
+        }}
+        onCancel={() => setPublicSaveConfirmOpen(false)}
+      />
 
       <p className="mt-6 text-center text-micro text-[var(--color-text-muted)] select-none">
         v{__APP_VERSION__} · {__BUILD_COMMIT__} · {__BUILD_DATE__}

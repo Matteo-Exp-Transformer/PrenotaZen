@@ -17,7 +17,10 @@ interface TenantContextType {
   featureOverrides: string[]
   isLoading: boolean
   setTenantFromSlug: (slug: string) => Promise<void>
-  setTenantFromAdmin: (email: string) => Promise<void>
+  /** Risolve il tenant admin via RPC. Ritorna `false` se la risoluzione fallisce
+   *  (RPC in errore o nessuna riga): il chiamante deve fare signOut, mai lasciare
+   *  un admin loggato con tenant nullo (FU-AUTH-3). */
+  setTenantFromAdmin: (email: string) => Promise<boolean>
   clearTenant: () => void
 }
 
@@ -74,7 +77,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   /** Risolve il tenant dall'email admin (usato dopo login).
    *  check_admin_email ora restituisce anche feature_overrides in un solo round-trip. */
-  const setTenantFromAdmin = useCallback(async (email: string) => {
+  const setTenantFromAdmin = useCallback(async (email: string): Promise<boolean> => {
     setIsLoading(true)
     try {
       const { data: adminData, error } = await supabase.rpc('check_admin_email', { check_email: email })
@@ -84,7 +87,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setTenantSlug(null)
         setOrganizationName(null)
         setFeatureOverrides([])
-        return
+        return false
       }
 
       const adminInfo = adminData[0]
@@ -96,11 +99,13 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // Dev console: fotografia salute (sei loggato come admin).
       setDevHealth({ tenant: adminInfo.org_name || null, isAdmin: true, edition: (adminInfo.edition as string) || 'pro' })
       printDevHealth('STATO (admin)')
+      return !!adminInfo.tenant_id
     } catch (err) {
       setTenantId(null)
       setTenantSlug(null)
       setOrganizationName(null)
       setFeatureOverrides([])
+      return false
     } finally {
       setIsLoading(false)
     }

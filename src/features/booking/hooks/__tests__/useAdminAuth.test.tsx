@@ -92,7 +92,8 @@ describe('useAdminAuth', () => {
     vi.clearAllMocks()
     mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
     mockSignOut.mockResolvedValue({ error: null })
-    mockSetTenantFromAdmin.mockResolvedValue(undefined)
+    // FU-AUTH-3: setTenantFromAdmin ritorna true = tenant risolto (default happy path).
+    mockSetTenantFromAdmin.mockResolvedValue(true)
   })
 
   it('user è null all\'avvio senza sessione attiva', async () => {
@@ -189,6 +190,47 @@ describe('useAdminAuth', () => {
 
     expect(mockSetTenantFromAdmin).toHaveBeenCalledWith('admin@test.it')
     expect(result.current.user?.email).toBe('admin@test.it')
+  })
+
+  it('FU-AUTH-3: restore con tenant non risolto fa signOut, pulisce tenant e user null', async () => {
+    mockStoredAdminSession()
+    mockSetTenantFromAdmin.mockResolvedValueOnce(false)
+
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper('/admin') })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(mockSetTenantFromAdmin).toHaveBeenCalledWith('admin@test.it')
+    expect(mockSignOut).toHaveBeenCalled()
+    expect(mockClearTenant).toHaveBeenCalled()
+    expect(result.current.user).toBeNull()
+  })
+
+  it('FU-AUTH-3: login con tenant non risolto fallisce e non lascia user loggato', async () => {
+    mockSignInWithPassword.mockResolvedValueOnce({
+      data: { user: { id: 'user-1', email: 'admin@test.it' }, session: { access_token: 'tok' } },
+      error: null,
+    })
+    mockFrom.mockReturnValueOnce(
+      buildChain({ data: { name: 'Admin Test', tenant_id: 'tenant-1' }, error: null })
+    )
+    mockFrom.mockReturnValueOnce(
+      buildChain({ data: { is_active: true }, error: null })
+    )
+    mockSetTenantFromAdmin.mockResolvedValueOnce(false)
+
+    const { result } = renderHook(() => useAdminAuth(), { wrapper: createWrapper() })
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+
+    let loginResult!: { success: boolean; error?: string }
+    await act(async () => {
+      loginResult = await result.current.login('admin@test.it', 'password123')
+    })
+
+    expect(loginResult.success).toBe(false)
+    expect(result.current.user).toBeNull()
+    expect(mockSignOut).toHaveBeenCalled()
+    expect(mockClearTenant).toHaveBeenCalled()
   })
 
   it('restore sessione admin revocata da admin_users fa signOut e pulisce tenant', async () => {

@@ -8,6 +8,7 @@ import { useTenantContext } from '@/contexts/TenantContext'
 import { useMenuQrcodeCategoriesForQr } from '../hooks/useMenuQrcodeCategories'
 import { useMenuItems } from '../hooks/useMenuItems'
 import { groupMenuItemsByCategory } from '../utils/menuCatalogGrouping'
+import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
 import {
   MenuQrCarouselSection,
   MenuQrCategoryCardsSection,
@@ -38,6 +39,29 @@ import type {
 import type { MenuCategoryRecord } from '../hooks/useMenuCategories'
 
 const EMPTY_QR_CATEGORY_OVERRIDES: MenuQrcodeCategoryOverride[] = []
+
+/** Calcola categoryFilter e hiddenItemIds da un preset staff esistente. */
+function computeImportFromPreset(
+  presetItemIds: string[],
+  allCategoryKeys: string[],
+  itemsByCategory: Record<string, import('@/types/menu').MenuItem[]>,
+): { categoryFilter: string[]; hiddenItemIds: string[] } {
+  const presetSet = new Set(presetItemIds)
+  const categoryFilter: string[] = []
+  const hiddenItemIds: string[] = []
+
+  for (const key of allCategoryKeys) {
+    const items = itemsByCategory[key] ?? []
+    const hasPresetItem = items.some((i) => presetSet.has(i.id))
+    if (!hasPresetItem) continue
+    categoryFilter.push(key)
+    for (const item of items) {
+      if (!presetSet.has(item.id)) hiddenItemIds.push(item.id)
+    }
+  }
+
+  return { categoryFilter, hiddenItemIds }
+}
 
 function normalizeThemeKey(key: string | undefined | null): MenuThemeKey {
   if (key && key in MENU_THEMES) return key as MenuThemeKey
@@ -94,7 +118,13 @@ function serializeMenuQrDraft(input: {
   themeKey: MenuThemeKey
   overrideDrafts: CategoryOverrideDraft
   hiddenItemIds: string[]
+  itemSortOverrides: Record<string, string[]>
 }): string {
+  const sortOverridesSerialized = Object.fromEntries(
+    Object.keys(input.itemSortOverrides)
+      .sort()
+      .map((k) => [k, input.itemSortOverrides[k]]),
+  )
   return JSON.stringify({
     name: input.name.trim(),
     categoryFilter: input.categoryFilter,
@@ -103,6 +133,7 @@ function serializeMenuQrDraft(input: {
     themeKey: input.themeKey,
     overrideDrafts: input.overrideDrafts,
     hiddenItemIds: [...input.hiddenItemIds].sort(),
+    itemSortOverrides: sortOverridesSerialized,
   })
 }
 
@@ -120,6 +151,11 @@ export function MenuQrModal({
   const { data: overrides = EMPTY_QR_CATEGORY_OVERRIDES, isLoading: overridesLoading } =
     useMenuQrcodeCategoriesForQr(menuQrCodeId)
   const { data: menuItems = [] } = useMenuItems()
+  const { data: customPresets = [] } = useRestaurantSetting('booking_custom_staff_presets', {
+    authenticated: true,
+  })
+
+  const [selectedPresetId, setSelectedPresetId] = useState('')
 
   const [draftShortCode, setDraftShortCode] = useState(() => generateShortCode())
   const [name, setName] = useState('')
@@ -129,6 +165,7 @@ export function MenuQrModal({
   const [themeKey, setThemeKey] = useState<MenuThemeKey>(DEFAULT_THEME_KEY)
   const [overrideDrafts, setOverrideDrafts] = useState<CategoryOverrideDraft>({})
   const [hiddenItemIds, setHiddenItemIds] = useState<string[]>([])
+  const [itemSortOverrides, setItemSortOverrides] = useState<Record<string, string[]>>({})
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
 
   const baselineRef = useRef('')
@@ -200,6 +237,7 @@ export function MenuQrModal({
       setCategoryImages(editing.category_images ?? {})
       setThemeKey(normalizeThemeKey(editing.theme_key))
       setHiddenItemIds(editing.hidden_menu_item_ids ?? [])
+      setItemSortOverrides(editing.item_sort_overrides ?? {})
       return
     }
 
@@ -212,6 +250,7 @@ export function MenuQrModal({
     setCategoryImages(buildCatalogPrefillForKeys(initialFilter, categories, {}, tenantId))
     setThemeKey(DEFAULT_THEME_KEY)
     setHiddenItemIds([])
+    setItemSortOverrides({})
     setOverrideDrafts(buildCategoryOverrideDrafts(categories, []))
     overridesHydratedSessionRef.current = 'new'
     setOverridesHydratedVersion((v) => v + 1)
@@ -243,6 +282,7 @@ export function MenuQrModal({
       themeKey,
       overrideDrafts,
       hiddenItemIds,
+      itemSortOverrides,
     })
     baselineSessionRef.current = sessionKey
     setBaselineReady(true)
@@ -259,6 +299,7 @@ export function MenuQrModal({
         themeKey,
         overrideDrafts,
         hiddenItemIds,
+        itemSortOverrides,
       }) !== baselineRef.current
     )
   }, [
@@ -270,6 +311,7 @@ export function MenuQrModal({
     themeKey,
     overrideDrafts,
     hiddenItemIds,
+    itemSortOverrides,
     baselineReady,
   ])
 
@@ -311,6 +353,25 @@ export function MenuQrModal({
     }
     setCategoryFilter((prev) => [...prev, key])
     setCategoryImages((prev) => buildCatalogPrefillForKeys([key], categories, prev, tenantId))
+  }
+
+  const handleImportPreset = () => {
+    const preset = customPresets.find((p) => p.id === selectedPresetId)
+    if (!preset) return
+    const { categoryFilter: newFilter, hiddenItemIds: newHidden } = computeImportFromPreset(
+      preset.item_ids,
+      categoryKeysWithItems,
+      itemsByCategory,
+    )
+    if (newFilter.length === 0) {
+      toast.warn('Nessuna categoria del menù corrisponde a questo preset.')
+      return
+    }
+    setCategoryFilter(newFilter)
+    setHiddenItemIds(newHidden)
+    setCategoryImages(buildCatalogPrefillForKeys(newFilter, categories, {}, tenantId))
+    setSelectedPresetId('')
+    toast.info(`Preset "${preset.name}" importato — categorie e ingredienti precompilati.`)
   }
 
   const moveCategoryInFilter = (key: string, direction: -1 | 1) => {
@@ -380,18 +441,28 @@ export function MenuQrModal({
       }
     })
 
+    const activeCategorySet = new Set(
+      categoryFilter.filter((key) => categoryKeysWithItems.includes(key)),
+    )
+    const prunedItemSortOverrides = Object.fromEntries(
+      Object.entries(itemSortOverrides).filter(([key]) => activeCategorySet.has(key)),
+    )
+
     return {
       shortCode,
       qrId: editing?.id ?? null,
       draftShortCode: editing ? null : draftShortCode,
       input: {
         name: trimmed,
-        category_filter: categoryFilter.filter((key) => categoryKeysWithItems.includes(key)),
+        category_filter: [...activeCategorySet],
         is_active: editing?.is_active ?? true,
         theme_key: themeKey,
         carousel_items: carouselItems,
         category_images: filteredCategoryImages,
         hidden_menu_item_ids: prunedHidden,
+        item_sort_overrides: Object.keys(prunedItemSortOverrides).length > 0
+          ? prunedItemSortOverrides
+          : null,
       },
       categoryOverrides,
     }
@@ -465,6 +536,38 @@ export function MenuQrModal({
             maxLength={80}
           />
         </div>
+
+        {customPresets.length > 0 && (
+          <div>
+            <p className="mb-1 text-sm font-semibold text-gray-800">Importa da preset staff</p>
+            <p className="mb-2 text-xs text-gray-500">
+              Precompila categorie e ingredienti visibili in base a un preset esistente. Il carosello
+              non viene toccato. Il preset originale rimane invariato.
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                className="min-w-0 flex-1 rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700 outline-none"
+                value={selectedPresetId}
+                onChange={(e) => setSelectedPresetId(e.target.value)}
+              >
+                <option value="">Scegli preset…</option>
+                {customPresets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportPreset}
+                disabled={!selectedPresetId}
+              >
+                Importa
+              </Button>
+            </div>
+          </div>
+        )}
 
         {publicCategories.length > 0 ? (
           <div>
@@ -550,6 +653,8 @@ export function MenuQrModal({
             itemsByCategory={itemsByCategory}
             hiddenItemIds={hiddenItemIds}
             onHiddenItemIdsChange={setHiddenItemIds}
+            itemSortOverrides={itemSortOverrides}
+            onItemSortOverridesChange={setItemSortOverrides}
             onMoveCategoryUp={(key) => moveCategoryInFilter(key, -1)}
             onMoveCategoryDown={(key) => moveCategoryInFilter(key, 1)}
           />

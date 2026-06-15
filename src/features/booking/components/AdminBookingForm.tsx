@@ -12,6 +12,7 @@ import { MenuSelection } from './MenuSelection'
 import { DietaryRestrictionsStructuredSection } from './DietaryRestrictionsStructuredSection'
 import { useMenuItems } from '../hooks/useMenuItems'
 import type { PresetMenuType } from '../constants/presetMenus'
+import { BOOKING_PUBLIC_CLIENT_TEXT_LIMITS } from '../constants/bookingPrenotaTextLimits'
 import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
 import {
   applyPresetTypeToBookingFormPayload,
@@ -173,7 +174,8 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
       return
     }
     if (/^\d+$/.test(inputValue)) {
-      const value = parseInt(inputValue, 10)
+      // L10: cap a video — il numero ospiti non può superare il massimo consentito.
+      const value = Math.min(parseInt(inputValue, 10), BOOKING_PUBLIC_CLIENT_TEXT_LIMITS.numGuestsMax)
       if (!isNaN(value) && value >= 1) {
         const totalPerPerson = formData.menu_total_per_person || 0
         setFormData({ ...formData, num_guests: value, menu_total_booking: totalPerPerson * value })

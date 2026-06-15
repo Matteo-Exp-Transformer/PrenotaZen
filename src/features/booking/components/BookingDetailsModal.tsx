@@ -23,6 +23,7 @@ import { MenuTab } from './MenuTab'
 import { DietaryTab } from './DietaryTab'
 import type { SelectedMenuItem } from '@/types/menu'
 import type { PresetMenuType } from '../constants/presetMenus'
+import { BOOKING_PUBLIC_CLIENT_TEXT_LIMITS } from '../constants/bookingPrenotaTextLimits'
 import { useMenuItems } from '../hooks/useMenuItems'
 import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
 import { useDigestSlotConfigs, useServiceSlots } from '../hooks/useServiceSlots'
@@ -669,8 +670,16 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       return false
     }
 
-    if (formData.numGuests < 1 || formData.numGuests > 110) {
-      toast.error('Inserisci un numero valido di ospiti (minimo 1, massimo 110)')
+    const maxGuests = BOOKING_PUBLIC_CLIENT_TEXT_LIMITS.numGuestsMax
+    if (formData.numGuests < 1 || formData.numGuests > maxGuests) {
+      toast.error(`Inserisci un numero valido di ospiti (minimo 1, massimo ${maxGuests})`)
+      if (fromNavigationGuard) rejectNavigationSave('Validazione non superata')
+      return false
+    }
+
+    // D7: orario mancante → feedback esplicito, non salvataggio silenzioso.
+    if (!formData.startTime?.trim() || !formData.endTime?.trim()) {
+      toast.error('Inserisci sia l\'orario di inizio sia quello di fine')
       if (fromNavigationGuard) rejectNavigationSave('Validazione non superata')
       return false
     }

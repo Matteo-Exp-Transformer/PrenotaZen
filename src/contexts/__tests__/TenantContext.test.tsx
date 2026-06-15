@@ -92,23 +92,41 @@ describe('TenantContext', () => {
 
       const { result } = renderHook(() => useTenantContext(), { wrapper })
 
+      let resolved: boolean | undefined
       await act(async () => {
-        await result.current.setTenantFromAdmin('admin@test.it')
+        resolved = await result.current.setTenantFromAdmin('admin@test.it')
       })
 
+      expect(resolved).toBe(true)
       expect(result.current.tenantId).toBe('tenant-xyz')
       expect(result.current.organizationName).toBe('Ristorante Test')
     })
 
-    it('mantiene tenantId null se l\'admin non esiste', async () => {
+    it('mantiene tenantId null e ritorna false se l\'admin non esiste (FU-AUTH-3)', async () => {
       mockRpc.mockResolvedValueOnce({ data: [], error: null })
 
       const { result } = renderHook(() => useTenantContext(), { wrapper })
 
+      let resolved: boolean | undefined
       await act(async () => {
-        await result.current.setTenantFromAdmin('sconosciuto@test.it')
+        resolved = await result.current.setTenantFromAdmin('sconosciuto@test.it')
       })
 
+      expect(resolved).toBe(false)
+      expect(result.current.tenantId).toBeNull()
+    })
+
+    it('ritorna false se la RPC va in errore (FU-AUTH-3)', async () => {
+      mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'RPC down' } })
+
+      const { result } = renderHook(() => useTenantContext(), { wrapper })
+
+      let resolved: boolean | undefined
+      await act(async () => {
+        resolved = await result.current.setTenantFromAdmin('admin@test.it')
+      })
+
+      expect(resolved).toBe(false)
       expect(result.current.tenantId).toBeNull()
     })
   })

@@ -248,7 +248,19 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
       onDirtyChange?.(dirty)
     }, [dirty, onDirtyChange])
 
-    const markDirty = () => setDirty(true)
+    const saveSilently = async (nextPromos: MenuPromo[]) => {
+      const normalized = normalizeMenuPromosList(nextPromos)
+      const uniqueness = validateMenuPromoUniqueness(normalized)
+      if (!uniqueness.ok) return
+      try {
+        await upsert.mutateAsync({ items: [{ key: 'booking_menu_promos', value: normalized }], options: { silent: true } })
+        setDirty(false)
+      } catch {
+        // Se il salvataggio silenzioso fallisce, segna dirty per retry via footer.
+        setDirty(true)
+        toast.error('Errore nel salvataggio della promo')
+      }
+    }
 
     const resetEditorDraft = () => {
       setEditorMode('list')
@@ -365,8 +377,8 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
         return false
       }
       setPromos(next)
-      markDirty()
       resetEditorDraft()
+      void saveSilently(next)
       return true
     }
 
@@ -410,19 +422,19 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
     const confirmDeletePromo = () => {
       if (!deleteConfirm) return
       const { promoId } = deleteConfirm
-      setPromos(promos.filter((p) => p.id !== promoId))
-      markDirty()
+      const next = promos.filter((p) => p.id !== promoId)
+      setPromos(next)
       if (editingId === promoId) resetEditorDraft()
       setDeleteConfirm(null)
+      void saveSilently(next)
     }
 
     const toggleVisibility = (promoId: string) => {
-      setPromos(
-        promos.map((p) =>
-          p.id === promoId ? { ...p, visible_on_booking: !isMenuPromoVisibleOnBooking(p) } : p,
-        ),
+      const next = promos.map((p) =>
+        p.id === promoId ? { ...p, visible_on_booking: !isMenuPromoVisibleOnBooking(p) } : p,
       )
-      markDirty()
+      setPromos(next)
+      void saveSilently(next)
     }
 
     const saveSection = async () => {

@@ -3,9 +3,41 @@ import {
   getBookingAcceptedEmail,
   getBookingRejectedEmail,
   getBookingCancelledEmail,
+  type TenantInfo,
 } from '@/lib/emailTemplates'
 import type { BookingRequest } from '@/types/booking'
 import { logger } from '@/lib/logger'
+
+/**
+ * Recupera nome ristorante e contatti dal tenant per personalizzare la firma email.
+ * Fallisce silenziosamente — l'email viene inviata anche senza dati di contatto.
+ */
+async function fetchTenantInfo(tenantId: string): Promise<TenantInfo> {
+  try {
+    const { supabase } = await import('@/lib/supabase')
+    const { data } = await supabase
+      .from('restaurant_settings')
+      .select('setting_key, setting_value')
+      .eq('tenant_id', tenantId)
+      .in('setting_key', ['restaurant_name', 'contact_phone', 'contact_email'])
+
+    const map: Record<string, string> = {}
+    for (const row of data ?? []) {
+      const v = row.setting_value
+      if (typeof v === 'string' && v.trim()) {
+        map[row.setting_key] = v.trim()
+      }
+    }
+
+    return {
+      name: map['restaurant_name'],
+      phone: map['contact_phone'],
+      email: map['contact_email'],
+    }
+  } catch {
+    return {}
+  }
+}
 
 /**
  * Send email when booking is accepted
@@ -16,7 +48,8 @@ export const sendBookingAcceptedEmail = async (booking: BookingRequest): Promise
       return { success: false }
     }
 
-    const { subject, html } = getBookingAcceptedEmail(booking)
+    const tenantInfo = await fetchTenantInfo(booking.tenant_id)
+    const { subject, html } = getBookingAcceptedEmail(booking, tenantInfo)
 
     const result = await sendAndLogEmail(
       {
@@ -45,7 +78,8 @@ export const sendBookingRejectedEmail = async (booking: BookingRequest): Promise
       return { success: false }
     }
 
-    const { subject, html } = getBookingRejectedEmail(booking)
+    const tenantInfo = await fetchTenantInfo(booking.tenant_id)
+    const { subject, html } = getBookingRejectedEmail(booking, tenantInfo)
 
     const result = await sendAndLogEmail(
       {
@@ -74,7 +108,8 @@ export const sendBookingCancelledEmail = async (booking: BookingRequest): Promis
       return { success: false }
     }
 
-    const { subject, html } = getBookingCancelledEmail(booking)
+    const tenantInfo = await fetchTenantInfo(booking.tenant_id)
+    const { subject, html } = getBookingCancelledEmail(booking, tenantInfo)
 
     const result = await sendAndLogEmail(
       {
@@ -102,4 +137,3 @@ export const sendBookingCancelledEmail = async (booking: BookingRequest): Promis
 export const areEmailNotificationsEnabled = (): boolean => {
   return import.meta.env.VITE_ENABLE_SEND_EMAIL === 'true'
 }
-

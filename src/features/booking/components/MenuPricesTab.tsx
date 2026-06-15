@@ -496,6 +496,11 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   const [categoryDiscardConfirmOpen, setCategoryDiscardConfirmOpen] = useState(false)
   const [categoryDiscardAction, setCategoryDiscardAction] = useState<'overlay' | 'form' | null>(null)
 
+  // FU-023: guard chiusura editor preset (menù preselezionati) con bozza non salvata.
+  const presetEditorBaselineRef = useRef('')
+  const [presetDiscardConfirmOpen, setPresetDiscardConfirmOpen] = useState(false)
+  const [presetDiscardAction, setPresetDiscardAction] = useState<'list' | 'section' | null>(null)
+
   const ADMIN_MENU_FORM_SCROLL_MARGIN = 132
   const scrollAdminMenuFormTitleIntoView = (element: HTMLElement | null) => {
     scrollIntoAdminShellView(element, {
@@ -524,6 +529,14 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     setEditingCustomPresetId(null)
   }
 
+  /** Serializza la bozza editor preset per il confronto dirty (FU-023). */
+  const serializePresetDraft = (
+    name: string,
+    description: string,
+    price: string,
+    items: SelectedMenuItem[],
+  ) => JSON.stringify({ name: name.trim(), description: description.trim(), price: price.trim(), items })
+
   const closePresetMenusSection = () => {
     resetPresetEditor()
     setViewMode('menu')
@@ -539,16 +552,49 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
     setPresetDescription('')
     setPresetPriceInput('')
     setPresetSelectedItems([])
+    presetEditorBaselineRef.current = serializePresetDraft('', '', '', [])
     setPresetEditorMode('editor')
   }
 
   const startEditCustomPreset = (preset: CustomStaffPreset) => {
+    const initialDescription = preset.description ?? ''
+    const initialPrice = preset.price_per_person != null ? String(preset.price_per_person) : ''
+    const initialItems = selectedItemsFromMenuItemIds(menuItems, preset.item_ids)
     setEditingCustomPresetId(preset.id)
     setPresetName(preset.name)
-    setPresetDescription(preset.description ?? '')
-    setPresetPriceInput(preset.price_per_person != null ? String(preset.price_per_person) : '')
-    setPresetSelectedItems(selectedItemsFromMenuItemIds(menuItems, preset.item_ids))
+    setPresetDescription(initialDescription)
+    setPresetPriceInput(initialPrice)
+    setPresetSelectedItems(initialItems)
+    presetEditorBaselineRef.current = serializePresetDraft(
+      preset.name,
+      initialDescription,
+      initialPrice,
+      initialItems,
+    )
     setPresetEditorMode('editor')
+  }
+
+  const isPresetEditorDirty = () =>
+    serializePresetDraft(presetName, presetDescription, presetPriceInput, presetSelectedItems) !==
+    presetEditorBaselineRef.current
+
+  /** Chiusura editor preset: se ci sono modifiche non salvate, conferma prima di scartare. */
+  const requestClosePresetEditor = (action: 'list' | 'section') => {
+    if (presetEditorMode === 'editor' && isPresetEditorDirty()) {
+      setPresetDiscardAction(action)
+      setPresetDiscardConfirmOpen(true)
+      return
+    }
+    if (action === 'section') closePresetMenusSection()
+    else resetPresetEditor()
+  }
+
+  const confirmPresetDiscard = () => {
+    const action = presetDiscardAction
+    setPresetDiscardConfirmOpen(false)
+    setPresetDiscardAction(null)
+    if (action === 'section') closePresetMenusSection()
+    else resetPresetEditor()
   }
 
   const buildPresetRowPayload = (
@@ -1728,7 +1774,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
           >
             <button
               type="button"
-              onClick={closePresetMenusSection}
+              onClick={() => requestClosePresetEditor('section')}
               className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-warm-wood/40 bg-white/90 text-warm-wood shadow-sm transition hover:bg-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-warm-wood/40"
               aria-label="Chiudi menù preselezionati"
             >
@@ -1892,10 +1938,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        resetPresetEditor()
-                        setPresetEditorMode('list')
-                      }}
+                      onClick={() => requestClosePresetEditor('list')}
                       className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-semibold rounded-xl transition-all duration-300 shadow-md hover:shadow-lg hover:bg-red-600 hover:text-white focus:outline-none focus:ring-4 focus:ring-red-500/30"
                     >
                       <X className="h-4 w-4 shrink-0" />
@@ -2311,6 +2354,16 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         }}
         onDiscard={confirmDiscardCategoryDraft}
         message="Hai modifiche non salvate alla categoria. Vuoi annullarle?"
+      />
+
+      <DiscardChangesConfirmModal
+        isOpen={presetDiscardConfirmOpen}
+        onStay={() => {
+          setPresetDiscardConfirmOpen(false)
+          setPresetDiscardAction(null)
+        }}
+        onDiscard={confirmPresetDiscard}
+        message="Hai modifiche non salvate al menù preselezionato. Vuoi annullarle?"
       />
     </div>
   )

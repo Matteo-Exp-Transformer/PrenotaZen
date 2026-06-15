@@ -27,11 +27,11 @@ interface EmailLog {
 }
 
 /**
- * Send email using Resend API
+ * Send email via Supabase Edge Function `send-email` (Brevo backend).
+ * Richiede sessione admin attiva — il JWT viene usato per autenticare l'edge function.
  */
 export const sendEmail = async (options: SendEmailOptions): Promise<{ success: boolean; error?: string }> => {
   try {
-
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
     if (!supabaseUrl) {
       throw new Error('VITE_SUPABASE_URL not configured')
@@ -39,7 +39,18 @@ export const sendEmail = async (options: SendEmailOptions): Promise<{ success: b
 
     const edgeFunctionUrl = `${supabaseUrl}/functions/v1/send-email`
 
+    // Usa il JWT admin — mai l'anon key, che non autentica il chiamante
+    const { supabase } = await import('./supabase')
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+
+    if (!accessToken) {
+      logger.warn('[Email] Sessione admin assente — impossibile inviare email')
+      return { success: false, error: 'Sessione scaduta. Effettua di nuovo il login.' }
+    }
+
     const payload = {
+      tenantId: options.tenantId,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -47,15 +58,11 @@ export const sendEmail = async (options: SendEmailOptions): Promise<{ success: b
       emailType: options.emailType || 'manual',
     }
 
-
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
-
     const response = await fetch(edgeFunctionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${anonKey}`,
-        apikey: anonKey,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(payload),
     })

@@ -256,22 +256,38 @@ export type CategoryOverrideDraft = Record<
 const MENU_QR_FIELD_CLASS =
   'w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-700 outline-none'
 
+/** Applica l'override ordine piatti per-QR sul display UI. */
+function applyItemSortForUi(items: MenuItem[], overrideIds: string[] | null | undefined): MenuItem[] {
+  if (!overrideIds || overrideIds.length === 0) return items
+  const posMap = new Map(overrideIds.map((id, i) => [id, i]))
+  return [...items].sort((a, b) => {
+    const pa = posMap.get(a.id) ?? Infinity
+    const pb = posMap.get(b.id) ?? Infinity
+    return pa - pb
+  })
+}
+
 export function MenuQrHiddenItemsPicker({
   categoryLabel,
   items,
   hiddenItemIds,
   onHiddenItemIdsChange,
+  itemSortOverride,
+  onItemSortOverrideChange,
 }: {
   categoryLabel: string
   items: MenuItem[]
   hiddenItemIds: string[]
   onHiddenItemIdsChange: (ids: string[]) => void
+  itemSortOverride?: string[] | null
+  onItemSortOverrideChange?: (ids: string[]) => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
   if (items.length === 0) return null
 
   const hiddenSet = new Set(hiddenItemIds)
+  const sortedItems = applyItemSortForUi(items, itemSortOverride)
 
   const toggleItem = (itemId: string) => {
     if (hiddenSet.has(itemId)) {
@@ -281,6 +297,17 @@ export function MenuQrHiddenItemsPicker({
     }
   }
 
+  const moveItem = (index: number, direction: -1 | 1) => {
+    if (!onItemSortOverrideChange) return
+    const j = index + direction
+    if (j < 0 || j >= sortedItems.length) return
+    const next = [...sortedItems]
+    ;[next[index], next[j]] = [next[j], next[index]]
+    onItemSortOverrideChange(next.map((i) => i.id))
+  }
+
+  const hasOrdering = !!onItemSortOverrideChange
+
   return (
     <div className={MENU_QR_FIELD_CLASS}>
       <button
@@ -289,24 +316,48 @@ export function MenuQrHiddenItemsPicker({
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="min-w-0 truncate">Scegli quali ingredienti non mostrare</span>
+        <span className="min-w-0 truncate">
+          {hasOrdering ? 'Visibilità e ordine ingredienti' : 'Scegli quali ingredienti non mostrare'}
+        </span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
           aria-hidden
         />
       </button>
       {expanded ? (
-        <div className="mt-2 grid grid-cols-2 gap-2 border-t border-gray-200 pt-2 sm:grid-cols-4">
-          {items.map((item) => {
+        <div className="mt-2 flex flex-col gap-1 border-t border-gray-200 pt-2">
+          {sortedItems.map((item, index) => {
             const isHidden = hiddenSet.has(item.id)
             return (
               <div
                 key={item.id}
-                className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5"
+                className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1"
               >
                 <span className="min-w-0 flex-1 truncate text-sm text-gray-700" title={item.name}>
                   {item.name}
                 </span>
+                {hasOrdering && (
+                  <div className="flex shrink-0 flex-col gap-0">
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => moveItem(index, -1)}
+                      className="rounded p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      aria-label={`Sposta ${item.name} su`}
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === sortedItems.length - 1}
+                      onClick={() => moveItem(index, 1)}
+                      className="rounded p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      aria-label={`Sposta ${item.name} giù`}
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="is-clickable shrink-0 rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
@@ -340,6 +391,8 @@ export function MenuQrCategoryCardsSection({
   itemsByCategory,
   hiddenItemIds,
   onHiddenItemIdsChange,
+  itemSortOverrides,
+  onItemSortOverridesChange,
   onMoveCategoryUp,
   onMoveCategoryDown,
 }: {
@@ -354,6 +407,8 @@ export function MenuQrCategoryCardsSection({
   itemsByCategory: Record<string, MenuItem[]>
   hiddenItemIds: string[]
   onHiddenItemIdsChange: (ids: string[]) => void
+  itemSortOverrides: Record<string, string[]>
+  onItemSortOverridesChange: (overrides: Record<string, string[]>) => void
   onMoveCategoryUp: (categoryKey: string) => void
   onMoveCategoryDown: (categoryKey: string) => void
 }) {
@@ -532,6 +587,10 @@ export function MenuQrCategoryCardsSection({
               items={itemsByCategory[cat.key] ?? []}
               hiddenItemIds={hiddenItemIds}
               onHiddenItemIdsChange={onHiddenItemIdsChange}
+              itemSortOverride={itemSortOverrides[cat.key]}
+              onItemSortOverrideChange={(ids) =>
+                onItemSortOverridesChange({ ...itemSortOverrides, [cat.key]: ids })
+              }
             />
           </div>
         )

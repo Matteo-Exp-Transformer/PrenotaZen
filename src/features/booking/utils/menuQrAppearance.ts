@@ -58,6 +58,35 @@ export function isCategoryInQrFilter(
   return categoryFilter.includes(categoryKey)
 }
 
+export function parseItemSortOverrides(raw: unknown): Record<string, string[]> | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
+  const out: Record<string, string[]> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(v)) {
+      out[k] = v.filter((x): x is string => typeof x === 'string' && x.length > 0)
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
+/**
+ * Applica l'override ordine piatti per-QR.
+ * Gli UUID presenti nell'array override vengono messi in quella sequenza;
+ * gli item non inclusi nell'override vengono appesi in coda (ordine originale).
+ */
+export function applyQrItemSortOverride<T extends { id: string }>(
+  items: T[],
+  overrideIds: string[] | null | undefined,
+): T[] {
+  if (!overrideIds || overrideIds.length === 0) return items
+  const posMap = new Map(overrideIds.map((id, i) => [id, i]))
+  return [...items].sort((a, b) => {
+    const pa = posMap.get(a.id) ?? Infinity
+    const pb = posMap.get(b.id) ?? Infinity
+    return pa - pb
+  })
+}
+
 export function parseMenuQrCodeRow(raw: Record<string, unknown>): MenuQrCode {
   return {
     id: String(raw.id),
@@ -75,5 +104,6 @@ export function parseMenuQrCodeRow(raw: Record<string, unknown>): MenuQrCode {
     carousel_items: parseCarouselItems(raw.carousel_items),
     category_images: parseCategoryImages(raw.category_images),
     hidden_menu_item_ids: parseHiddenMenuItemIds(raw.hidden_menu_item_ids),
+    item_sort_overrides: parseItemSortOverrides(raw.item_sort_overrides),
   }
 }

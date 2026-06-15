@@ -58,6 +58,7 @@ import { SETTINGS_AUTOSAVE_ENABLED } from '@/config/settingsAutosave'
 import { useDebouncedSettingsAutosave } from '@/features/booking/hooks/useDebouncedSettingsAutosave'
 import {
   FieldAutosaveIndicator,
+  PublicDataSaveConfirmModal,
   SettingsSaveFooter,
 } from '@/features/booking/components/settings/SettingsSaveUi'
 import { AdminFieldWithCharCount } from '@/features/booking/components/settings/AdminFieldWithCharCount'
@@ -361,6 +362,7 @@ export const BookingFormConfigPanel: React.FC<BookingFormConfigPanelProps> = ({
     organizationName?.trim() ||
     ''
 
+  const [publicSaveConfirmOpen, setPublicSaveConfirmOpen] = useState(false)
   const [config, setConfig] = useState<BookingPublicFormConfig>(DEFAULT_BOOKING_FORM_CONFIG)
   const [headerTextDirty, setHeaderTextDirty] = useState(false)
   const [headerStylesDirty, setHeaderStylesDirty] = useState(false)
@@ -1792,12 +1794,22 @@ export const BookingFormConfigPanel: React.FC<BookingFormConfigPanelProps> = ({
       {pageHasUnsaved && (
         <SettingsSaveFooter
           onCancel={handleCancelAllPage}
-          onSave={() => void handleSaveAllPage()}
+          onSave={() => setPublicSaveConfirmOpen(true)}
           pending={upsert.isPending}
           cancelDisabled={upsert.isPending}
           saveDisabled={upsert.isPending}
         />
       )}
+
+      <PublicDataSaveConfirmModal
+        isOpen={publicSaveConfirmOpen}
+        pending={upsert.isPending}
+        onConfirm={async () => {
+          await handleSaveAllPage()
+          setPublicSaveConfirmOpen(false)
+        }}
+        onCancel={() => setPublicSaveConfirmOpen(false)}
+      />
     </div>
   )
 }
