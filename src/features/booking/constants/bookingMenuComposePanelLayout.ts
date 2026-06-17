@@ -16,3 +16,17 @@ export const BOOKING_MENU_CATEGORY_PANEL_SCROLL_CLASS =
 
 /** Card aperta in portal (`position: fixed`): stessa larghezza della card chiusa (shell), sopra form/riepilogo in scroll (`z-[160]`). Nessuna sticky bar mobile (rimossa 02-06-26). */
 export const BOOKING_MENU_CATEGORY_EXPANDED_PORTAL_CLASS = 'fixed z-[160] shadow-xl'
+
+/** True se l'elemento è interamente dentro il contenitore scroll orizzontale (tolleranza px). */
+export function isElementFullyVisibleInHorizontalContainer(
+  element: Element,
+  container: Element,
+  tolerancePx = 2,
+): boolean {
+  const elRect = element.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  return (
+    elRect.left >= containerRect.left - tolerancePx &&
+    elRect.right <= containerRect.right + tolerancePx
+  )
+}

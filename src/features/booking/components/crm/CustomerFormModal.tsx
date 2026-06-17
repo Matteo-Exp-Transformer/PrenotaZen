@@ -2,13 +2,14 @@ import type { FC, FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Modal, Input, Label, Button, Textarea } from '@/components/ui'
 import type { CustomerProfile } from '@/types/customer'
-import { useCreateCustomer, useUpdateCustomer } from '@/features/booking/hooks/useCustomerMutations'
+import { useUpdateCustomer } from '@/features/booking/hooks/useCustomerMutations'
 import { DiscardChangesConfirmModal } from '@/features/booking/components/settings/SettingsSaveUi'
 
+// Solo modifica: i clienti non si inseriscono a mano. Solo chi ha inviato una
+// prenotazione (accettando la privacy policy nel form pubblico) entra in rubrica.
 interface CustomerFormModalProps {
   isOpen: boolean
   onClose: () => void
-  mode: 'create' | 'edit'
   initialProfile?: CustomerProfile | null
 }
 
@@ -29,10 +30,8 @@ function normalizeDraft(value: {
 export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   isOpen,
   onClose,
-  mode,
   initialProfile,
 }) => {
-  const createCustomer = useCreateCustomer()
   const updateCustomer = useUpdateCustomer()
 
   const [name, setName] = useState('')
@@ -44,34 +43,22 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
 
   useEffect(() => {
-    if (!isOpen) return
-    if (mode === 'edit' && initialProfile) {
-      const next = normalizeDraft({
-        name: initialProfile.name,
-        email: initialProfile.email,
-        phone: initialProfile.phone ?? '',
-        notes: initialProfile.notes ?? '',
-      })
-      setName(next.name)
-      setEmail(next.email)
-      setPhone(next.phone)
-      setNotes(next.notes)
-      setEmailSnapshot(initialProfile.email)
-      setBaseline(next)
-      return
-    }
-    if (mode === 'create') {
-      const empty = normalizeDraft({ name: '', email: '', phone: '', notes: '' })
-      setName('')
-      setEmail('')
-      setPhone('')
-      setNotes('')
-      setEmailSnapshot('')
-      setBaseline(empty)
-    }
-  }, [isOpen, mode, initialProfile])
+    if (!isOpen || !initialProfile) return
+    const next = normalizeDraft({
+      name: initialProfile.name,
+      email: initialProfile.email,
+      phone: initialProfile.phone ?? '',
+      notes: initialProfile.notes ?? '',
+    })
+    setName(next.name)
+    setEmail(next.email)
+    setPhone(next.phone)
+    setNotes(next.notes)
+    setEmailSnapshot(initialProfile.email)
+    setBaseline(next)
+  }, [isOpen, initialProfile])
 
-  const busy = createCustomer.isPending || updateCustomer.isPending
+  const busy = updateCustomer.isPending
 
   const isDirty = useMemo(
     () =>
@@ -98,13 +85,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (mode === 'create') {
-      createCustomer.mutate(
-        { name, email, phone: phone || undefined, notes: notes || undefined },
-        { onSuccess: () => onClose() },
-      )
-      return
-    }
     if (!initialProfile) return
     updateCustomer.mutate(
       {
@@ -124,7 +104,7 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       <Modal
         isOpen={isOpen}
         onClose={requestClose}
-        title={mode === 'create' ? 'Nuovo cliente' : 'Modifica cliente'}
+        title="Modifica cliente"
         size="md"
         closeOnOverlayClick={!busy}
         closeOnEscape={!busy}

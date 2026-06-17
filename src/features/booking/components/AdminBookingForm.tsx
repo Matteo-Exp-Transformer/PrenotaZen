@@ -19,8 +19,10 @@ import { getModeLabelByType } from '../utils/bookingModeLabels'
 import {
   applyPresetTypeToBookingFormPayload,
   computeMenuTotalsFromItems,
+  isGuestComposableMenuSelection,
   presetSelectionStillMatchesStoredPreset,
 } from '../utils/buildPresetMenuSelection'
+import { shouldShowComposeMenuHeader } from '../constants/presetMenus'
 import { useAcceptedBookings } from '../hooks/useBookingQueries'
 import { useCapacityCheck } from '../hooks/useCapacityCheck'
 import { sumGuestsByDate } from '../utils/capacityCalculator'
@@ -331,18 +333,19 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
       if (!firstErrorKey) firstErrorKey = 'booking_type'
     }
 
-    // Menu validation (Rinfresco / menù a prezzo fisso)
-    if (bookingTypeUsesMenuSelections(formData.booking_type)) {
-      if (!formData.menu_selection || !formData.menu_selection.items || formData.menu_selection.items.length === 0) {
-        newErrors.menu = 'Seleziona almeno un prodotto dal menù'
-        isValid = false
-        if (!firstErrorKey) firstErrorKey = 'menu'
-      }
-      if (!formData.menu_total_per_person || formData.menu_total_per_person <= 0) {
-        newErrors.menu = 'Il totale a persona deve essere maggiore di 0'
-        isValid = false
-        if (!firstErrorKey) firstErrorKey = 'menu'
-      }
+    // Menù personalizzabile: almeno un piatto scelto (menù a prezzo fisso / preset fisso: fuori scope).
+    const guestComposableMenu =
+      (selectedPreset != null &&
+        isGuestComposableMenuSelection(selectedPreset, customStaffPresets)) ||
+      (selectedPreset == null &&
+        shouldShowComposeMenuHeader(null, undefined, formData.booking_type))
+    if (
+      guestComposableMenu &&
+      (!formData.menu_selection || !formData.menu_selection.items || formData.menu_selection.items.length === 0)
+    ) {
+      newErrors.menu = 'Scegli almeno un piatto dal menù!'
+      isValid = false
+      if (!firstErrorKey) firstErrorKey = 'menu'
     }
 
     setErrors(newErrors)
@@ -362,7 +365,7 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
     return isValid
   }
 
-  /** Dopo eventuale OK su orario passato: capienza → eventuale modale → creazione. */
+  /** Dopo eventuale OK su orario passato: capienza → modale → creazione. */
   const continueSubmitAfterPastTimeCheck = () => {
     setCapacityWarningOverride(null)
 

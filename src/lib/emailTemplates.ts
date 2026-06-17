@@ -14,6 +14,27 @@ export interface TenantInfo {
 
 export type { BookingEmailSummaryContext }
 
+export interface EmailTemplateOverrides {
+  subject?: string
+  intro?: string
+  closing?: string
+}
+
+// ── Default testi cablati (esposti per placeholder UI e "Ripristina") ──────
+
+export const DEFAULT_ACCEPTED_SUBJECT = 'Prenotazione confermata'
+export const DEFAULT_ACCEPTED_INTRO = 'Siamo felici di confermare la tua prenotazione.'
+export const DEFAULT_ACCEPTED_CLOSING =
+  "Non vediamo l'ora di ospitarti.\nIn caso di necessità non esitare a contattarci."
+
+export const DEFAULT_REJECTED_SUBJECT = 'Prenotazione non disponibile'
+export const DEFAULT_REJECTED_INTRO =
+  'Ci dispiace informarti che la tua richiesta di prenotazione non può essere confermata per la data richiesta.'
+export const DEFAULT_REJECTED_CLOSING =
+  "Ti invitiamo a scegliere un'altra data contattandoci direttamente.\n\nCi scusiamo per l'inconveniente."
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const BASE_STYLE = `
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -171,6 +192,11 @@ function buildSummaryBlock(
   return fallbackRows.length > 0 ? `<div class="info-box">${fallbackRows.join('')}</div>` : ''
 }
 
+/** Converte \n in <br> per il rendering HTML. */
+function nl2br(text: string): string {
+  return text.replace(/\n/g, '<br>')
+}
+
 /**
  * Email template: Booking Accepted
  */
@@ -178,8 +204,11 @@ export const getBookingAcceptedEmail = (
   booking: BookingRequest,
   tenantInfo?: TenantInfo,
   summaryContext?: BookingEmailSummaryContext,
+  overrides?: EmailTemplateOverrides,
 ) => {
-  const subject = 'Prenotazione confermata'
+  const subject = overrides?.subject?.trim() || DEFAULT_ACCEPTED_SUBJECT
+  const introText = overrides?.intro?.trim() || DEFAULT_ACCEPTED_INTRO
+  const closingText = overrides?.closing?.trim() || DEFAULT_ACCEPTED_CLOSING
   const summaryBlock = buildSummaryBlock(booking, summaryContext, 'accepted')
 
   const html = `
@@ -222,11 +251,11 @@ export const getBookingAcceptedEmail = (
 
         <p>Ciao <strong>${booking.client_name}</strong>,</p>
 
-        <p>Siamo felici di confermare la tua prenotazione.</p>
+        <p>${nl2br(introText)}</p>
 
         ${summaryBlock}
 
-        <p>Non vediamo l'ora di ospitarti.<br>In caso di necessità non esitare a contattarci.</p>
+        <p>${nl2br(closingText)}</p>
 
         <p>A presto,<br>${buildSignature(tenantInfo)}</p>
       </div>
@@ -248,8 +277,11 @@ export const getBookingRejectedEmail = (
   booking: BookingRequest,
   tenantInfo?: TenantInfo,
   summaryContext?: BookingEmailSummaryContext,
+  overrides?: EmailTemplateOverrides,
 ) => {
-  const subject = 'Prenotazione non disponibile'
+  const subject = overrides?.subject?.trim() || DEFAULT_REJECTED_SUBJECT
+  const introText = overrides?.intro?.trim() || DEFAULT_REJECTED_INTRO
+  const closingText = overrides?.closing?.trim() || DEFAULT_REJECTED_CLOSING
   const summaryBlock = buildSummaryBlock(booking, summaryContext, 'rejected')
 
   const html = `
@@ -282,13 +314,11 @@ export const getBookingRejectedEmail = (
       <div class="content">
         <p>Ciao <strong>${booking.client_name}</strong>,</p>
 
-        <p>Ci dispiace informarti che la tua richiesta di prenotazione non può essere confermata per la data richiesta.</p>
+        <p>${nl2br(introText)}</p>
 
         ${summaryBlock}
 
-        <p>Ti invitiamo a scegliere un'altra data contattandoci direttamente.</p>
-
-        <p>Ci scusiamo per l'inconveniente.</p>
+        <p>${nl2br(closingText)}</p>
 
         <p>Cordiali saluti,<br>${buildSignature(tenantInfo)}</p>
       </div>
@@ -363,5 +393,184 @@ export const getBookingCancelledEmail = (
   return { subject, html }
 }
 
+/**
+ * Email template: Promo/offerte — testo libero, nessun riepilogo prenotazione.
+ * Footer privacy fisso incluso.
+ */
+export const getPromoEmail = (
+  { subject, body }: { subject: string; body: string },
+  tenantInfo?: TenantInfo,
+) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        ${BASE_STYLE}
+        .header {
+          background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+          color: white;
+          padding: 30px;
+          text-align: center;
+          border-radius: 8px 8px 0 0;
+        }
+        .privacy-note {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #e5e7eb;
+          font-size: 12px;
+          color: #9ca3af;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Un messaggio per te</h1>
+      </div>
+
+      <div class="content">
+        <p>${nl2br(body)}</p>
+
+        <p>${buildSignature(tenantInfo)}</p>
+
+        <p class="privacy-note">Hai ricevuto questa email perché sei nostro cliente. Per non riceverne più, contattaci.</p>
+      </div>
+
+      <div class="footer">
+        <p>Questa è un'email automatica, non rispondere a questo messaggio.</p>
+      </div>
+    </body>
+    </html>
+  `
+
+  return { subject, html }
+}
+
 /** @deprecated Alias — usare getBookingAcceptedEmail. */
 export const getBookingConfirmationEmail = getBookingAcceptedEmail
+
+// ── Campagne email ────────────────────────────────────────────────────────────
+
+export const DEFAULT_CAMPAIGN_HEADING = 'Un messaggio per te'
+
+export interface CampaignLink {
+  label: string
+  url: string
+}
+
+export interface CampaignEmailInput {
+  subject: string
+  body: string
+  links: CampaignLink[]
+  heading?: string
+}
+
+/** Valida che un URL sia solo http o https (scarta javascript:, data:, ecc.). */
+export function isValidHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function autoLinkify(html: string): string {
+  // Trasforma https?://... e www.... in <a href>. Opera sull'HTML già escaped.
+  return html.replace(
+    /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/g,
+    (match, httpUrl, wwwUrl) => {
+      const href = httpUrl ?? `https://${wwwUrl}`
+      const display = escapeHtml(match)
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${display}</a>`
+    },
+  )
+}
+
+function buildCampaignLinksHtml(links: CampaignLink[]): string {
+  const valid = links.filter((l) => l.label.trim() && isValidHttpUrl(l.url))
+  if (valid.length === 0) return ''
+
+  const buttons = valid
+    .map(
+      (l) =>
+        `<a href="${l.url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;margin:4px 4px 4px 0;">${escapeHtml(l.label)}</a>`,
+    )
+    .join(' ')
+
+  return `<div style="margin:20px 0 16px;">${buttons}</div>`
+}
+
+/**
+ * Email template: Campagna promo — corpo con escape + auto-link, pulsanti link strutturati,
+ * footer privacy fisso. Nessun riepilogo prenotazione.
+ */
+export const getCampaignEmail = (
+  { subject, body, links, heading }: CampaignEmailInput,
+  tenantInfo?: TenantInfo,
+) => {
+  const escapedBody = escapeHtml(body)
+  const bodyWithBr = nl2br(escapedBody)
+  const bodyLinked = autoLinkify(bodyWithBr)
+  const linksHtml = buildCampaignLinksHtml(links)
+  const headingText = escapeHtml(heading?.trim() || DEFAULT_CAMPAIGN_HEADING)
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        ${BASE_STYLE}
+        .header {
+          background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+          color: white;
+          padding: 30px;
+          text-align: center;
+          border-radius: 8px 8px 0 0;
+        }
+        .privacy-note {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #e5e7eb;
+          font-size: 12px;
+          color: #9ca3af;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>${headingText}</h1>
+      </div>
+
+      <div class="content">
+        <p>${bodyLinked}</p>
+
+        ${linksHtml}
+
+        <p>${buildSignature(tenantInfo)}</p>
+
+        <p class="privacy-note">Hai ricevuto questa email perché sei nostro cliente. Per non riceverne più, contattaci.</p>
+      </div>
+
+      <div class="footer">
+        <p>Questa è un'email automatica, non rispondere a questo messaggio.</p>
+      </div>
+    </body>
+    </html>
+  `
+
+  return { subject, html }
+}

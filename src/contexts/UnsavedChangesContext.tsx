@@ -194,6 +194,10 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
   }, [closeGuard])
 
   const handleSaveAndContinue = useCallback(async () => {
+    if (hasBlockingOperations) {
+      toast.warn(BLOCKING_TOAST_MESSAGE)
+      return
+    }
     setGuardPending(true)
     try {
       await runSaveAllDirty()
@@ -201,7 +205,7 @@ export const UnsavedChangesProvider: React.FC<{ children: React.ReactNode }> = (
     } catch {
       setGuardPending(false)
     }
-  }, [closeGuard, runSaveAllDirty])
+  }, [closeGuard, hasBlockingOperations, runSaveAllDirty])
 
   const handleDiscardAndContinue = useCallback(() => {
     runDiscardAllDirty()

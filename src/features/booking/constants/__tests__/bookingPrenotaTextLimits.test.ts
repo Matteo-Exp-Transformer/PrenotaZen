@@ -10,10 +10,10 @@ import {
 } from '../bookingPrenotaTextLimits'
 
 describe('bookingPrenotaTextLimits', () => {
-  it('restaurantName max 40', () => {
-    expect(BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName).toBe(40)
+  it('restaurantName max 45', () => {
+    expect(BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName).toBe(45)
     expect(clampBookingText('x'.repeat(50), BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName)).toHaveLength(
-      40,
+      45,
     )
   })
 

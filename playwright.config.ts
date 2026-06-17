@@ -16,10 +16,10 @@ if (!process.env.E2E_SUPABASE_SERVICE_KEY && process.env.SUPABASE_SERVICE_ROLE_K
  * Credenziali da impostare in .env.local.test (gitignored):
  *   VITE_SUPABASE_URL=https://<staging-project>.supabase.co
  *   VITE_SUPABASE_ANON_KEY=<staging-anon-key>
- *   E2E_ADMIN_EMAIL=admin-classic@test.local
- *   E2E_ADMIN_PASSWORD=TestE2E2026!
- *   E2E_TENANT_SLUG=ristorante-test-classic
- *   E2E_CLASSIC_TENANT_ID=22222222-2222-2222-2222-222222222222
+ *   E2E_ADMIN_EMAIL=testc@c.com
+ *   E2E_ADMIN_PASSWORD=123456
+ *   E2E_TENANT_SLUG=test-classic
+ *   E2E_CLASSIC_TENANT_ID=c97a2fa5-3675-4578-ad23-654ae71d06a7
  *   E2E_SUPABASE_SERVICE_KEY=<service-role-key-staging>
  */
 export default defineConfig({

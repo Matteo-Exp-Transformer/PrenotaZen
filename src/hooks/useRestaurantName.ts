@@ -8,10 +8,11 @@ import { useTenantContext } from '@/contexts/TenantContext'
 
 /**
  * Legge `restaurant_name` da restaurant_settings (anon) per il tenant corrente.
- * Fallback a `organizationName` (tabella organizations) se la riga non esiste o è vuota.
+ * Nessun fallback inventato: se assente/vuoto restituisce null (Pagina Prenota senza titolo finto).
+ * L'admin shell usa fallback locali (`organizationName`, testo di sistema) dove serve.
  */
 export const useRestaurantName = (): string | null => {
-  const { tenantId, organizationName } = useTenantContext()
+  const { tenantId } = useTenantContext()
 
   const { data } = useQuery({
     queryKey: ['restaurant_settings', 'restaurant_name', tenantId],
@@ -42,5 +43,5 @@ export const useRestaurantName = (): string | null => {
     refetchInterval: 10 * 60 * 1000,
   })
 
-  return (data && data.length > 0 ? data : null) ?? organizationName
+  return data && data.length > 0 ? data : null
 }

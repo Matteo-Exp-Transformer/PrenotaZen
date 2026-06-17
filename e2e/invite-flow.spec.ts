@@ -6,10 +6,12 @@
  */
 import { test, expect } from '@playwright/test'
 
-const VALID_TOKEN = process.env.E2E_VALID_INVITE_TOKEN || 'valid-test-token-000'
+const VALID_TOKEN = process.env.E2E_VALID_INVITE_TOKEN ?? ''
+const hasValidInviteToken = Boolean(VALID_TOKEN)
 
 test.describe('Flusso invito admin', () => {
   test('token valido mostra il form di registrazione', async ({ page }) => {
+    test.skip(!hasValidInviteToken, 'richiede E2E_VALID_INVITE_TOKEN reale in .env.local.test')
     await page.goto(`/invite/${VALID_TOKEN}`)
 
     // La pagina deve mostrare un form di registrazione, non un errore
@@ -29,6 +31,7 @@ test.describe('Flusso invito admin', () => {
   })
 
   test('vecchio URL /register?token= funziona per retrocompatibilità', async ({ page }) => {
+    test.skip(!hasValidInviteToken, 'richiede E2E_VALID_INVITE_TOKEN reale in .env.local.test')
     await page.goto(`/register?token=${VALID_TOKEN}`)
 
     // Deve mostrare lo stesso form del percorso /invite/:token
@@ -38,6 +41,7 @@ test.describe('Flusso invito admin', () => {
   })
 
   test('registrazione OK con token valido', async ({ page }) => {
+    test.skip(!hasValidInviteToken, 'richiede E2E_VALID_INVITE_TOKEN reale in .env.local.test')
     await page.goto(`/invite/${VALID_TOKEN}`)
 
     const passwordInput = page.locator('input[type="password"]').first()

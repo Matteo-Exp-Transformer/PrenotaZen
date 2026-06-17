@@ -1264,11 +1264,19 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
         })
         await refetchMenuItems()
         await refetchCategories()
+        setPriceInput('')
+        setPhotoFile(null)
+        setPhotoPreviewUrl(null)
+        setCurrentImageUrl(null)
         setFormData({
-          ...formData,
-          ...payload,
+          name: '',
+          category: categoryKeys[0] ?? '',
+          price: 0,
+          description: '',
+          sort_order: 0,
         })
-        setPriceInput(parsedPrice === 0 ? '' : String(parsedPrice))
+        setIsAdding(false)
+        setEditingId(null)
       } else {
         const created = await createMutation.mutateAsync(payload)
         // Upload foto dopo la creazione (serve l'id)

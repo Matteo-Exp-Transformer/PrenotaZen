@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Store, Loader2, Eye, Clock, Plus, Trash2 } from 'lucide-react'
+import { Store, Loader2, Eye, Clock, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -40,6 +40,8 @@ import {
   BOOKING_STRIP_PHOTO_IDS,
   bookingFullPageBackgroundPublicHref,
   bookingStripPhotoPublicHref,
+  hydrateAdminBookingBackgroundEditor,
+  isAdminBookingBackgroundDirty,
   type BookingPageBackgroundId,
   type BookingStripPhotoId,
 } from '@/features/booking/constants/bookingPageBackground'
@@ -48,7 +50,7 @@ import {
   DEFAULT_APP_THEME,
   type AppThemeId,
 } from '@/features/booking/constants/appTheme'
-import { BookingFormConfigPanel } from './settings/BookingFormConfigPanel'
+import { BookingFormConfigPanel, type BookingFormConfigPanelHandle } from './settings/BookingFormConfigPanel'
 import { SETTINGS_AUTOSAVE_ENABLED } from '@/config/settingsAutosave'
 import { useDebouncedSettingsAutosave } from '@/features/booking/hooks/useDebouncedSettingsAutosave'
 import {
@@ -56,9 +58,22 @@ import {
   PublicDataSaveConfirmModal,
   SettingsSaveFooter,
 } from './settings/SettingsSaveUi'
-import { BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS } from '@/features/booking/constants/bookingPrenotaTextLimits'
+import { BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS, clampBookingText } from '@/features/booking/constants/bookingPrenotaTextLimits'
+import { useFormValidationAttention } from '@/features/booking/hooks/useFormValidationAttention'
+import { getFormFieldAttentionProps } from '@/features/booking/utils/formValidationAttention'
+
+/** Mappa errorKey → id DOM per scroll+pulse al primo errore del Salva (FIX 4, 16-06-26). Ordine di
+ *  priorità = ordine visivo top-down della pagina: nome locale → orari → fasce. */
+const SETTINGS_ERROR_FIELD_IDS: Record<string, string> = {
+  restaurant_name: 'settings-error-restaurant-name',
+  business_hours: 'settings-error-business-hours',
+  time_slots: 'settings-error-time-slots',
+}
 
 const RESTAURANT_NAME_MAX_LENGTH = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName
+const CONTACT_EMAIL_MAX_LENGTH = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.contactEmail
+const CONTACT_PHONE_MAX_LENGTH = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.contactPhone
+const CONTACT_ADDRESS_MAX_LENGTH = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.contactAddress
 const SLOT_NAME_MAX_LENGTH = 40
 const TEMP_SLOT_ID_PREFIX = 'temp-'
 const isTempSlotId = (id: string) => id.startsWith(TEMP_SLOT_ID_PREFIX)
@@ -69,6 +84,11 @@ type EditingSlot = {
   start_time: string
   end_time: string
   display_order: number
+}
+
+type SettingsValidationIssue = {
+  key: keyof typeof SETTINGS_ERROR_FIELD_IDS
+  message: string
 }
 
 function validateEditingSlots(slots: EditingSlot[]): string | null {
@@ -98,7 +118,7 @@ const previewPickFocusRingClass =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 sm:focus-visible:ring-offset-2'
 
 const previewPickEyeButtonClass =
-  'absolute left-1/2 top-1/2 z-[10] flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-0 bg-black/50 text-white shadow-md transition-opacity duration-200 sm:min-h-[3rem] sm:min-w-[3rem] pointer-events-none opacity-0 [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:opacity-100 max-sm:pointer-events-auto max-sm:opacity-100 max-sm:bg-black/45 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100 [@media(pointer:coarse)]:bg-black/45'
+  'absolute left-1/2 top-1/2 z-[10] flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-0 bg-black/50 text-white opacity-0 shadow-md transition-opacity duration-200 sm:min-h-[3rem] sm:min-w-[3rem] [@media(hover:hover)]:group-hover:opacity-100 max-sm:opacity-100 max-sm:bg-black/45 [@media(pointer:coarse)]:opacity-100 [@media(pointer:coarse)]:bg-black/45'
 
 const previewPickHoverScaleClass =
   'h-full w-full transition-transform duration-300 ease-out [@media(hover:hover)]:group-hover:scale-105'
@@ -329,16 +349,24 @@ export const RestaurantSettingsTab: React.FC = () => {
   const stripPhotoQuery = useRestaurantSetting('public_booking_strip_photo')
   const appThemeQuery = useRestaurantSetting('app_theme', { authenticated: true })
   const upsert = useUpsertRestaurantSetting()
+  const { attentionFieldKey, clearAttentionField, focusFirstValidationIssue } =
+    useFormValidationAttention({ errorFieldIds: SETTINGS_ERROR_FIELD_IDS })
 
   const [publicSaveConfirmOpen, setPublicSaveConfirmOpen] = useState(false)
+  const formConfigPanelRef = useRef<BookingFormConfigPanelHandle>(null)
+  const [formPanelDirty, setFormPanelDirty] = useState(false)
+  const formPanelDirtyRef = useRef(false)
+  formPanelDirtyRef.current = formPanelDirty
   const [anagraficaDirty, setAnagraficaDirty] = useState(false)
   const [hoursDirty, setHoursDirty] = useState(false)
   const [themeDirty, setThemeDirty] = useState(false)
   const [slotsDirty, setSlotsDirty] = useState(false)
   const anagraficaFooterDirty = SETTINGS_AUTOSAVE_ENABLED ? false : anagraficaDirty
   const dirty = anagraficaFooterDirty || hoursDirty || themeDirty || slotsDirty
+  const combinedDirty = dirty || formPanelDirty
   const dirtyRef = useRef(false)
   dirtyRef.current = dirty
+  const combinedSaveInFlightRef = useRef(false)
   const bookingBgDirtyRef = useRef(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [slotCapacities, setSlotCapacities] = useState<Record<string, number | ''>>({})
@@ -355,6 +383,7 @@ export const RestaurantSettingsTab: React.FC = () => {
   const [slotValidationError, setSlotValidationError] = useState<string | null>(null)
   const [businessHours, setBusinessHours] = useState<BusinessHours>(() => getDefaultBusinessHours())
   const businessHoursValidationError = validateBusinessHours(businessHours)
+  const combinedSaveDisabled = upsert.isPending || !tenantId
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactAddress, setContactAddress] = useState('')
@@ -439,16 +468,18 @@ export const RestaurantSettingsTab: React.FC = () => {
   }, [tenantId, clearUnsavedSource])
 
   useEffect(() => {
-    registerUnsavedSource('restaurant-settings', 'Anagrafica azienda', dirty)
+    registerUnsavedSource('restaurant-settings', 'Impostazioni locale', combinedDirty)
     return () => {
-      if (!dirtyRef.current) clearUnsavedSource('restaurant-settings')
+      if (!dirtyRef.current && !formPanelDirtyRef.current) clearUnsavedSource('restaurant-settings')
     }
-  }, [clearUnsavedSource, dirty, registerUnsavedSource])
+  }, [clearUnsavedSource, combinedDirty, registerUnsavedSource])
 
-  const savedBookingPageBackground = publicBookingPageBgQuery.data ?? DEFAULT_BOOKING_PAGE_BACKGROUND
+  const savedBookingPageBackground = publicBookingPageBgQuery.data ?? null
   const savedStripPhoto = stripPhotoQuery.data ?? null
-  const bookingBgDirty =
-    bookingPageBackground !== savedBookingPageBackground || stripPhoto !== savedStripPhoto
+  const bookingBgDirty = isAdminBookingBackgroundDirty(
+    { stripPhotoId: savedStripPhoto, pageBackground: savedBookingPageBackground },
+    { stripPhoto, pageBackground: bookingPageBackground },
+  )
   bookingBgDirtyRef.current = bookingBgDirty
 
   const allSuccess =
@@ -491,14 +522,22 @@ export const RestaurantSettingsTab: React.FC = () => {
     })))
     setInitialSlotIds(slots.map((s: SlotConfig) => s.id))
     setBusinessHours(hoursQuery.data ?? getDefaultBusinessHours())
-    setContactEmail(stripDirectionalFormattingChars(contactEmailQuery.data ?? ''))
-    setContactPhone(stripDirectionalFormattingChars(contactPhoneQuery.data ?? ''))
-    setContactAddress(stripDirectionalFormattingChars(contactAddressQuery.data ?? ''))
-    const resolvedBg = publicBookingPageBgQuery.data ?? DEFAULT_BOOKING_PAGE_BACKGROUND
-    setBookingPageBackground(resolvedBg)
-    const resolvedStripPhoto = stripPhotoQuery.data ?? null
-    setStripPhoto(resolvedStripPhoto)
-    setBookingBgMode(resolvedStripPhoto ? 'strip' : 'full')
+    setContactEmail(
+      clampBookingText(stripDirectionalFormattingChars(contactEmailQuery.data ?? ''), CONTACT_EMAIL_MAX_LENGTH),
+    )
+    setContactPhone(
+      clampBookingText(stripDirectionalFormattingChars(contactPhoneQuery.data ?? ''), CONTACT_PHONE_MAX_LENGTH),
+    )
+    setContactAddress(
+      clampBookingText(stripDirectionalFormattingChars(contactAddressQuery.data ?? ''), CONTACT_ADDRESS_MAX_LENGTH),
+    )
+    const bgEditor = hydrateAdminBookingBackgroundEditor({
+      stripPhotoId: stripPhotoQuery.data ?? null,
+      pageBackground: publicBookingPageBgQuery.data ?? null,
+    })
+    setBookingPageBackground(bgEditor.pageBackground)
+    setStripPhoto(bgEditor.stripPhoto)
+    setBookingBgMode(bgEditor.mode)
     setAppTheme(appThemeQuery.data ?? DEFAULT_APP_THEME)
     hydratedRef.current = true
   }, [
@@ -555,9 +594,15 @@ export const RestaurantSettingsTab: React.FC = () => {
     setRestaurantName(
       stripDirectionalFormattingChars(String(nameQuery.data ?? '')).slice(0, RESTAURANT_NAME_MAX_LENGTH),
     )
-    setContactEmail(stripDirectionalFormattingChars(contactEmailQuery.data ?? ''))
-    setContactPhone(stripDirectionalFormattingChars(contactPhoneQuery.data ?? ''))
-    setContactAddress(stripDirectionalFormattingChars(contactAddressQuery.data ?? ''))
+    setContactEmail(
+      clampBookingText(stripDirectionalFormattingChars(contactEmailQuery.data ?? ''), CONTACT_EMAIL_MAX_LENGTH),
+    )
+    setContactPhone(
+      clampBookingText(stripDirectionalFormattingChars(contactPhoneQuery.data ?? ''), CONTACT_PHONE_MAX_LENGTH),
+    )
+    setContactAddress(
+      clampBookingText(stripDirectionalFormattingChars(contactAddressQuery.data ?? ''), CONTACT_ADDRESS_MAX_LENGTH),
+    )
   }
 
   const hydrateHoursFromQueries = () => {
@@ -597,11 +642,13 @@ export const RestaurantSettingsTab: React.FC = () => {
     hydrateAnagraficaFromQueries()
     hydrateSlotsFromQueries()
     hydrateHoursFromQueries()
-    const resolvedBg = publicBookingPageBgQuery.data ?? DEFAULT_BOOKING_PAGE_BACKGROUND
-    setBookingPageBackground(resolvedBg)
-    const resolvedStripPhoto = stripPhotoQuery.data ?? null
-    setStripPhoto(resolvedStripPhoto)
-    setBookingBgMode(resolvedStripPhoto ? 'strip' : 'full')
+    const bgEditor = hydrateAdminBookingBackgroundEditor({
+      stripPhotoId: stripPhotoQuery.data ?? null,
+      pageBackground: publicBookingPageBgQuery.data ?? null,
+    })
+    setBookingPageBackground(bgEditor.pageBackground)
+    setStripPhoto(bgEditor.stripPhoto)
+    setBookingBgMode(bgEditor.mode)
     hydrateThemeFromQueries()
   }
 
@@ -609,6 +656,27 @@ export const RestaurantSettingsTab: React.FC = () => {
     anagraficaAutosave.cancelPending()
     hydrateLocalSettingsFromQueries()
     clearAllSectionDirty()
+  }
+
+  const handleCombinedDiscard = () => {
+    handleCancelChanges()
+    formConfigPanelRef.current?.discardAll()
+  }
+
+  const handleCombinedSave = async () => {
+    if (combinedSaveInFlightRef.current || upsert.isPending) {
+      throw new Error('Combined save already in progress')
+    }
+    combinedSaveInFlightRef.current = true
+    try {
+      if (dirtyRef.current) {
+        const settingsSaved = await handleSave()
+        if (!settingsSaved) throw new Error('Settings validation failed')
+      }
+      await formConfigPanelRef.current?.saveAll()
+    } finally {
+      combinedSaveInFlightRef.current = false
+    }
   }
 
   const refetchRestaurantSettings = async () => {
@@ -702,9 +770,13 @@ export const RestaurantSettingsTab: React.FC = () => {
   }
 
   const handleCancelBookingBackgroundOnly = () => {
-    setBookingPageBackground(savedBookingPageBackground)
-    setStripPhoto(savedStripPhoto)
-    setBookingBgMode(savedStripPhoto ? 'strip' : 'full')
+    const bgEditor = hydrateAdminBookingBackgroundEditor({
+      stripPhotoId: savedStripPhoto,
+      pageBackground: savedBookingPageBackground,
+    })
+    setBookingPageBackground(bgEditor.pageBackground)
+    setStripPhoto(bgEditor.stripPhoto)
+    setBookingBgMode(bgEditor.mode)
   }
 
   const handleRestaurantNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -742,6 +814,30 @@ export const RestaurantSettingsTab: React.FC = () => {
     setEditingSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, name: safe } : s)))
   }
 
+  /** Riordino manuale fasce (FIX 3, 16-06-26): frecce Su/Giù, come ordine categorie Menu QR — niente
+   *  drag&drop riusabile in app. display_order persistito riassegnato come index al Salva da
+   *  `persistServiceSlots()`; le capienze restano agganciate perché indicizzate per `id`, non per
+   *  posizione. */
+  const moveSlotUp = (idx: number) => {
+    if (idx <= 0) return
+    setSlotsDirty(true)
+    setEditingSlots((prev) => {
+      const next = [...prev]
+      ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+      return next
+    })
+  }
+
+  const moveSlotDown = (idx: number) => {
+    setSlotsDirty(true)
+    setEditingSlots((prev) => {
+      if (idx >= prev.length - 1) return prev
+      const next = [...prev]
+      ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+      return next
+    })
+  }
+
   const handleRequestRemoveSlot = (slot: EditingSlot) => {
     setDeleteConfirmSlot(slot)
   }
@@ -761,69 +857,99 @@ export const RestaurantSettingsTab: React.FC = () => {
     setDeleteConfirmSlot(null)
   }
 
-  const handleSave = async () => {
-    if (businessHoursValidationError) {
-      toast.error(businessHoursValidationError)
-      return
+  const getSettingsValidationIssue = (): SettingsValidationIssue | null => {
+    // FIX 4 (16-06-26): priorità = ordine visivo top-down della pagina (nome → orari → fasce), non
+    // ordine dei controlli — scroll+pulse devono portare l'utente al PRIMO campo che vede, non al
+    // primo controllo che fallisce nel codice.
+    if (!restaurantName.trim()) {
+      return { key: 'restaurant_name', message: 'Il nome del ristorante è obbligatorio' }
     }
-
+    if (businessHoursValidationError) {
+      return { key: 'business_hours', message: businessHoursValidationError }
+    }
     if (!features.servizio && timeSlotsEnabled) {
-      const validationError = validateEditingSlots(editingSlots)
-      if (validationError) {
-        setSlotValidationError(validationError)
-        toast.error(validationError)
+      const slotsValidationError = validateEditingSlots(editingSlots)
+      if (slotsValidationError) return { key: 'time_slots', message: slotsValidationError }
+    }
+    return null
+  }
+
+  const reportSettingsValidationIssue = (issue: SettingsValidationIssue) => {
+    if (issue.key === 'time_slots') {
+      setSlotValidationError(issue.message)
+    }
+    toast.error(issue.message)
+    focusFirstValidationIssue(issue.key)
+  }
+
+  const handleFooterSaveClick = () => {
+    if (dirtyRef.current) {
+      const validationIssue = getSettingsValidationIssue()
+      if (validationIssue) {
+        reportSettingsValidationIssue(validationIssue)
         return
       }
     }
+    setPublicSaveConfirmOpen(true)
+  }
 
-    try {
-      const safeName = stripDirectionalFormattingChars(restaurantName).slice(0, RESTAURANT_NAME_MAX_LENGTH)
-      const safeEmail = stripDirectionalFormattingChars(contactEmail)
-      const safePhone = stripDirectionalFormattingChars(contactPhone)
-      const safeAddress = stripDirectionalFormattingChars(contactAddress)
-
-      setRestaurantName(safeName)
-      setContactEmail(safeEmail)
-      setContactPhone(safePhone)
-      setContactAddress(safeAddress)
-
-      const createdSlotIdMap = await persistServiceSlots()
-      const slotCapValue = buildSlotCapacitiesPayload(createdSlotIdMap)
-
-      await upsert.mutateAsync([
-        { key: 'restaurant_name', value: safeName },
-        { key: 'slot_guest_capacities', value: slotCapValue },
-        // '' = nessun limite → null: il registry lo serializza nella sentinella DB -1.
-        { key: 'daily_guest_limit', value: dailyGuestLimit === '' ? null : dailyGuestLimit },
-        { key: 'booking_time_slots_enabled', value: timeSlotsEnabled },
-        { key: 'business_hours', value: businessHours },
-        { key: 'contact_email', value: safeEmail },
-        { key: 'contact_phone', value: safePhone },
-        { key: 'contact_address', value: safeAddress },
-        { key: 'public_booking_page_background', value: bookingPageBackground },
-        { key: 'public_booking_strip_photo', value: stripPhoto },
-        { key: 'app_theme', value: appTheme },
-      ])
-      await refetchRestaurantSettings()
-
-      if (!features.servizio) {
-        await refreshSlotsStateAfterSave(createdSlotIdMap)
-      }
-
-      setSlotValidationError(null)
-      clearAllSectionDirty()
-    } catch {
-      /* toast gestito da useUpsertRestaurantSetting.onError */
+  const handleSave = async (): Promise<boolean> => {
+    const validationIssue = getSettingsValidationIssue()
+    if (validationIssue) {
+      reportSettingsValidationIssue(validationIssue)
+      return false
     }
+    setSlotValidationError(null)
+
+    const safeName = normalizeAnagraficaName(restaurantName)
+    const safeEmail = clampBookingText(stripDirectionalFormattingChars(contactEmail), CONTACT_EMAIL_MAX_LENGTH)
+    const safePhone = clampBookingText(stripDirectionalFormattingChars(contactPhone), CONTACT_PHONE_MAX_LENGTH)
+    const safeAddress = clampBookingText(stripDirectionalFormattingChars(contactAddress), CONTACT_ADDRESS_MAX_LENGTH)
+
+    setRestaurantName(safeName)
+    setContactEmail(safeEmail)
+    setContactPhone(safePhone)
+    setContactAddress(safeAddress)
+
+    const createdSlotIdMap = await persistServiceSlots()
+    const slotCapValue = buildSlotCapacitiesPayload(createdSlotIdMap)
+
+    await upsert.mutateAsync([
+      { key: 'restaurant_name', value: safeName },
+      { key: 'slot_guest_capacities', value: slotCapValue },
+      // '' = nessun limite → null: il registry lo serializza nella sentinella DB -1.
+      { key: 'daily_guest_limit', value: dailyGuestLimit === '' ? null : dailyGuestLimit },
+      { key: 'booking_time_slots_enabled', value: timeSlotsEnabled },
+      { key: 'business_hours', value: businessHours },
+      { key: 'contact_email', value: safeEmail },
+      { key: 'contact_phone', value: safePhone },
+      { key: 'contact_address', value: safeAddress },
+      ...(bookingBgDirty
+        ? ([
+            { key: 'public_booking_page_background' as const, value: bookingPageBackground },
+            { key: 'public_booking_strip_photo' as const, value: stripPhoto },
+          ] as const)
+        : []),
+      { key: 'app_theme', value: appTheme },
+    ])
+    await refetchRestaurantSettings()
+
+    if (!features.servizio) {
+      await refreshSlotsStateAfterSave(createdSlotIdMap)
+    }
+
+    setSlotValidationError(null)
+    clearAllSectionDirty()
+    return true
   }
 
   useEffect(() => {
     registerUnsavedHandlers('restaurant-settings', {
-      saveAll: handleSave,
-      discardAll: handleCancelChanges,
+      saveAll: handleCombinedSave,
+      discardAll: handleCombinedDiscard,
     })
     return () => registerUnsavedHandlers('restaurant-settings', null)
-  }, [handleCancelChanges, handleSave, registerUnsavedHandlers])
+  }, [handleCombinedDiscard, handleCombinedSave, registerUnsavedHandlers])
 
   if (loadError) {
     return (
@@ -1012,6 +1138,9 @@ export const RestaurantSettingsTab: React.FC = () => {
 
       {settingsTab === 'form' && (
         <BookingFormConfigPanel
+          ref={formConfigPanelRef}
+          hideSaveUi
+          onDirtyChange={setFormPanelDirty}
           afterBookingModesSection={
             bookingPageBackgroundSection
           }
@@ -1027,7 +1156,17 @@ export const RestaurantSettingsTab: React.FC = () => {
       <section className={sectionSurfaceClass}>
         <h3 className="text-lg font-semibold text-slate-800">Anagrafica Azienda</h3>
         <div className="flex w-full flex-col items-center">
-          <div className={anagraficaFieldWrapClass}>
+          <div
+            id={SETTINGS_ERROR_FIELD_IDS.restaurant_name}
+            className={cn(
+              anagraficaFieldWrapClass,
+              'rounded-2xl',
+              getFormFieldAttentionProps('restaurant_name', attentionFieldKey, clearAttentionField).className,
+            )}
+            onPointerDown={
+              getFormFieldAttentionProps('restaurant_name', attentionFieldKey, clearAttentionField).onPointerDown
+            }
+          >
             <Label htmlFor="restaurant_name" className="block w-full text-center">
               Nome ristorante
             </Label>
@@ -1070,12 +1209,23 @@ export const RestaurantSettingsTab: React.FC = () => {
               className={anagraficaInputClassName}
               onChange={(e) => {
                 if (!SETTINGS_AUTOSAVE_ENABLED) setAnagraficaDirty(true)
-                setContactEmail(stripDirectionalFormattingChars(e.target.value))
+                setContactEmail(
+                  clampBookingText(stripDirectionalFormattingChars(e.target.value), CONTACT_EMAIL_MAX_LENGTH),
+                )
                 anagraficaAutosave.notifyFieldChange('contact_email')
               }}
               onBlur={() => anagraficaAutosave.flushField('contact_email')}
               placeholder="ristorante@example.com"
+              maxLength={CONTACT_EMAIL_MAX_LENGTH}
             />
+            <p
+              className={cn(
+                'text-right text-[11px] tabular-nums',
+                contactEmail.length >= CONTACT_EMAIL_MAX_LENGTH ? 'text-red-500' : 'text-slate-400',
+              )}
+            >
+              {contactEmail.length}/{CONTACT_EMAIL_MAX_LENGTH}
+            </p>
             {SETTINGS_AUTOSAVE_ENABLED ? (
               <FieldAutosaveIndicator status={anagraficaAutosave.fieldStatus.contact_email} />
             ) : null}
@@ -1091,12 +1241,23 @@ export const RestaurantSettingsTab: React.FC = () => {
               className={anagraficaInputClassName}
               onChange={(e) => {
                 if (!SETTINGS_AUTOSAVE_ENABLED) setAnagraficaDirty(true)
-                setContactPhone(stripDirectionalFormattingChars(e.target.value))
+                setContactPhone(
+                  clampBookingText(stripDirectionalFormattingChars(e.target.value), CONTACT_PHONE_MAX_LENGTH),
+                )
                 anagraficaAutosave.notifyFieldChange('contact_phone')
               }}
               onBlur={() => anagraficaAutosave.flushField('contact_phone')}
               placeholder="+39 ..."
+              maxLength={CONTACT_PHONE_MAX_LENGTH}
             />
+            <p
+              className={cn(
+                'text-right text-[11px] tabular-nums',
+                contactPhone.length >= CONTACT_PHONE_MAX_LENGTH ? 'text-red-500' : 'text-slate-400',
+              )}
+            >
+              {contactPhone.length}/{CONTACT_PHONE_MAX_LENGTH}
+            </p>
             {SETTINGS_AUTOSAVE_ENABLED ? (
               <FieldAutosaveIndicator status={anagraficaAutosave.fieldStatus.contact_phone} />
             ) : null}
@@ -1112,12 +1273,23 @@ export const RestaurantSettingsTab: React.FC = () => {
               className={anagraficaInputClassName}
               onChange={(e) => {
                 if (!SETTINGS_AUTOSAVE_ENABLED) setAnagraficaDirty(true)
-                setContactAddress(stripDirectionalFormattingChars(e.target.value))
+                setContactAddress(
+                  clampBookingText(stripDirectionalFormattingChars(e.target.value), CONTACT_ADDRESS_MAX_LENGTH),
+                )
                 anagraficaAutosave.notifyFieldChange('contact_address')
               }}
               onBlur={() => anagraficaAutosave.flushField('contact_address')}
               placeholder="Via ..., Citta, CAP"
+              maxLength={CONTACT_ADDRESS_MAX_LENGTH}
             />
+            <p
+              className={cn(
+                'text-right text-[11px] tabular-nums',
+                contactAddress.length >= CONTACT_ADDRESS_MAX_LENGTH ? 'text-red-500' : 'text-slate-400',
+              )}
+            >
+              {contactAddress.length}/{CONTACT_ADDRESS_MAX_LENGTH}
+            </p>
             {SETTINGS_AUTOSAVE_ENABLED ? (
               <FieldAutosaveIndicator status={anagraficaAutosave.fieldStatus.contact_address} />
             ) : null}
@@ -1126,8 +1298,19 @@ export const RestaurantSettingsTab: React.FC = () => {
       </section>
       </div>
 
-      <div className="w-full max-w-2xl mx-auto">
-      <section className={sectionSurfaceClass}>
+      <div
+        id={SETTINGS_ERROR_FIELD_IDS.business_hours}
+        className="w-full max-w-2xl mx-auto rounded-xl"
+      >
+      <section
+        className={cn(
+          sectionSurfaceClass,
+          getFormFieldAttentionProps('business_hours', attentionFieldKey, clearAttentionField).className,
+        )}
+        onPointerDown={
+          getFormFieldAttentionProps('business_hours', attentionFieldKey, clearAttentionField).onPointerDown
+        }
+      >
         <h3 className="text-lg font-semibold text-slate-800">Orari di apertura</h3>
         <p className="text-sm text-slate-600">
           Modifica gli orari visibili al pubblico nella pagina di Prenotazione.
@@ -1190,8 +1373,19 @@ export const RestaurantSettingsTab: React.FC = () => {
       </div>
 
       {!features.servizio && (
-      <div className="w-full max-w-2xl mx-auto">
-      <section className={sectionSurfaceClass}>
+      <div
+        id={SETTINGS_ERROR_FIELD_IDS.time_slots}
+        className="w-full max-w-2xl mx-auto rounded-xl"
+      >
+      <section
+        className={cn(
+          sectionSurfaceClass,
+          getFormFieldAttentionProps('time_slots', attentionFieldKey, clearAttentionField).className,
+        )}
+        onPointerDown={
+          getFormFieldAttentionProps('time_slots', attentionFieldKey, clearAttentionField).onPointerDown
+        }
+      >
         <div className="mb-5 w-full space-y-1.5 md:mb-6">
           <h3 className="text-center text-lg font-semibold leading-tight text-slate-800">
             Imposta Fasce Orarie
@@ -1264,8 +1458,28 @@ export const RestaurantSettingsTab: React.FC = () => {
                 className="w-full rounded-xl border bg-white/75 p-4 text-center shadow-md backdrop-blur-[2px]"
                 style={{ borderColor: ADMIN_WARM_BORDER }}
               >
-                {/* Riga nome fascia + bottone elimina */}
+                {/* Riga nome fascia + frecce ordine + bottone elimina */}
                 <div className="mb-3 flex items-center justify-center gap-2">
+                  <div className="flex shrink-0 flex-col gap-0.5">
+                    <button
+                      type="button"
+                      disabled={upsert.isPending || idx === 0}
+                      onClick={() => moveSlotUp(idx)}
+                      className="rounded p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30"
+                      aria-label={`Sposta su fascia ${slot.name}`}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={upsert.isPending || idx === editingSlots.length - 1}
+                      onClick={() => moveSlotDown(idx)}
+                      className="rounded p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30"
+                      aria-label={`Sposta giù fascia ${slot.name}`}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
                   <Input
                     aria-label={`Nome fascia ${idx + 1}`}
                     value={slot.name}
@@ -1439,13 +1653,13 @@ export const RestaurantSettingsTab: React.FC = () => {
       </React.Fragment>
       )}
 
-      {settingsTab === 'anagrafica' && dirty && (
+      {combinedDirty && (
         <SettingsSaveFooter
-          onCancel={handleCancelChanges}
-          onSave={() => setPublicSaveConfirmOpen(true)}
+          onCancel={handleCombinedDiscard}
+          onSave={handleFooterSaveClick}
           pending={upsert.isPending}
-          cancelDisabled={upsert.isPending || !dirty}
-          saveDisabled={upsert.isPending || !tenantId || businessHoursValidationError != null}
+          cancelDisabled={upsert.isPending || !combinedDirty}
+          saveDisabled={combinedSaveDisabled}
         />
       )}
 
@@ -1453,8 +1667,12 @@ export const RestaurantSettingsTab: React.FC = () => {
         isOpen={publicSaveConfirmOpen}
         pending={upsert.isPending}
         onConfirm={async () => {
-          await handleSave()
-          setPublicSaveConfirmOpen(false)
+          try {
+            await handleCombinedSave()
+            setPublicSaveConfirmOpen(false)
+          } catch {
+            /* toast gestito da useUpsertRestaurantSetting / figlio; modale resta aperta */
+          }
         }}
         onCancel={() => setPublicSaveConfirmOpen(false)}
       />

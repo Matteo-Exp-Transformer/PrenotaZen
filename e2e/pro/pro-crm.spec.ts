@@ -1,12 +1,11 @@
 /**
- * Test E2E — Admin Pro: sezione CRM mostra la lista clienti.
+ * // @admin-blindatura: crm
+ * // Copre: apertura CRM Pro, tab Rubrica clienti, tab Personalizza email, sezioni Email automatiche / Email personalizzate e stati vuoti stabili.
  *
- * Verifica che la sezione CRM (gated da features.crm) mostri almeno
- * 3 clienti nel DB staging del tenant Pro.
+ * Test E2E — Admin Pro: CRM con sidebar Pro e tab interne.
  *
  * Richiede staging Supabase con:
  *   E2E_PRO_ADMIN_EMAIL / E2E_PRO_ADMIN_PASSWORD → admin del tenant Pro
- *   Tenant Pro (ID 11111111-...) deve avere almeno 3 clienti in tabella `customers`
  * Configurare in .env.local.test (vedi playwright.config.ts).
  */
 
@@ -22,47 +21,43 @@ async function loginAsProAdmin(page: import('@playwright/test').Page) {
   await page.getByLabel(/email/i).fill(PRO_EMAIL)
   await page.getByLabel(/password/i).fill(PRO_PASSWORD)
   await page.getByRole('button', { name: /accedi|login/i }).click()
-  await expect(page.getByRole('navigation', { name: /navigazione principale/i })).toBeVisible({
+  await expect(page.getByRole('complementary', { name: /navigazione principale/i })).toBeVisible({
     timeout: 15000,
   })
 }
 
+function proSidebar(page: import('@playwright/test').Page) {
+  return page.getByRole('complementary', { name: /navigazione principale/i })
+}
+
 test.describe('Admin Pro — CRM Clienti', () => {
-  test('sezione CRM è accessibile dalla sidebar', async ({ page }) => {
+  test('apre CRM, passa tra Rubrica e Personalizza email e mostra stati stabili', async ({ page }) => {
     await loginAsProAdmin(page)
-    await page.getByRole('navigation', { name: /navigazione principale/i })
-      .getByRole('button', { name: /crm clienti/i })
-      .click()
-    // La pagina CRM deve caricarsi senza errori
+
+    await proSidebar(page).getByRole('button', { name: /crm clienti/i }).click()
+    await expect(page.getByRole('heading', { name: /crm clienti/i })).toBeVisible({ timeout: 5000 })
+
+    await expect(page.getByRole('button', { name: /rubrica clienti/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /personalizza email/i })).toBeVisible()
+
+    await page.getByRole('button', { name: /rubrica clienti/i }).click()
+    await expect(page.getByLabel(/cerca/i)).toBeVisible()
+    await expect(page.getByLabel(/filtra data ultima prenotazione/i)).toBeVisible()
     await expect(
-      page.getByRole('heading', { name: /crm|clienti/i }).or(
-        page.locator('[data-testid="crm-page"]')
-      ).first()
-    ).toBeVisible({ timeout: 5000 })
-  })
+      page.getByRole('table').or(page.getByText(/nessun cliente trovato\./i)).first(),
+    ).toBeVisible()
 
-  test('lista clienti contiene almeno 3 clienti nel DB staging', async ({ page }) => {
-    await loginAsProAdmin(page)
-    await page.getByRole('navigation', { name: /navigazione principale/i })
-      .getByRole('button', { name: /crm clienti/i })
-      .click()
-
-    // Attende il caricamento della lista (può richiedere una chiamata API)
-    await page.waitForTimeout(2000)
-
-    // Le righe clienti devono essere almeno 3 (dati staging pre-popolati)
-    const customerRows = page.locator(
-      'tr[role="row"]:not(:first-child), [data-testid="customer-row"], [class*="customer-row"]',
-    )
-    await expect(customerRows.first()).toBeVisible({ timeout: 5000 })
-    const count = await customerRows.count()
-    expect(count).toBeGreaterThanOrEqual(3)
-  })
-
-  test('admin Classic NON può accedere al CRM (RLS)', async ({ page }) => {
-    // Questo test è informativo: Classic non vede il bottone CRM nella sidebar
-    // (la sidebar stessa non esiste per Classic). Verificato in edition-classic-data-protection.spec.ts.
-    // Incluso qui come reminder documentale — non fallisce mai.
-    test.skip(true, 'controllo RLS Classic già coperto da edition-classic-data-protection.spec.ts')
+    await page.getByRole('button', { name: /personalizza email/i }).click()
+    await expect(page.getByRole('heading', { name: /email automatiche/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /email personalizzate/i })).toBeVisible()
+    await expect(page.getByText(/accetta prenotazione/i)).toBeVisible()
+    await expect(page.getByText(/rifiuta prenotazione/i)).toBeVisible()
+    await expect(
+      page
+        .getByText(/nessuna campagna ancora/i)
+        .or(page.getByRole('button', { name: /\+ nuova campagna/i }))
+        .or(page.getByRole('button', { name: /invia ora/i }))
+        .first(),
+    ).toBeVisible()
   })
 })

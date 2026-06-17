@@ -878,21 +878,15 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
       if (!firstErrorKey) firstErrorKey = 'menu'
     }
 
-    // Menu validation (card scorrevole con menù preselezionato collegato)
-    if (showMenuSelectionSection) {
-      if (
-        !activeSubTabUsesFixedPricing &&
-        (!formData.menu_selection || !formData.menu_selection.items || formData.menu_selection.items.length === 0)
-      ) {
-        newErrors.menu = 'Seleziona almeno un prodotto dal menù'
-        isValid = false
-        if (!firstErrorKey) firstErrorKey = 'menu'
-      }
-      if (!activeSubTabUsesFixedPricing && (!formData.menu_total_per_person || formData.menu_total_per_person <= 0)) {
-        newErrors.menu = 'Il totale a persona deve essere maggiore di 0'
-        isValid = false
-        if (!firstErrorKey) firstErrorKey = 'menu'
-      }
+    // Menù personalizzabile: almeno un piatto scelto (prezzo fisso sottotab: fuori scope).
+    if (
+      showMenuSelectionSection &&
+      !activeSubTabUsesFixedPricing &&
+      (!formData.menu_selection || !formData.menu_selection.items || formData.menu_selection.items.length === 0)
+    ) {
+      newErrors.menu = 'Scegli almeno un piatto dal menù!'
+      isValid = false
+      if (!firstErrorKey) firstErrorKey = 'menu'
     }
 
     // Privacy consent validation

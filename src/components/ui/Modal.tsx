@@ -54,6 +54,24 @@ export const Modal: React.FC<ModalProps> = ({
     }
   }, [isOpen, closeOnEscape, onClose])
 
+  // FIX 7 (16-06-26): inquadra il modale intero all'apertura. Niente z-index/struttura portal
+  // toccati (LOCK) — solo focus + scroll-into-view sul dialog già renderizzato, per evitare che
+  // un contenuto più alto del viewport apra "a metà" (centrato con titolo o footer fuori vista).
+  // Sincrono (niente rAF): l'effect scatta già dopo il commit DOM, e un ritardo in più rischia di
+  // cadere mentre l'utente ha già iniziato a digitare in un campo del modale, rubandogli il focus.
+  // Dipende solo da `isOpen`: una volta per apertura, non a ogni re-render del genitore.
+  useEffect(() => {
+    if (!isOpen) return
+    const dialog = modalRef.current
+    if (!dialog) return
+    dialog.focus({ preventScroll: true })
+    // jsdom (test) non implementa scrollIntoView: guardia per non far esplodere le suite che
+    // non lo stubbano esplicitamente — in browser reale è sempre presente.
+    if (typeof dialog.scrollIntoView === 'function') {
+      dialog.scrollIntoView({ block: 'start', behavior: 'auto' })
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   /** Sopra overlay admin (z-50), sotto ToastContainer (~100000). Scroll esterno se il dialog è più alto del viewport. */

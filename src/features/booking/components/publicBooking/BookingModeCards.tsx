@@ -71,14 +71,14 @@ export const BookingModeCards: React.FC<BookingModeCardsProps> = ({
               <div className="min-w-0 w-full text-center">
                 <p
                   className={cn(
-                    'text-[13px] font-bold leading-tight sm:text-base lg:text-sm xl:text-base',
+                    'text-[16px] font-bold leading-tight sm:text-[19px] lg:text-[17px] xl:text-[19px]',
                     isActive ? 'text-warm-orange' : 'text-warm-wood',
                   )}
                 >
                   {mode.label}
                 </p>
                 {mode.description && (
-                  <p className="mt-0.5 hidden text-xs leading-snug text-warm-wood-dark/70 line-clamp-3 min-[700px]:block sm:line-clamp-2">
+                  <p className="mt-0.5 hidden text-sm leading-snug text-warm-wood-dark/70 line-clamp-3 min-[700px]:block sm:line-clamp-2">
                     {mode.description}
                   </p>
                 )}

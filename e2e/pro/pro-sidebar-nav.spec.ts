@@ -1,6 +1,6 @@
 /**
- * // @admin-blindatura: shell-sidebar
- * // Copre: sidebar Pro, sezioni avanzate e ritorno alla dashboard prenotazioni.
+ * @admin-blindatura: shell-sidebar
+ * Copre: sidebar Pro con role complementary, sezioni abilitate e ritorno alla dashboard prenotazioni.
  *
  * Test E2E — Admin Pro: sidebar visibile e navigazione tra sezioni.
  *

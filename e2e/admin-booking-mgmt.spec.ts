@@ -268,9 +268,12 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByRole('heading', { name: /dettagli prenotazione/i })).toBeVisible({
         timeout: 10000,
       })
-      await page.getByRole('button', { name: /^elimina$/i }).click()
+      const deleteButton = page.getByRole('button', { name: /^elimina$/i }).last()
+      await expect(deleteButton).toBeVisible({ timeout: 5000 })
+      await deleteButton.scrollIntoViewIfNeeded()
+      await deleteButton.evaluate((button: HTMLElement) => button.click())
 
-      const confirmDialog = page.getByRole('dialog').filter({ hasText: /elimina prenotazione accettata/i })
+      const confirmDialog = page.getByRole('dialog', { name: /elimina prenotazione accettata/i })
       await expect(confirmDialog).toBeVisible({ timeout: 8000 })
 
       const textarea = confirmDialog.locator('textarea').first()

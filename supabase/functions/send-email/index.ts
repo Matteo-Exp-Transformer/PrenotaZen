@@ -20,6 +20,7 @@ const ALLOWED_EMAIL_TYPES = new Set([
   "booking_thank_you",
   "test_email",
   "manual",
+  "promo",
 ]);
 
 function jsonResponse(body: unknown, status = 200): Response {

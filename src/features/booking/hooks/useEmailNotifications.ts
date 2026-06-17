@@ -5,6 +5,7 @@ import {
   getBookingCancelledEmail,
   type BookingEmailSummaryContext,
   type TenantInfo,
+  type EmailTemplateOverrides,
 } from '@/lib/emailTemplates'
 import type { BookingRequest } from '@/types/booking'
 import { logger } from '@/lib/logger'
@@ -14,16 +15,18 @@ import type { CustomStaffPreset } from '@/features/booking/constants/presetMenus
 interface TenantEmailBundle {
   tenantInfo: TenantInfo
   summaryContext: BookingEmailSummaryContext
+  templateOverrides: Record<string, EmailTemplateOverrides>
 }
 
 /**
- * Recupera nome ristorante, contatti e contesto riepilogo (config Prenota + preset + categorie).
- * Fallisce parzialmente — l'email usa solo campi booking certi se manca il contesto.
+ * Recupera nome ristorante, contatti, contesto riepilogo e override template email.
+ * Fallisce parzialmente — l'email usa i default cablati se manca il contesto o gli override.
  */
 async function fetchTenantEmailBundle(tenantId: string): Promise<TenantEmailBundle> {
   const empty: TenantEmailBundle = {
     tenantInfo: {},
     summaryContext: { modes: [], customStaffPresets: [], menuCategories: [] },
+    templateOverrides: {},
   }
 
   try {
@@ -65,6 +68,22 @@ async function fetchTenantEmailBundle(tenantId: string): Promise<TenantEmailBund
       .eq('tenant_id', tenantId)
       .order('sort_order')
 
+    // Legge gli override template email del tenant (booking_accepted / booking_rejected)
+    const { data: templateRows } = await supabase
+      .from('email_templates')
+      .select('template_key, subject, intro, closing')
+      .eq('tenant_id', tenantId)
+      .in('template_key', ['booking_accepted', 'booking_rejected'])
+
+    const templateOverrides: Record<string, EmailTemplateOverrides> = {}
+    for (const row of templateRows ?? []) {
+      templateOverrides[row.template_key] = {
+        subject: row.subject ?? undefined,
+        intro: row.intro ?? undefined,
+        closing: row.closing ?? undefined,
+      }
+    }
+
     return {
       tenantInfo,
       summaryContext: {
@@ -76,6 +95,7 @@ async function fetchTenantEmailBundle(tenantId: string): Promise<TenantEmailBund
           sort_order: c.sort_order,
         })),
       },
+      templateOverrides,
     }
   } catch (error) {
     logger.warn('[Email] Impossibile caricare contesto tenant per riepilogo:', error)
@@ -92,8 +112,9 @@ export const sendBookingAcceptedEmail = async (booking: BookingRequest): Promise
       return { success: false }
     }
 
-    const { tenantInfo, summaryContext } = await fetchTenantEmailBundle(booking.tenant_id)
-    const { subject, html } = getBookingAcceptedEmail(booking, tenantInfo, summaryContext)
+    const { tenantInfo, summaryContext, templateOverrides } = await fetchTenantEmailBundle(booking.tenant_id)
+    const overrides = templateOverrides['booking_accepted']
+    const { subject, html } = getBookingAcceptedEmail(booking, tenantInfo, summaryContext, overrides)
 
     const result = await sendAndLogEmail(
       {
@@ -122,8 +143,9 @@ export const sendBookingRejectedEmail = async (booking: BookingRequest): Promise
       return { success: false }
     }
 
-    const { tenantInfo, summaryContext } = await fetchTenantEmailBundle(booking.tenant_id)
-    const { subject, html } = getBookingRejectedEmail(booking, tenantInfo, summaryContext)
+    const { tenantInfo, summaryContext, templateOverrides } = await fetchTenantEmailBundle(booking.tenant_id)
+    const overrides = templateOverrides['booking_rejected']
+    const { subject, html } = getBookingRejectedEmail(booking, tenantInfo, summaryContext, overrides)
 
     const result = await sendAndLogEmail(
       {

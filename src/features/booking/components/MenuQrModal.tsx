@@ -41,10 +41,10 @@ import type { MenuCategoryRecord } from '../hooks/useMenuCategories'
 const EMPTY_QR_CATEGORY_OVERRIDES: MenuQrcodeCategoryOverride[] = []
 
 /** Calcola categoryFilter e hiddenItemIds da un preset staff esistente. */
-function computeImportFromPreset(
+export function computeImportFromPreset(
   presetItemIds: string[],
   allCategoryKeys: string[],
-  itemsByCategory: Record<string, import('@/types/menu').MenuItem[]>,
+  itemsByCategory: Record<string, MenuItem[]>,
 ): { categoryFilter: string[]; hiddenItemIds: string[] } {
   const presetSet = new Set(presetItemIds)
   const categoryFilter: string[] = []

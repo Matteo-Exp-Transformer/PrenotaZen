@@ -116,9 +116,13 @@ export const useAcceptBooking = () => {
       
       if (emailEnabled) {
         try {
-          await sendBookingAcceptedEmail(booking)
+          const result = await sendBookingAcceptedEmail(booking)
+          if (!result.success) {
+            toast.warn('Prenotazione accettata, ma email al cliente non inviata.')
+          }
         } catch (error) {
           logger.warn('[useAcceptBooking] Email opzionale non inviata', error)
+          toast.warn('Prenotazione accettata, ma email al cliente non inviata.')
         }
       } else {
       }
@@ -171,9 +175,13 @@ export const useRejectBooking = () => {
       // Send email notification
       if (areEmailNotificationsEnabled()) {
         try {
-          await sendBookingRejectedEmail(booking)
+          const result = await sendBookingRejectedEmail(booking)
+          if (!result.success) {
+            toast.warn('Prenotazione rifiutata, ma email al cliente non inviata.')
+          }
         } catch (error) {
           logger.warn('[useRejectBooking] Email opzionale non inviata', error)
+          toast.warn('Prenotazione rifiutata, ma email al cliente non inviata.')
         }
       }
     },

@@ -1,4 +1,7 @@
 /**
+ * @admin-blindatura: home-analytics
+ * Copre: Home Pro come entry point, KPI di giornata e accesso rapido alle sezioni Analytics/Servizio.
+ *
  * Test E2E — Admin Pro: sezione Home (AdminHomePage) visibile e navigabile.
  *
  * La sezione Home è l'entry point default per Pro/Enterprise.
@@ -22,7 +25,7 @@ async function loginAsProAdmin(page: import('@playwright/test').Page) {
   await page.getByLabel(/email/i).fill(PRO_EMAIL)
   await page.getByLabel(/password/i).fill(PRO_PASSWORD)
   await page.getByRole('button', { name: /accedi|login/i }).click()
-  await expect(page.getByRole('navigation', { name: /navigazione principale/i })).toBeVisible({
+  await expect(page.getByRole('complementary', { name: /navigazione principale/i })).toBeVisible({
     timeout: 15000,
   })
 }
@@ -40,7 +43,7 @@ test.describe('Admin Pro — Home page', () => {
 
   test('da Home, click sidebar "Home" non produce errori', async ({ page }) => {
     await loginAsProAdmin(page)
-    const sidebar = page.getByRole('navigation', { name: /navigazione principale/i })
+    const sidebar = page.getByRole('complementary', { name: /navigazione principale/i })
     // Clicca Home dalla sidebar (dovrebbe essere già attivo, ma il click deve essere idempotente)
     await sidebar.getByRole('button', { name: /home/i }).click()
     await expect(sidebar).toBeVisible({ timeout: 3000 })
@@ -60,7 +63,7 @@ test.describe('Admin Pro — Home page', () => {
 
   test('sidebar rimane visibile durante la navigazione tra sezioni', async ({ page }) => {
     await loginAsProAdmin(page)
-    const sidebar = page.getByRole('navigation', { name: /navigazione principale/i })
+    const sidebar = page.getByRole('complementary', { name: /navigazione principale/i })
 
     // Naviga CRM → Servizio → Home e verifica che la sidebar rimanga
     await sidebar.getByRole('button', { name: /crm clienti/i }).click()

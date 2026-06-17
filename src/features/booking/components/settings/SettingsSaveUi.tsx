@@ -300,6 +300,55 @@ export function PublicDataSaveConfirmModal({
   )
 }
 
+export type DestructiveActionConfirmModalProps = {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
+  title: string
+  message: React.ReactNode
+  cancelLabel?: string
+  confirmLabel?: string
+  pending?: boolean
+  size?: 'sm' | 'md'
+}
+
+/** Conferma azioni distruttive in Impostazioni (delete card, promo, fascia oraria, …). */
+export function DestructiveActionConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  cancelLabel = 'Annulla',
+  confirmLabel = 'Elimina',
+  pending = false,
+  size = 'sm',
+}: DestructiveActionConfirmModalProps) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={pending ? () => undefined : onClose}
+      title={title}
+      size={size}
+      showCloseButton={!pending}
+      closeOnOverlayClick={!pending}
+      closeOnEscape={!pending}
+    >
+      <div className="space-y-4">
+        <div className="text-sm text-slate-700">{message}</div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+          <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onClose}>
+            {cancelLabel}
+          </Button>
+          <Button type="button" variant="danger" size="sm" disabled={pending} onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export type UnsavedNavigationGuardModalProps = {
   isOpen: boolean
   dirtyLabels: string[]

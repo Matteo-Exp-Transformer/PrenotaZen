@@ -7,9 +7,9 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://docnnernvpyrbwuzzach.supabase.co'
 const ANON_KEY = 'sb_publishable_K2xia0LzCfG3tJFlFYL3Jg_gtqZmjtg'
-const ADMIN_EMAIL = 'classic@c.com'
-const ADMIN_PASSWORD = 'TestEmail2026!'
-const TENANT_ID = '46d6d683-55dd-4cd1-91e9-b8b91420c908'
+const ADMIN_EMAIL = 'testc@c.com'
+const ADMIN_PASSWORD = '123456'
+const TENANT_ID = 'c97a2fa5-3675-4578-ad23-654ae71d06a7' // test-classic
 
 const TEST_RECIPIENT_DEFAULT = 'matteo.cavallaro.work@gmail.com'
 const RECIPIENT_EMAIL = process.env.TEST_RECIPIENT_EMAIL || TEST_RECIPIENT_DEFAULT
@@ -23,7 +23,7 @@ async function main() {
   const supabase = createClient(SUPABASE_URL, ANON_KEY)
 
   // 1. Login via SDK (gestisce sb_publishable_* correttamente)
-  console.log('1. Login come admin-classic...')
+  console.log('1. Login come testc@c.com (test-classic)...')
   const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({
     email: ADMIN_EMAIL,
     password: ADMIN_PASSWORD,

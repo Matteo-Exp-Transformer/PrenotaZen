@@ -1,3 +1,5 @@
+// @admin-blindatura: settings-background
+// Copre: superficie pubblica Prenota (light = crema #faf7f1) e contrasto testo (surfaceUsesLightText)
 import { describe, expect, it } from 'vitest'
 import {
   resolvePublicBookingSurface,
@@ -21,8 +23,14 @@ describe('resolvePublicBookingSurface', () => {
     )
   })
 
-  it('niente striscia, niente full-page → light', () => {
+  it('niente striscia, niente full-page → light (crema neutra, D-M2: niente gradiente/tile)', () => {
     expect(resolvePublicBookingSurface({ showPhotoStrip: false, isFullPagePhoto: false })).toBe('light')
+  })
+
+  it('legacy in DB (parse null) + niente striscia → light, non full-page-photo', () => {
+    const surface = resolvePublicBookingSurface({ showPhotoStrip: false, isFullPagePhoto: false })
+    expect(surface).toBe('light')
+    expect(surfaceUsesLightText(surface)).toBe(false)
   })
 })
 

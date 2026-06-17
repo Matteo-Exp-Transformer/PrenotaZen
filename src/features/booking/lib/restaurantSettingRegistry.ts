@@ -43,6 +43,8 @@ import {
   clampBookingText,
 } from '@/features/booking/constants/bookingPrenotaTextLimits'
 
+const DEFAULT_BOOKING_WINDOW_DAYS = 60
+
 export const RESTAURANT_SETTING_KEYS_V1 = [
   'restaurant_name',
   'timezone',
@@ -109,15 +111,19 @@ export const businessHoursSettingSchema = z
   )
 
 const restaurantNameMax = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName
+const contactEmailMax = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.contactEmail
+const contactPhoneMax = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.contactPhone
+const contactAddressMax = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.contactAddress
 const restaurantNameSchema = z
   .string()
   .trim()
   .min(1, 'Il nome e obbligatorio')
   .max(restaurantNameMax, `Massimo ${restaurantNameMax} caratteri`)
 const timezoneSchema = z.string().trim().min(1, 'Il fuso orario e obbligatorio').max(80)
-const genericTextSchema = z.string().trim().min(1, 'Campo obbligatorio').max(200)
-const emailSchema = z.string().trim().email('Email non valida').max(200)
-const phoneSchema = z.string().trim().min(3, 'Telefono non valido').max(50)
+const DEFAULT_TIMEZONE = 'Europe/Rome'
+const optionalEmailSchema = z.string().trim().max(contactEmailMax, `Massimo ${contactEmailMax} caratteri`).email('Email non valida')
+const optionalPhoneSchema = z.string().trim().min(3, 'Telefono non valido').max(contactPhoneMax, `Massimo ${contactPhoneMax} caratteri`)
+const optionalAddressSchema = z.string().trim().max(contactAddressMax, `Massimo ${contactAddressMax} caratteri`)
 const bookingWindowDaysSchema = z.coerce
   .number()
   .int('Deve essere un intero')
@@ -186,14 +192,19 @@ function parseJsonScalarString(raw: unknown): string {
 }
 
 function parseBookingWindowDaysFromDb(raw: unknown): number {
-  if (raw == null) return 60
-  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
-  if (typeof raw === 'string') {
-    const n = parseInt(raw, 10)
-    if (!Number.isNaN(n)) return n
+  if (raw == null) return DEFAULT_BOOKING_WINDOW_DAYS
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const n = Math.floor(raw)
+    return n >= 1 && n <= 365 ? n : DEFAULT_BOOKING_WINDOW_DAYS
   }
-  return 60
+  if (typeof raw === 'string') {
+    const n = parseInt(raw.trim(), 10)
+    if (!Number.isNaN(n) && n >= 1 && n <= 365) return n
+  }
+  return DEFAULT_BOOKING_WINDOW_DAYS
 }
+
+export { parseBookingWindowDaysFromDb }
 
 /**
  * `daily_guest_limit` puo essere assente/`null` per indicare «nessun limite».
@@ -376,14 +387,18 @@ export const restaurantSettingRegistry: {
   },
   timezone: {
     key: 'timezone',
-    parseFromDb: (raw) => parseJsonScalarString(raw),
-    serializeToDb: (value) => value as Json,
+    parseFromDb: (raw) => {
+      const v = parseJsonScalarString(raw).trim()
+      return v || DEFAULT_TIMEZONE
+    },
+    serializeToDb: (value) => (String(value).trim() || DEFAULT_TIMEZONE) as Json,
     validate: (value) => {
       const r = timezoneSchema.safeParse(value)
       return r.success ? null : r.error.issues[0]?.message ?? 'Valore non valido'
     },
   },
   booking_window_days: {
+    /** Chiave orfana (solo admin): nessun consumer UI/pubblico. Non implementare senza nuova decisione Matteo. */
     key: 'booking_window_days',
     parseFromDb: (raw) => parseBookingWindowDaysFromDb(raw),
     serializeToDb: (value) => value as Json,
@@ -449,30 +464,34 @@ export const restaurantSettingRegistry: {
   },
   contact_email: {
     key: 'contact_email',
-    parseFromDb: (raw) => parseJsonScalarString(raw),
+    parseFromDb: (raw) =>
+      clampBookingText(parseJsonScalarString(raw), contactEmailMax),
     serializeToDb: (value) => value as Json,
     validate: (value) => {
       if (!value || String(value).trim() === '') return null
-      const r = emailSchema.safeParse(value)
+      const r = optionalEmailSchema.safeParse(value)
       return r.success ? null : r.error.issues[0]?.message ?? 'Valore non valido'
     },
   },
   contact_phone: {
     key: 'contact_phone',
-    parseFromDb: (raw) => parseJsonScalarString(raw),
+    parseFromDb: (raw) =>
+      clampBookingText(parseJsonScalarString(raw), contactPhoneMax),
     serializeToDb: (value) => value as Json,
     validate: (value) => {
       if (!value || String(value).trim() === '') return null
-      const r = phoneSchema.safeParse(value)
+      const r = optionalPhoneSchema.safeParse(value)
       return r.success ? null : r.error.issues[0]?.message ?? 'Valore non valido'
     },
   },
   contact_address: {
     key: 'contact_address',
-    parseFromDb: (raw) => parseJsonScalarString(raw),
+    parseFromDb: (raw) =>
+      clampBookingText(parseJsonScalarString(raw), contactAddressMax),
     serializeToDb: (value) => value as Json,
     validate: (value) => {
-      const r = genericTextSchema.safeParse(value)
+      if (!value || String(value).trim() === '') return null
+      const r = optionalAddressSchema.safeParse(value)
       return r.success ? null : r.error.issues[0]?.message ?? 'Valore non valido'
     },
   },

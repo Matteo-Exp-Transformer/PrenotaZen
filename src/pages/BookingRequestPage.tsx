@@ -8,19 +8,13 @@ import { useBookingPublicViewport } from '@/hooks/useBookingPublicViewport'
 import { useBusinessHours } from '@/hooks/useBusinessHours'
 import { useRestaurantName } from '@/hooks/useRestaurantName'
 import { formatHours } from '@/lib/businessHours'
-import type { BusinessHours } from '@/lib/businessHours'
+import { hasAnyBusinessHoursConfigured, type BusinessHours } from '@/lib/businessHours'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { useRestaurantSetting } from '@/features/booking/hooks/useRestaurantSetting'
 import { cn } from '@/lib/utils'
 import {
-  BOOKING_PAGE_NEUTRAL_BACKGROUND_COLOR,
-  BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR,
   bookingFullPageBackgroundPublicHref,
-  bookingPageGradientCss,
-  bookingPageTilePublicHref,
-  isBookingFullPageBackgroundId,
-  isBookingPageGradientId,
-  type BookingPageBackgroundId,
+  resolvePublicBookingPageLayout,
 } from '@/features/booking/constants/bookingPageBackground'
 import {
   DEFAULT_BOOKING_HEADER_STYLES,
@@ -32,10 +26,7 @@ import {
   BOOKING_FULL_PAGE_FORM_MAX_WIDTH_PX,
   BOOKING_FULL_PAGE_SUMMARY_WIDTH_PX,
 } from '@/features/booking/constants/bookingPageLayout'
-import {
-  resolvePublicBookingSurface,
-  surfaceUsesLightText,
-} from '@/features/booking/constants/bookingPublicFieldStyles'
+import { surfaceUsesLightText } from '@/features/booking/constants/bookingPublicFieldStyles'
 
 /** Padding colonna contenuto — header e form condividono lo stesso inset (no -mx bleed). */
 const BOOKING_PAGE_CONTENT_PAD_FULL = 'px-8 md:px-10 lg:px-10'
@@ -173,7 +164,8 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
   const displayContactEmail = (contactEmail ?? '').trim()
   const displayContactPhone = (contactPhone ?? '').trim()
   const displayContactAddress = (contactAddress ?? '').trim()
-  const showHoursSection = isLoading || businessHours != null
+  const showHoursSection =
+    isLoading || (businessHours != null && hasAnyBusinessHoursConfigured(businessHours))
   const showContactSection = Boolean(displayContactEmail || displayContactPhone || displayContactAddress)
   const showInfoFooter = showHoursSection || showContactSection
 
@@ -182,29 +174,15 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
       setMobileInfoOpen('contacts')
     }
   }, [mobileInfoOpen, showContactSection, showHoursSection])
-  const bookingPageBackground: BookingPageBackgroundId | null = publicBookingBg ?? null
-  const showPhotoStrip = stripPhotoId != null
-  const hasTenantPageBackground = bookingPageBackground != null
-  const contentColumnPad = showPhotoStrip ? BOOKING_PAGE_CONTENT_PAD_STRIP : BOOKING_PAGE_CONTENT_PAD_FULL
-  // Quando la striscia laterale è attiva, il resto della pagina deve restare uniforme
-  // chiaro (crema/avorio): l'immagine full-page o legacy viene applicata SOLO senza striscia.
-  const STRIP_MODE_PAGE_BG = BOOKING_PAGE_NEUTRAL_BACKGROUND_COLOR
-  const fullPagePhotoId =
-    hasTenantPageBackground &&
-    !showPhotoStrip &&
-    isBookingFullPageBackgroundId(bookingPageBackground)
-      ? bookingPageBackground
-      : null
-  const legacyTileId =
-    hasTenantPageBackground &&
-    !showPhotoStrip &&
-    !isBookingFullPageBackgroundId(bookingPageBackground) &&
-    !isBookingPageGradientId(bookingPageBackground)
-      ? bookingPageBackground
-      : null
+  const pageLayout = resolvePublicBookingPageLayout({
+    pageBackground: publicBookingBg ?? null,
+    stripPhotoId: stripPhotoId ?? null,
+  })
+  const showPhotoStrip = pageLayout.mode === 'strip'
+  const fullPagePhotoId = pageLayout.fullPagePhotoId
   const isFullPagePhoto = fullPagePhotoId != null
-  // FU-014: superficie visiva tipizzata (un punto solo) → palette testo/errori derivata da qui.
-  const publicBookingSurface = resolvePublicBookingSurface({ showPhotoStrip, isFullPagePhoto })
+  const publicBookingSurface = pageLayout.surface
+  const contentColumnPad = showPhotoStrip ? BOOKING_PAGE_CONTENT_PAD_STRIP : BOOKING_PAGE_CONTENT_PAD_FULL
   /** Cap form + riepilogo esterno: solo full-page senza striscia, desktop ≥1256px (CSS). */
   const useFullPageDesktopFreezeLayout = !showPhotoStrip && isFullPagePhoto
   const fullPagePhotoLandscapeUrl = fullPagePhotoId
@@ -213,9 +191,8 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
   const fullPagePhotoPortraitUrl = fullPagePhotoId
     ? bookingFullPageBackgroundPublicHref(fullPagePhotoId, import.meta.env.BASE_URL, 'portrait')
     : null
-  // Foto full-page: layer viewport `fixed` + cover (contenuto scrolla sopra). Root crema solo
-  // primo paint / se l'immagine non carica. Tile/gradiente restano su layer `absolute` scrollabile.
-  const FULL_PAGE_FALLBACK_BG = STRIP_MODE_PAGE_BG
+  // Foto full-page: layer viewport `fixed` + cover (contenuto scrolla sopra). Root crema per
+  // striscia, assenza scelta decorativa, primo paint / errore caricamento immagine.
   const fullPagePhotoLayerStyle = (url: string): React.CSSProperties => ({
     backgroundImage: `url("${url}")`,
     backgroundSize: 'cover',
@@ -223,35 +200,9 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     backgroundRepeat: 'no-repeat',
     // `position:fixed` sul div (non `background-attachment:fixed`) — equivalente robusto su iOS.
   })
-  // Colore di fallback sul root (primo paint). Senza config tenant → crema neutra, niente asset demo.
-  const pageRootFallbackStyle: React.CSSProperties =
-    showPhotoStrip || !hasTenantPageBackground
-      ? { backgroundColor: STRIP_MODE_PAGE_BG }
-      : isFullPagePhoto
-        ? { backgroundColor: FULL_PAGE_FALLBACK_BG }
-        : { backgroundColor: BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR }
-
-  const scrollablePageBackgroundStyle: React.CSSProperties | null =
-    hasTenantPageBackground && !showPhotoStrip && !isFullPagePhoto
-      ? isBookingPageGradientId(bookingPageBackground)
-        ? {
-            backgroundColor: BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR,
-            backgroundImage: bookingPageGradientCss(bookingPageBackground),
-            // `100% 100%` sul layer alto quanto il documento evita ricalcoli `cover` vs viewport in scroll.
-            backgroundSize: '100% 100%',
-            backgroundPosition: 'top center',
-            backgroundRepeat: 'no-repeat',
-          }
-        : legacyTileId
-          ? {
-              backgroundColor: BOOKING_PAGE_GRADIENT_ROOT_FALLBACK_COLOR,
-              backgroundImage: `url("${bookingPageTilePublicHref(legacyTileId, import.meta.env.BASE_URL)}")`,
-              backgroundSize: '100% auto',
-              backgroundPosition: 'top center',
-              backgroundRepeat: 'repeat-y',
-            }
-          : null
-      : null
+  const pageRootFallbackStyle: React.CSSProperties = {
+    backgroundColor: pageLayout.rootBackgroundColor,
+  }
 
   const summaryFormData = {
     desired_date: sharedFormData.desired_date,
@@ -386,13 +337,6 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
 
   return (
     <div className="min-h-screen font-bold relative isolate" style={pageRootFallbackStyle}>
-      {scrollablePageBackgroundStyle && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10"
-          style={scrollablePageBackgroundStyle}
-        />
-      )}
       {/*
         Foto full-page (responsive): layer fixed con h-[100lvh] — crop stabile su Android Chrome
         (barra URL). Portrait <768px, landscape ≥768px; cover + top center, no-repeat (doc §2).

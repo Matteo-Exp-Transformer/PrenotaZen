@@ -71,13 +71,9 @@ test.describe('Admin Classic — Tab Impostazioni', () => {
     await loginAsClassicAdmin(page)
     await dashboardNav(page).getByRole('button', { name: /impostazioni/i }).click()
     // Il form impostazioni contiene sempre almeno il nome del ristorante
-    await expect(
-      page.getByRole('heading', { name: /impostazioni|settings|ristorante/i }).or(
-        page.getByLabel(/nome ristorante|nome locale|nome del ristorante/i)
-      ).or(
-        page.locator('[data-testid="settings-tab"], [class*="settings"]').first()
-      )
-    ).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('heading', { name: /impostazioni locale/i })).toBeVisible({
+      timeout: 5000,
+    })
   })
 
   test('tab Impostazioni contiene almeno un campo form compilabile', async ({ page }) => {

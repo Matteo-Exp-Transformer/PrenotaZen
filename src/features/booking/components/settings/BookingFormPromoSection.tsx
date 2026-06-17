@@ -3,6 +3,7 @@ import { Edit, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { DestructiveActionConfirmModal } from '@/features/booking/components/settings/SettingsSaveUi'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import type { BookingMode } from '@/features/booking/constants/bookingPublicFormConfig'
@@ -259,18 +260,13 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
       onDirtyChange?.(dirty)
     }, [dirty, onDirtyChange])
 
-    const saveSilently = async (nextPromos: MenuPromo[]) => {
-      const normalized = normalizeMenuPromosList(nextPromos)
-      const uniqueness = validateMenuPromoUniqueness(normalized)
-      if (!uniqueness.ok) return
-      try {
-        await upsert.mutateAsync({ items: [{ key: 'booking_menu_promos', value: normalized }], options: { silent: true } })
-        setDirty(false)
-      } catch {
-        // Se il salvataggio silenzioso fallisce, segna dirty per retry via footer.
-        setDirty(true)
-        toast.error('Errore nel salvataggio della promo')
-      }
+    /** FIX 6 (16-06-26): «Applica»/elimina/visibilità aggiornano solo lo stato locale e alzano dirty
+     *  — niente persistenza autonoma scollegata dal footer (era FU-002, ribaltato su richiesta).
+     *  Il salvataggio vero avviene da `saveSection()`, chiamata dal footer Impostazioni via ref
+     *  (`BookingFormConfigPanel.handleSaveAllPage` quando `promoDirty`). */
+    const commitPromosLocally = (nextPromos: MenuPromo[]) => {
+      setPromos(nextPromos)
+      setDirty(true)
     }
 
     const resetEditorDraft = () => {
@@ -387,9 +383,8 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
         toast.error(uniqueness.message)
         return false
       }
-      setPromos(next)
+      commitPromosLocally(next)
       resetEditorDraft()
-      void saveSilently(next)
       return true
     }
 
@@ -434,18 +429,16 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
       if (!deleteConfirm) return
       const { promoId } = deleteConfirm
       const next = promos.filter((p) => p.id !== promoId)
-      setPromos(next)
       if (editingId === promoId) resetEditorDraft()
       setDeleteConfirm(null)
-      void saveSilently(next)
+      commitPromosLocally(next)
     }
 
     const toggleVisibility = (promoId: string) => {
       const next = promos.map((p) =>
         p.id === promoId ? { ...p, visible_on_booking: !isMenuPromoVisibleOnBooking(p) } : p,
       )
-      setPromos(next)
-      void saveSilently(next)
+      commitPromosLocally(next)
     }
 
     const saveSection = async () => {
@@ -486,32 +479,21 @@ export const BookingFormPromoSection = forwardRef<BookingFormPromoSectionHandle,
             onConfirm={confirmConflictReplacement}
           />
         ) : null}
-        <Modal
+        <DestructiveActionConfirmModal
           isOpen={deleteConfirm != null}
           onClose={() => setDeleteConfirm(null)}
+          onConfirm={confirmDeletePromo}
           title="Eliminare la promo?"
-          size="sm"
-          showCloseButton
-          closeOnOverlayClick
-          closeOnEscape
-        >
-          {deleteConfirm ? (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-700">
-                Sei sicuro di voler eliminare «{deleteConfirm.summary}»? La modifica verrà applicata solo al
-                prossimo salvataggio della sezione.
+          confirmLabel="Elimina promo"
+          message={
+            deleteConfirm ? (
+              <p>
+                Sei sicuro di voler eliminare «{deleteConfirm.summary}»? L&apos;eliminazione si applica
+                subito alla lista e verrà salvata con il pulsante «Salva modifiche» del footer.
               </p>
-              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-                <Button type="button" variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>
-                  Annulla
-                </Button>
-                <Button type="button" variant="danger" size="sm" onClick={confirmDeletePromo}>
-                  Elimina promo
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </Modal>
+            ) : null
+          }
+        />
         <section className="admin-warm-surface rounded-xl border p-5 space-y-4 shadow-sm">
           <div>
             <h3 className="text-base font-semibold text-slate-800">Messaggio Promozionale</h3>

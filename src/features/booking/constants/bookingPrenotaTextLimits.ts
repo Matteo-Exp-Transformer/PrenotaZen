@@ -20,7 +20,11 @@ export const BOOKING_PUBLIC_CLIENT_TEXT_LIMITS = {
 /** Copy ristoratore su Pagina Prenota — contatore admin. */
 export const BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS = {
   /** Nome locale (Anagrafica + h1 Pagina Prenota). */
-  restaurantName: 40,
+  restaurantName: 45,
+  /** Contatti anagrafica (Impostazioni → footer Prenota). */
+  contactEmail: 65,
+  contactPhone: 30,
+  contactAddress: 120,
   pageTitle: 50,
   pageDescription: 120,
   modeLabel: 40,

@@ -103,6 +103,9 @@ type MenuQrE2eInput = {
   name: string
   categoryFilter: string[]
   hiddenMenuItemIds?: string[]
+  themeKey?: string
+  carouselItems?: unknown[]
+  categoryImages?: Record<string, string>
 }
 
 export type MenuQrE2eRow = {
@@ -235,9 +238,9 @@ export async function upsertMenuQrCode(input: MenuQrE2eInput): Promise<MenuQrE2e
     hidden_menu_item_ids: input.hiddenMenuItemIds ?? [],
     is_active: true,
     sort_order: 9000,
-    theme_key: 'mediterranean_teal',
-    carousel_items: [],
-    category_images: {},
+    theme_key: input.themeKey ?? 'mediterranean_teal',
+    carousel_items: input.carouselItems ?? [],
+    category_images: input.categoryImages ?? {},
     updated_at: new Date().toISOString(),
   }
 
@@ -261,15 +264,17 @@ export async function upsertMenuQrCode(input: MenuQrE2eInput): Promise<MenuQrE2e
 export async function deleteMenuE2eData(
   tenantId: string,
   categoryKey: string,
-  shortCode: string,
+  shortCode?: string,
 ): Promise<void> {
-  await rest(
-    `menu_qr_codes?tenant_id=eq.${tenantId}&short_code=eq.${encodeURIComponent(shortCode)}`,
-    {
-      method: 'DELETE',
-      headers: restHeaders({ Prefer: 'return=minimal' }),
-    },
-  )
+  if (shortCode) {
+    await rest(
+      `menu_qr_codes?tenant_id=eq.${tenantId}&short_code=eq.${encodeURIComponent(shortCode)}`,
+      {
+        method: 'DELETE',
+        headers: restHeaders({ Prefer: 'return=minimal' }),
+      },
+    )
+  }
   await rest(
     `menu_items?tenant_id=eq.${tenantId}&category=eq.${encodeURIComponent(categoryKey)}`,
     {
@@ -353,6 +358,20 @@ export async function getTenantIdBySlug(slug: string): Promise<string> {
   return id
 }
 
+export async function getExistingTenantSlug(
+  preferredSlug: string,
+  fallbacks: string[] = ['da-tommaso', 'test-classic', 'test-pro'],
+): Promise<string> {
+  const rows = await rest<Array<{ slug: string }>>(
+    `organizations?select=slug&order=slug`,
+  )
+  const available = new Set(rows.map((row) => row.slug))
+  if (available.has(preferredSlug)) return preferredSlug
+  const fallback = fallbacks.find((slug) => available.has(slug)) ?? rows[0]?.slug
+  if (!fallback) throw new Error('Nessun tenant disponibile su staging TEST')
+  return fallback
+}
+
 export type ServiceSlotRow = {
   id: string
   name: string
@@ -361,9 +380,75 @@ export type ServiceSlotRow = {
   max_guests: number | null
 }
 
+export type ServiceSlotFullRow = {
+  id: string
+  tenant_id: string
+  name: string
+  start_time: string
+  end_time: string
+  display_order: number
+  is_canonical: boolean
+  max_guests: number | null
+  max_turns: number | null
+  max_turns_resume: number | null
+  slot_color: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type ServiceSlotsSnapshot = {
+  slots: ServiceSlotFullRow[]
+}
+
 export async function getServiceSlots(tenantId: string): Promise<ServiceSlotRow[]> {
   return rest<ServiceSlotRow[]>(
     `service_slots?tenant_id=eq.${tenantId}&select=id,name,start_time,end_time,max_guests&order=display_order`,
+  )
+}
+
+export async function getServiceSlotsSnapshot(tenantId: string): Promise<ServiceSlotsSnapshot> {
+  const slots = await rest<ServiceSlotFullRow[]>(
+    `service_slots?tenant_id=eq.${tenantId}&select=*&order=display_order`,
+  )
+  return { slots }
+}
+
+export async function deleteAllServiceSlots(tenantId: string): Promise<void> {
+  await rest(`service_slots?tenant_id=eq.${tenantId}`, {
+    method: 'DELETE',
+    headers: restHeaders({ Prefer: 'return=minimal' }),
+  })
+}
+
+export async function insertServiceSlots(
+  slots: Array<Omit<ServiceSlotFullRow, 'created_at' | 'updated_at'>>,
+): Promise<void> {
+  if (slots.length === 0) return
+  const now = new Date().toISOString()
+  await rest('service_slots', {
+    method: 'POST',
+    headers: restHeaders({ Prefer: 'return=minimal' }),
+    body: JSON.stringify(
+      slots.map((slot) => ({
+        ...slot,
+        created_at: now,
+        updated_at: now,
+      })),
+    ),
+  })
+}
+
+export async function restoreServiceSlotsSnapshot(
+  tenantId: string,
+  snapshot: ServiceSlotsSnapshot,
+): Promise<void> {
+  await deleteAllServiceSlots(tenantId)
+  if (snapshot.slots.length === 0) return
+  await insertServiceSlots(
+    snapshot.slots.map((slot) => ({
+      ...slot,
+      tenant_id: tenantId,
+    })),
   )
 }
 
@@ -433,6 +518,20 @@ export async function insertBooking(input: SeedBookingInput): Promise<string> {
   const id = created[0]?.id
   if (!id) throw new Error('insertBooking: nessun id restituito')
   return id
+}
+
+export async function patchBookingById(
+  bookingId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  await rest(`booking_requests?id=eq.${bookingId}`, {
+    method: 'PATCH',
+    headers: restHeaders({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({
+      ...patch,
+      updated_at: new Date().toISOString(),
+    }),
+  })
 }
 
 export async function deleteBookingsByPrefix(tenantId: string, prefix = E2E_BOOKING_PREFIX): Promise<void> {

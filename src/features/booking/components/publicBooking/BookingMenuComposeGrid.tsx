@@ -10,6 +10,7 @@ import {
   type ComposeMenuItem,
 } from '../../utils/menuComposeVisibility'
 import { BookingMenuCategoryCard } from './BookingMenuCategoryCard'
+import { dispatchBookingMenuComposeCollapse } from '../../utils/bookingPublicFormAttention'
 
 const COMPOSE_SCROLL_STEP_PX = 320
 
@@ -128,6 +129,7 @@ function ComposeScrollRow({
   }, [categories.length, updateScrollHints])
 
   const scrollBy = (delta: number) => {
+    dispatchBookingMenuComposeCollapse()
     scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' })
   }
 

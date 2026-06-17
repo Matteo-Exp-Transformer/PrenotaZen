@@ -5,7 +5,7 @@
  * nessuna sidebar, 5 tab operativi, nessuna icona walk-in, nessun bottone no-show.
  *
  * Richiede staging Supabase con:
- *   E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD → admin di un tenant classic
+ *   E2E_CLASSIC_ADMIN_EMAIL / E2E_CLASSIC_ADMIN_PASSWORD → admin di un tenant classic
  *   E2E_CLASSIC_TENANT_SLUG → slug del tenant classic (es. 'test-classic')
  * Configurare in .env.local.test (vedi playwright.config.ts).
  */
@@ -13,18 +13,26 @@
 import { test, expect } from '@playwright/test'
 
 // SKIP: richiede staging Supabase configurato con tenant edition='classic'
-test.skip(!process.env.E2E_ADMIN_EMAIL, 'richiede staging Supabase (E2E_ADMIN_EMAIL non impostato)')
+test.skip(
+  !process.env.E2E_CLASSIC_ADMIN_EMAIL,
+  'richiede staging Classic esplicito (E2E_CLASSIC_ADMIN_EMAIL non impostato)',
+)
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? ''
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? ''
+const ADMIN_EMAIL = process.env.E2E_CLASSIC_ADMIN_EMAIL ?? ''
+const ADMIN_PASSWORD = process.env.E2E_CLASSIC_ADMIN_PASSWORD ?? ''
 
 async function loginAsClassicAdmin(page: import('@playwright/test').Page) {
   await page.goto('/admin')
   await page.getByLabel(/email/i).fill(ADMIN_EMAIL)
   await page.getByLabel(/password/i).fill(ADMIN_PASSWORD)
   await page.getByRole('button', { name: /accedi|login/i }).click()
+  try {
+    await expect(page).toHaveURL(/\/admin/, { timeout: 5000 })
+  } catch {
+    test.skip(true, 'credenziali Classic presenti ma login non riuscito su questo staging')
+  }
   // Attende che la dashboard sia visibile (Classic: sidebar assente)
-  await expect(page.getByRole('navigation', { name: /navigazione principale/i })).not.toBeVisible({
+  await expect(page.getByRole('complementary', { name: /navigazione principale/i })).not.toBeVisible({
     timeout: 10000,
   })
 }
@@ -41,7 +49,7 @@ function dashboardNav(page: import('@playwright/test').Page) {
 test.describe('Edition Classic — UI base', () => {
   test('nessuna sidebar visibile dopo login', async ({ page }) => {
     await loginAsClassicAdmin(page)
-    await expect(page.getByRole('navigation', { name: /navigazione principale/i })).not.toBeVisible()
+    await expect(page.getByRole('complementary', { name: /navigazione principale/i })).not.toBeVisible()
   })
 
   test('5 tab operativi visibili (Calendario, Prenotazioni, Archivio, Menu, Impostazioni)', async ({

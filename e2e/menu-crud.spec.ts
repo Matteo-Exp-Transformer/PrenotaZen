@@ -4,8 +4,8 @@
  */
 import { test, expect, Page } from '@playwright/test'
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@staging.it'
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'password-staging'
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'testc@c.com'
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || '123456'
 
 async function loginAdmin(page: Page) {
   await page.goto('/login')
@@ -26,6 +26,8 @@ async function navigateToMenuSection(page: Page) {
 }
 
 test.describe('Gestione menu admin', () => {
+  test.skip(true, 'suite legacy sostituita da admin-menu-magazzino-blindatura.spec.ts e admin-menu-magazzino-ct.spec.ts')
+
   test.beforeEach(async ({ page }) => {
     await loginAdmin(page)
     await navigateToMenuSection(page)

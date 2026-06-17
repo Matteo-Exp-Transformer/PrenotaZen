@@ -23,6 +23,16 @@ const DAY_ORDER: (keyof BusinessHours)[] = [
 
 const defaultSlot = (): BusinessHourSlot => ({ open: '11:00', close: '00:00' })
 
+/**
+ * Default «pranzo + cena» quando un giorno passa da chiuso/vuoto ad aperto per la prima volta
+ * (intento Matteo 16-06-26, FIX 2): due fasce pronte all'uso invece di un solo slot generico.
+ * Non si applica quando il giorno ha già fasce salvate — quel ramo resta intatto (vedi `addSlot`/`toggleClosed`).
+ */
+const defaultOpeningSlots = (): BusinessHourSlot[] => [
+  { open: '06:30', close: '16:30' },
+  { open: '17:30', close: '23:30' },
+]
+
 function isDayClosed(slots: BusinessHourSlot[] | null): boolean {
   return slots == null || slots.length === 0
 }
@@ -58,7 +68,7 @@ export const BusinessHoursEditor: React.FC<BusinessHoursEditorProps> = ({
       setDay(day, null)
     } else {
       const snap = closedDaySnapshots[day]
-      setDay(day, snap && snap.length > 0 ? snap.map((s) => ({ ...s })) : [defaultSlot()])
+      setDay(day, snap && snap.length > 0 ? snap.map((s) => ({ ...s })) : defaultOpeningSlots())
       setClosedDaySnapshots((prev) => {
         const next = { ...prev }
         delete next[day]
@@ -79,9 +89,14 @@ export const BusinessHoursEditor: React.FC<BusinessHoursEditorProps> = ({
   }
 
   const addSlot = (day: keyof BusinessHours) => {
-    const slots = value[day] && value[day]!.length > 0 ? [...value[day]!] : [defaultSlot()]
-    slots.push(defaultSlot())
-    setDay(day, slots)
+    const existing = value[day]
+    // Giorno senza fasce reali: popola pranzo+cena in un colpo (FIX 2), non un solo slot generico.
+    if (!existing || existing.length === 0) {
+      setDay(day, defaultOpeningSlots())
+      return
+    }
+    // Giorno già con aperture esistenti: non sovrascrivere, aggiungi solo una fascia in più.
+    setDay(day, [...existing, defaultSlot()])
   }
 
   const removeSlot = (day: keyof BusinessHours, index: number) => {

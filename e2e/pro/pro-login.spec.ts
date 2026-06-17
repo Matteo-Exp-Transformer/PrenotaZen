@@ -1,4 +1,7 @@
 /**
+ * @admin-blindatura: shell-login
+ * Copre: login Pro e presenza della sidebar con role complementary.
+ *
  * Test E2E — Admin Pro: login e redirect alla dashboard con sidebar.
  *
  * Verifica che un admin Pro possa accedere e che la sidebar sia visibile
@@ -24,7 +27,7 @@ test.describe('Admin Pro — Login', () => {
     await page.getByRole('button', { name: /accedi|login/i }).click()
 
     // Pro ha la sidebar — la sua presenza conferma edition Pro attiva
-    await expect(page.getByRole('navigation', { name: /navigazione principale/i })).toBeVisible({
+    await expect(page.getByRole('complementary', { name: /navigazione principale/i })).toBeVisible({
       timeout: 15000,
     })
   })

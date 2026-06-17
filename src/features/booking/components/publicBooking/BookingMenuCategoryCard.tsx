@@ -6,13 +6,17 @@ import type { SelectedMenuItem } from '@/types/menu'
 import {
   BOOKING_MENU_CATEGORY_EXPANDED_PORTAL_CLASS,
   BOOKING_MENU_CATEGORY_PANEL_SCROLL_CLASS,
+  isElementFullyVisibleInHorizontalContainer,
 } from '../../constants/bookingMenuComposePanelLayout'
 import {
   type ComposeMenuItem,
   countSelectedInCategory,
   selectionStatusLabel,
 } from '../../utils/menuComposeVisibility'
-import { BOOKING_MENU_COMPOSE_COLLAPSE_EVENT } from '../../utils/bookingPublicFormAttention'
+import {
+  BOOKING_MENU_COMPOSE_COLLAPSE_EVENT,
+  dispatchBookingMenuComposeCollapse,
+} from '../../utils/bookingPublicFormAttention'
 import {
   BOOKING_MENU_COMPOSE_TEXT_LIMITS,
   clampBookingText,
@@ -142,10 +146,34 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
   const [expanded, setExpanded] = useState(false)
   const shellRef = useRef<HTMLDivElement>(null)
   const portalArticleRef = useRef<HTMLElement | null>(null)
+  /** Evita chiusura durante scrollIntoView programmatico all'apertura. */
+  const suppressVisibilityCollapseUntilRef = useRef(0)
 
   const collapseExpanded = useCallback(() => {
     setExpanded(false)
   }, [])
+
+  const collapseIfClipOutsideScrollContainer = useCallback(() => {
+    if (!expanded || layout !== 'scroll') return
+    if (Date.now() < suppressVisibilityCollapseUntilRef.current) return
+    const shell = shellRef.current
+    const container = horizontalScrollRef?.current
+    if (!shell || !container) return
+    if (!isElementFullyVisibleInHorizontalContainer(shell, container)) {
+      collapseExpanded()
+    }
+  }, [expanded, layout, horizontalScrollRef, collapseExpanded])
+
+  const handleExpand = useCallback(() => {
+    if (layout === 'scroll') {
+      dispatchBookingMenuComposeCollapse()
+      if (horizontalScrollRef?.current) {
+        suppressVisibilityCollapseUntilRef.current = Date.now() + 700
+        shellRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+      }
+    }
+    setExpanded(true)
+  }, [layout, horizontalScrollRef])
 
   useLayoutEffect(() => {
     collapseExpanded()
@@ -180,6 +208,10 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
     rafId = requestAnimationFrame(tick)
 
     const onScrollOrResize = () => applyOverlayPosition()
+    const onHorizontalScroll = () => {
+      applyOverlayPosition()
+      collapseIfClipOutsideScrollContainer()
+    }
     window.addEventListener('scroll', onScrollOrResize, true)
     window.addEventListener('resize', onScrollOrResize)
 
@@ -187,16 +219,16 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
     if (shellRef.current) ro.observe(shellRef.current)
 
     const horizontalScrollEl = horizontalScrollRef?.current ?? null
-    horizontalScrollEl?.addEventListener('scroll', onScrollOrResize, { passive: true })
+    horizontalScrollEl?.addEventListener('scroll', onHorizontalScroll, { passive: true })
 
     return () => {
       cancelAnimationFrame(rafId)
       window.removeEventListener('scroll', onScrollOrResize, true)
       window.removeEventListener('resize', onScrollOrResize)
       ro.disconnect()
-      horizontalScrollEl?.removeEventListener('scroll', onScrollOrResize)
+      horizontalScrollEl?.removeEventListener('scroll', onHorizontalScroll)
     }
-  }, [expanded, applyOverlayPosition, horizontalScrollRef])
+  }, [expanded, applyOverlayPosition, horizontalScrollRef, collapseIfClipOutsideScrollContainer])
 
   const shellClass = cn(
     'relative',
@@ -344,7 +376,7 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
             aria-expanded={false}
             aria-controls={panelId}
             className="group relative block w-full overflow-hidden rounded-[inherit] text-left"
-            onClick={() => setExpanded(true)}
+            onClick={handleExpand}
           >
             <div className={cn('relative w-full overflow-hidden bg-warm-beige/40', closedImageClass)}>
               {heroSrc ? (

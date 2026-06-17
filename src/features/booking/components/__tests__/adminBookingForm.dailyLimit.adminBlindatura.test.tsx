@@ -10,7 +10,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { BookingRequest } from '@/types/booking'
 
 const mutateSpy = vi.fn()
-const FUTURE_BOOKING_DATE = '2099-06-12'
+function getStableFutureBookingDate(): string {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() + 1)
+  d.setMonth(8)
+  d.setDate(1)
+  return d.toISOString().slice(0, 10)
+}
+const FUTURE_BOOKING_DATE = getStableFutureBookingDate()
 const restaurantSettings = vi.hoisted(() => ({
   daily_guest_limit: 24 as number | null,
   booking_staff_presets_visible: true,

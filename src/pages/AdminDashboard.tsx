@@ -239,8 +239,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   const { user, logout } = useAdminAuth()
-  const { tenantSlug } = useTenantContext()
-  const restaurantName = useRestaurantName()
+  const { tenantSlug, organizationName } = useTenantContext()
+  const restaurantNameFromSettings = useRestaurantName()
+  const restaurantName = restaurantNameFromSettings || organizationName
   const appIconSrc = `${import.meta.env.BASE_URL}icons/Icona-per-adminPage-no-bg.png`
   const { data: savedAppTheme = DEFAULT_APP_THEME, isPending: isAppThemePending } =
     useRestaurantSetting('app_theme', { authenticated: true })

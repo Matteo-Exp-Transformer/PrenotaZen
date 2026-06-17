@@ -89,12 +89,12 @@ export function bookingPublicSubTabScrollCardWidthClass(): string {
  * Un solo punto tipizzato invece dei booleani sparsi (`!showPhotoStrip && isFullPagePhoto`):
  * - `strip` — striscia foto laterale: il resto pagina è crema/avorio → palette scura su chiaro.
  * - `full-page-photo` — foto a pagina intera senza striscia → testo bianco su sfondo scuro.
- * - `light` — sfondo chiaro/gradiente/tile o nessuno sfondo tenant → palette scura su chiaro.
+ * - `light` — niente striscia e nessuna foto full-page (crema neutra `#faf7f1`; legacy DB → null)
  * - `dark` — riservato a un futuro tema scuro (oggi non emesso dal resolver).
  */
 export type PublicBookingSurface = 'strip' | 'full-page-photo' | 'light' | 'dark'
 
-/** Mappa gli input layout di `BookingRequestPage` alla superficie. XOR striscia/full-page. */
+/** Mappa layout → superficie. Preferire `resolvePublicBookingPageLayout` (input DB) in pagina. */
 export function resolvePublicBookingSurface(input: {
   showPhotoStrip: boolean
   isFullPagePhoto: boolean
