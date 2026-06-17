@@ -22,6 +22,7 @@ import {
   BookOpen,
   Tag,
 } from 'lucide-react'
+import { DEFAULT_BOOKING_FORM_CONFIG } from '../constants/bookingPublicFormConfig'
 import { getBookingEventTypeLabel } from '../utils/eventTypeLabels'
 import { bookingTypeUsesMenuSelections } from '../utils/bookingTypeMenu'
 import { getPresetMenuLabel } from '../constants/presetMenus'
@@ -78,6 +79,9 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
   rejectDisabled = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
+  const { data: bookingFormConfig } = useRestaurantSetting('booking_public_form_config')
+  const bookingModes =
+    bookingFormConfig?.booking_modes ?? DEFAULT_BOOKING_FORM_CONFIG.booking_modes
   const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets')
   const { data: menuPromos = [] } = useRestaurantSetting('booking_menu_promos')
 
@@ -95,7 +99,7 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
     return timeStr.split(':').slice(0, 2).join(':')
   }
 
-  const eventTypeLabel = getBookingEventTypeLabel(booking)
+  const eventTypeLabel = getBookingEventTypeLabel(booking, bookingModes)
   const statusConfig = STATUS_CONFIG[booking.status] || STATUS_CONFIG.pending
   const menuPriceDisplay = getMenuPriceDisplayFromBooking(booking)
   const digestMenuPrice =

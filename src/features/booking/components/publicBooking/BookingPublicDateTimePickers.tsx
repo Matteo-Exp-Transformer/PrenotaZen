@@ -201,9 +201,9 @@ export function BookingPublicDatePickerField({
       )}
     >
       <div className={cn(BOOKING_PUBLIC_FIELD_BOX, hasError && 'border-red-500!')}>
-        <span id={`${id}-label`} className={BOOKING_PUBLIC_FIELD_INNER_LABEL}>
+        <label htmlFor={`${id}-control`} className={BOOKING_PUBLIC_FIELD_INNER_LABEL}>
           {label}
-        </span>
+        </label>
         <div className="flex min-w-0 flex-1">
           <button
             id={`${id}-control`}
@@ -211,7 +211,6 @@ export function BookingPublicDatePickerField({
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-required={required}
-            aria-labelledby={`${id}-label`}
             data-booking-picker-trigger="true"
             className={BOOKING_PUBLIC_PICKER_TRIGGER_CLASS}
             onPointerDown={(event) => {
@@ -336,9 +335,9 @@ export function BookingPublicTimePickerField({
       )}
     >
       <div className={cn(BOOKING_PUBLIC_FIELD_BOX, hasError && 'border-red-500!')}>
-        <span id={`${id}-label`} className={BOOKING_PUBLIC_FIELD_INNER_LABEL}>
+        <label htmlFor={`${id}-control`} className={BOOKING_PUBLIC_FIELD_INNER_LABEL}>
           {label}
-        </span>
+        </label>
         <div className="grid min-w-0 flex-1 grid-cols-2">
           <button
             id={`${id}-control`}
@@ -346,7 +345,6 @@ export function BookingPublicTimePickerField({
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-required={required}
-            aria-labelledby={`${id}-label`}
             data-booking-picker-trigger="true"
             className={cn(BOOKING_PUBLIC_PICKER_TRIGGER_CLASS, 'min-h-9 w-full sm:min-h-10')}
             onPointerDown={(event) => {

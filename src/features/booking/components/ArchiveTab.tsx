@@ -29,7 +29,9 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { extractTimeFromISO } from '../utils/dateUtils'
+import { DEFAULT_BOOKING_FORM_CONFIG } from '../constants/bookingPublicFormConfig'
 import { getBookingEventTypeLabel } from '../utils/eventTypeLabels'
+import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 
@@ -78,6 +80,9 @@ const ArchiveBookingCard: React.FC<ArchiveBookingCardProps> = ({
   onRequeueToPending,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
+  const { data: bookingFormConfig } = useRestaurantSetting('booking_public_form_config')
+  const bookingModes =
+    bookingFormConfig?.booking_modes ?? DEFAULT_BOOKING_FORM_CONFIG.booking_modes
 
   const formatDate = (dateStr: string) => {
     try {
@@ -111,7 +116,7 @@ const ArchiveBookingCard: React.FC<ArchiveBookingCardProps> = ({
   }
 
 
-  const eventTypeLabel = getBookingEventTypeLabel(booking)
+  const eventTypeLabel = getBookingEventTypeLabel(booking, bookingModes)
   // Usa eventConfig solo se event_type è valido, altrimenti usa valori di default
   const eventConfig = booking.event_type && EVENT_TYPE_CONFIG[booking.event_type] 
     ? EVENT_TYPE_CONFIG[booking.event_type] 

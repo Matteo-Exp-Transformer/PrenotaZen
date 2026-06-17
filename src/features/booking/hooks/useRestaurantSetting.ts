@@ -106,7 +106,12 @@ export function useUpsertRestaurantSetting() {
     },
     onSuccess: ({ items, options }) => {
       const silent = options?.silent === true
-      for (const { key } of items) {
+      for (const { key, value } of items) {
+        if (tenantId) {
+          const reg = restaurantSettingRegistry[key]
+          const parsed = reg.parseFromDb(reg.serializeToDb(value as never))
+          queryClient.setQueryData(['restaurant_settings', key, tenantId], parsed)
+        }
         queryClient.invalidateQueries({
           queryKey: ['restaurant_settings', key, tenantId],
           refetchType: 'active',

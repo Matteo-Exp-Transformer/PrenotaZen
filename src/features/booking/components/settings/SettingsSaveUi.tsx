@@ -9,6 +9,9 @@ import type { AutosaveFieldStatus } from '@/features/booking/hooks/useDebouncedS
 const saveFooterShellClass =
   'restaurant-settings-save-footer admin-warm-surface sticky bottom-0 z-[85] ml-auto flex w-[50%] min-w-0 flex-col gap-2 rounded-tl-xl border border-b-0 border-slate-200/90 px-3 py-2.5 shadow-lg backdrop-blur-sm max-sm:bg-white/90 sm:px-4 sm:py-3 pb-[max(0.625rem,env(safe-area-inset-bottom))]'
 
+/** Pulse controllato su Salva/Annulla quando il footer dirty è visibile — CSS: `index.css` → `.settings-save-footer-btn-attention`. */
+export const SETTINGS_SAVE_FOOTER_BTN_ATTENTION_CLASS = 'settings-save-footer-btn-attention'
+
 /** Indicatore discreto sotto un campo con autosave. */
 export function FieldAutosaveIndicator({ status }: { status: AutosaveFieldStatus }) {
   if (status === 'idle') return null
@@ -147,7 +150,10 @@ export function SettingsSaveFooter({
             size="sm"
             onClick={handleCancelClick}
             disabled={cancelDisabled || pending}
-            className="min-h-9 border-slate-300 px-3 font-semibold"
+            className={cn(
+              'min-h-9 border-slate-300 px-3 font-semibold',
+              SETTINGS_SAVE_FOOTER_BTN_ATTENTION_CLASS,
+            )}
           >
             Annulla tutte
           </Button>
@@ -156,7 +162,10 @@ export function SettingsSaveFooter({
             size="sm"
             onClick={() => void Promise.resolve(onSave())}
             disabled={saveDisabled || pending}
-            className="min-h-9 border-2 border-primary-700 bg-primary-600 px-4 font-semibold shadow-sm hover:bg-primary-500 disabled:opacity-60"
+            className={cn(
+              'min-h-9 border-2 border-primary-700 bg-primary-600 px-4 font-semibold shadow-sm hover:bg-primary-500 disabled:opacity-60',
+              SETTINGS_SAVE_FOOTER_BTN_ATTENTION_CLASS,
+            )}
           >
             {pending ? (
               <span className="inline-flex items-center gap-1.5">
@@ -284,6 +293,7 @@ export function PublicDataSaveConfirmModal({
             size="sm"
             disabled={pending}
             onClick={() => void Promise.resolve(onConfirm())}
+            className={SETTINGS_SAVE_FOOTER_BTN_ATTENTION_CLASS}
           >
             {pending ? (
               <span className="inline-flex items-center gap-1.5">
@@ -394,6 +404,7 @@ export function UnsavedNavigationGuardModal({
             size="sm"
             disabled={pending}
             onClick={onSaveAndContinue}
+            className={SETTINGS_SAVE_FOOTER_BTN_ATTENTION_CLASS}
           >
             {pending ? (
               <span className="inline-flex items-center gap-1.5">
@@ -410,6 +421,7 @@ export function UnsavedNavigationGuardModal({
             size="sm"
             disabled={pending}
             onClick={onDiscardAndContinue}
+            className={SETTINGS_SAVE_FOOTER_BTN_ATTENTION_CLASS}
           >
             Annulla e continua
           </Button>

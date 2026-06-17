@@ -1901,6 +1901,35 @@ button.booking-request-reject-booking-btn:focus-visible {
   background-color: var(--color-surface-2);
 }
 
+/* Admin Impostazioni — footer dirty: pulse controllato su Salva / Annulla (solo box-shadow, no layout shift) */
+@keyframes settings-save-footer-btn-attention-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.05),
+      0 0 0 0 color-mix(in srgb, var(--color-warm-orange) 48%, transparent);
+  }
+
+  55% {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.05),
+      0 0 0 4px color-mix(in srgb, var(--color-warm-orange) 32%, transparent);
+  }
+}
+
+.settings-save-footer-btn-attention {
+  animation: settings-save-footer-btn-attention-pulse 1.25s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-save-footer-btn-attention {
+    animation: none;
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.05),
+      0 0 0 3px color-mix(in srgb, var(--color-warm-orange) 38%, transparent);
+  }
+}
+
 /* Restaurant settings — footer salvataggio: pulsante sempre bianco; messaggio “non salvato” leggibile sul gradient */
 .restaurant-settings-save-footer-msg {
   color: var(--color-text) !important;

@@ -148,6 +148,38 @@ describe('BookingSummarySidebar — carosello show_offer_details_in_summary', ()
     expect(screen.queryByText(/\/persona/)).not.toBeInTheDocument()
   })
 
+  it('FIX 9 — totale esclude automaticamente item di categorie non compilabili (non entrano in menu_selection)', () => {
+    // Item di categoria non compilabile non può essere selezionato dall'utente → non è in menu_selection.
+    // Il sidebar riceve solo gli item selezionati: i totali sono corretti senza logica aggiuntiva.
+    const modes = [makeMode({ booking_type: 'rinfresco_laurea', label: 'Rinfresco', capabilities: { uses_menu: true } })]
+    const onlyCompilableItems = [
+      { id: 'i1', name: 'Antipasto compilabile', category: 'antipasti', price: 5 },
+    ]
+    render(
+      <BookingSummarySidebar
+        formData={{
+          num_guests: 2,
+          booking_type: 'rinfresco_laurea',
+          menu_selection: { items: onlyCompilableItems },
+          menu_total_per_person: 5,
+          menu_total_booking: 10,
+        }}
+        modes={modes}
+        activeSubTab={{
+          id: 'card-1',
+          display: 'cards',
+          label: 'Menu Rinfresco',
+          preset_id: 'preset-1',
+          compilable_category_keys: ['antipasti'],
+        }}
+      />,
+    )
+    // Solo l'item della categoria compilabile ('antipasti') è nel riepilogo
+    expect(screen.getByText('Antipasto compilabile')).toBeInTheDocument()
+    // Il totale riflette solo quell'item (5€ × 2 = 10€)
+    expect(screen.getByText(/10,00/)).toBeInTheDocument()
+  })
+
   it('card sottotab: Tipo mostra etichetta modalità, non influenzata dal toggle carosello', () => {
     render(
       <BookingSummarySidebar

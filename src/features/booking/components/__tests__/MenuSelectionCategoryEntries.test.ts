@@ -131,3 +131,50 @@ describe('MenuSelection normalizedMenuItems (LOCK preset per ogni booking_type)'
     expect(result.map((i) => i.id)).toEqual(['tllu', 'tommy', 'neo', 'extra'])
   })
 })
+
+/**
+ * FIX 9 fase pubblica — compilable_category_keys
+ * Verifica la logica di locked per-categoria usata in BookingMenuComposeGrid.
+ * Replica la formula: `locked || (compilableCategoryKeys !== undefined && !compilableCategoryKeys.includes(key))`
+ */
+describe('compilable_category_keys — per-category locked logic (FIX 9 fase pubblica)', () => {
+  function computeCategoryLocked(
+    globalLocked: boolean,
+    compilableCategoryKeys: string[] | undefined,
+    categoryKey: string,
+  ): boolean {
+    return globalLocked || (compilableCategoryKeys !== undefined && !compilableCategoryKeys.includes(categoryKey))
+  }
+
+  it('campo assente → tutte le categorie compilabili (backward compat)', () => {
+    expect(computeCategoryLocked(false, undefined, 'antipasti')).toBe(false)
+    expect(computeCategoryLocked(false, undefined, 'dolci')).toBe(false)
+    expect(computeCategoryLocked(false, undefined, 'secondi')).toBe(false)
+  })
+
+  it('array vuoto → nessuna categoria compilabile', () => {
+    expect(computeCategoryLocked(false, [], 'antipasti')).toBe(true)
+    expect(computeCategoryLocked(false, [], 'dolci')).toBe(true)
+  })
+
+  it('array parziale → solo le chiavi elencate compilabili, le altre bloccate', () => {
+    const compilable = ['antipasti', 'secondi']
+    expect(computeCategoryLocked(false, compilable, 'antipasti')).toBe(false)
+    expect(computeCategoryLocked(false, compilable, 'secondi')).toBe(false)
+    expect(computeCategoryLocked(false, compilable, 'dolci')).toBe(true)
+    expect(computeCategoryLocked(false, compilable, 'bevande')).toBe(true)
+  })
+
+  it('locked globale true → tutte bloccate, compilableCategoryKeys ignorato', () => {
+    expect(computeCategoryLocked(true, ['antipasti', 'dolci'], 'antipasti')).toBe(true)
+    expect(computeCategoryLocked(true, undefined, 'dolci')).toBe(true)
+    expect(computeCategoryLocked(true, [], 'secondi')).toBe(true)
+  })
+
+  it('mix — stessa card ha categorie compilabili e non', () => {
+    const compilable = ['antipasti']
+    expect(computeCategoryLocked(false, compilable, 'antipasti')).toBe(false) // compilabile
+    expect(computeCategoryLocked(false, compilable, 'primi')).toBe(true)      // non compilabile
+    expect(computeCategoryLocked(false, compilable, 'dolci')).toBe(true)      // non compilabile
+  })
+})

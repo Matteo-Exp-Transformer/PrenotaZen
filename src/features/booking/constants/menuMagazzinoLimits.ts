@@ -6,8 +6,16 @@ export const MENU_MAGAZZINO_HARD_LIMITS = {
   qrCodes: 6,
 } as const
 
-export const MENU_MAGAZZINO_SAVE_PROPAGATION_MESSAGE =
-  'Salvando aggiorni subito la Pagina Prenota e il Menu QR. Le prenotazioni già inviate conservano lo storico di ciò che il cliente ha scelto.'
+const MENU_MAGAZZINO_SAVE_PROPAGATION_SNAPSHOT_SUFFIX =
+  'Le prenotazioni già inviate conservano lo storico di ciò che il cliente ha scelto.'
+
+/** Copy avviso save ingredienti — edition-aware via `features.qrMenu` (tenant_features). */
+export function getMenuMagazzinoSavePropagationMessage(qrMenuEnabled: boolean): string {
+  const targets = qrMenuEnabled
+    ? 'la Pagina Prenota e il Menu QR'
+    : 'la Pagina Prenota'
+  return `Salvando aggiorni subito ${targets}. ${MENU_MAGAZZINO_SAVE_PROPAGATION_SNAPSHOT_SUFFIX}`
+}
 
 export function canAddMenuCategory(currentCount: number): boolean {
   return currentCount < MENU_MAGAZZINO_HARD_LIMITS.categories

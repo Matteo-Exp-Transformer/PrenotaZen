@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Modal, Input } from '@/components/ui'
 import { useCustomers } from '@/features/booking/hooks/useCustomers'
 import type { CustomerProfile } from '@/types/customer'
@@ -9,17 +9,31 @@ interface Props {
   onClose: () => void
   /** Chiamato con la lista di email selezionate. */
   onConfirm: (recipients: string[]) => void
+  /** Gruppo già confermato nell'editor — usato solo all'apertura del modale. */
+  initialRecipients?: string[]
 }
 
 function hasValidEmail(c: CustomerProfile): boolean {
   return c.source === 'booking' && !!c.email && c.email.includes('@')
 }
 
-export const PromoRecipientPicker: FC<Props> = ({ isOpen, onClose, onConfirm }) => {
+export const PromoRecipientPicker: FC<Props> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  initialRecipients = [],
+}) => {
   const { customers } = useCustomers()
   const eligible = useMemo(() => customers.filter(hasValidEmail), [customers])
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(initialRecipients))
   const [search, setSearch] = useState('')
+
+  // Seed draft solo all'apertura: resta stabile durante refetch clienti o edit campagna.
+  useEffect(() => {
+    if (!isOpen) return
+    setSelected(new Set(initialRecipients))
+    setSearch('')
+  }, [isOpen])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()

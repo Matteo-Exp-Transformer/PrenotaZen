@@ -1,3 +1,4 @@
+// @admin-blindatura: settings-form-config
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_BOOKING_HEADER_FONT_SIZE_PX,
@@ -565,5 +566,189 @@ describe('resolveCarouselSummaryDisplay / sticky mini-pannello', () => {
     })
     expect(resolveCarouselSummaryDisplay(tab)).toBeNull()
     expect(getCarouselStickyMiniPanelLine(tab)).toBeNull()
+  })
+})
+
+// @admin-blindatura: settings-form-config
+describe('compilable_category_keys — parse / serialize / round-trip (LOCK Parser/normalizer accoppiati)', () => {
+  const basePersonalizzabile = {
+    id: 'card-1',
+    display: 'cards',
+    label: 'Menu a scelta',
+    is_fixed_menu: false,
+  }
+
+  it('config legacy senza il campo → assente (tutte compilabili per default)', () => {
+    const tab = parseSubTabFromUnknown({
+      ...basePersonalizzabile,
+      // nessun compilable_category_keys
+    })
+    expect(tab).not.toBeNull()
+    expect(tab!.compilable_category_keys).toBeUndefined()
+  })
+
+  it('parse: array valido su card personalizzabile → preservato', () => {
+    const tab = parseSubTabFromUnknown({
+      ...basePersonalizzabile,
+      compilable_category_keys: ['antipasti', 'dolci'],
+    })
+    expect(tab!.compilable_category_keys).toEqual(['antipasti', 'dolci'])
+  })
+
+  it('parse: array vuoto su card personalizzabile → array vuoto (nessuna categoria compilabile)', () => {
+    const tab = parseSubTabFromUnknown({
+      ...basePersonalizzabile,
+      compilable_category_keys: [],
+    })
+    expect(tab!.compilable_category_keys).toEqual([])
+  })
+
+  it('parse: filtro stringhe vuote/invalide', () => {
+    const tab = parseSubTabFromUnknown({
+      ...basePersonalizzabile,
+      compilable_category_keys: ['antipasti', '', '  ', 42, 'dolci'],
+    })
+    expect(tab!.compilable_category_keys).toEqual(['antipasti', 'dolci'])
+  })
+
+  it('parse: campo ignorato su card con is_fixed_menu non false (menu fisso)', () => {
+    const tab = parseSubTabFromUnknown({
+      id: 'card-fisso',
+      display: 'cards',
+      label: 'Menu fisso',
+      // is_fixed_menu assente = menu fisso
+      compilable_category_keys: ['antipasti'],
+    })
+    expect(tab).not.toBeNull()
+    expect(tab!.compilable_category_keys).toBeUndefined()
+  })
+
+  it('parse: campo ignorato su card con is_fixed_menu: true', () => {
+    const tab = parseSubTabFromUnknown({
+      id: 'card-fixed-true',
+      display: 'cards',
+      label: 'Menu fisso esplicito',
+      is_fixed_menu: true,
+      compilable_category_keys: ['antipasti'],
+    })
+    expect(tab!.compilable_category_keys).toBeUndefined()
+  })
+
+  it('parse: campo ignorato su carosello (non card)', () => {
+    const tab = parseSubTabFromUnknown({
+      id: 'car-1',
+      label: 'Offerta',
+      display: 'carousel',
+      is_fixed_menu: false,
+      compilable_category_keys: ['antipasti'],
+      carousel_items: [{ image_url: 'https://example.com/a.jpg' }],
+    })
+    expect(tab!.compilable_category_keys).toBeUndefined()
+  })
+
+  it('normalize: preserva compilable_category_keys su card personalizzabile', () => {
+    const config: BookingPublicFormConfig = {
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      header_styles: parseBookingHeaderStylesFromUnknown({}),
+      booking_modes: [{
+        id: 'm1',
+        booking_type: 'tavolo',
+        enabled: true,
+        label: 'Tavolo',
+        description: 'D',
+        icon: 'fork_knife',
+        sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{
+          id: 's1',
+          display: 'cards',
+          label: 'Menu a scelta',
+          is_fixed_menu: false,
+          compilable_category_keys: ['antipasti', 'dolci'],
+        }],
+      }],
+    }
+    const normalized = normalizeBookingPublicFormConfig(config)
+    expect(normalized.booking_modes[0].sub_tabs[0].compilable_category_keys).toEqual(['antipasti', 'dolci'])
+  })
+
+  it('normalize: strip compilable_category_keys se menu fisso (is_fixed_menu non false)', () => {
+    const config: BookingPublicFormConfig = {
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      header_styles: parseBookingHeaderStylesFromUnknown({}),
+      booking_modes: [{
+        id: 'm1',
+        booking_type: 'tavolo',
+        enabled: true,
+        label: 'Tavolo',
+        description: 'D',
+        icon: 'fork_knife',
+        sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{
+          id: 's1',
+          display: 'cards',
+          label: 'Menu fisso',
+          // is_fixed_menu assente = fisso
+          compilable_category_keys: ['antipasti'] as string[] | undefined,
+        }],
+      }],
+    }
+    const normalized = normalizeBookingPublicFormConfig(config)
+    expect(normalized.booking_modes[0].sub_tabs[0].compilable_category_keys).toBeUndefined()
+  })
+
+  it('round-trip: parseFromDb con campo preserva compilable_category_keys', () => {
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [{
+        id: 'm1',
+        booking_type: 'tavolo',
+        enabled: true,
+        label: 'Tavolo',
+        description: 'D',
+        icon: 'fork_knife',
+        sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{
+          id: 's1',
+          display: 'cards',
+          label: 'Menu personalizzabile',
+          is_fixed_menu: false,
+          compilable_category_keys: ['antipasti', 'primi'],
+        }],
+      }],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].sub_tabs[0].compilable_category_keys).toEqual(['antipasti', 'primi'])
+  })
+
+  it('round-trip: parseFromDb legacy senza il campo → campo assente', () => {
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [{
+        id: 'm1',
+        booking_type: 'tavolo',
+        enabled: true,
+        label: 'Tavolo',
+        description: 'D',
+        icon: 'fork_knife',
+        sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{
+          id: 's1',
+          display: 'cards',
+          label: 'Menu personalizzabile',
+          is_fixed_menu: false,
+          // nessun compilable_category_keys — legacy
+        }],
+      }],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].sub_tabs[0].compilable_category_keys).toBeUndefined()
   })
 })

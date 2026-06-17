@@ -6,9 +6,9 @@
  * Uso:
  *   npm run seed:booking-table
  *
- * Stesse variabili di scripts/seed-full-menu-booking.mjs:
- *   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, TENANT_SLUG
- * Opzionale: SUPABASE_SERVICE_ROLE_KEY (solo lettura org + insert PENDING come il form pubblico), NUM_GUESTS, DESIRED_TIME, CLIENT_* (CLIENT_NAME = nome esplicito; altrimenti nome persona casuale da bookingSeedShared).
+ * Env: .env.local.test (come Playwright) — E2E_TENANT_SLUG / MANUAL_TENANT_SLUG (default da-tommaso),
+ *   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, E2E_SUPABASE_SERVICE_KEY o SUPABASE_SERVICE_ROLE_KEY.
+ * Opzionale: NUM_GUESTS, DESIRED_TIME, CLIENT_* (CLIENT_NAME = nome esplicito; altrimenti nome persona casuale da bookingSeedShared).
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -36,21 +36,18 @@ async function main() {
 
   log('slug risolto', { slug: tenantSlug || '(vuoto)' })
   if (slugFromFile) {
-    log('tenant da .env.local / .env nel repo')
+    log('tenant da .env.local.test / .env.local (E2E_TENANT_SLUG)')
   }
 
   if (PLACEHOLDER_SLUGS.has(tenantSlug)) {
     fail(
-      `Placeholder (${tenantSlug}): imposta TENANT_SLUG allo slug vero dell'organizzazione.`,
+      `Placeholder (${tenantSlug}): imposta E2E_TENANT_SLUG in .env.local.test allo slug vero dell'organizzazione.`,
       1,
     )
   }
 
   if (!supabaseUrl || !anonKey) {
-    fail('Mancano VITE_SUPABASE_URL e/o VITE_SUPABASE_ANON_KEY (o SUPABASE_*).', 1)
-  }
-  if (!tenantSlug) {
-    fail('Manca TENANT_SLUG / VITE_TENANT_SLUG in .env.local', 1)
+    fail('Mancano VITE_SUPABASE_URL e/o VITE_SUPABASE_ANON_KEY in .env.local.test (o SUPABASE_*).', 1)
   }
 
   const supabaseAnon = createClient(supabaseUrl, anonKey)

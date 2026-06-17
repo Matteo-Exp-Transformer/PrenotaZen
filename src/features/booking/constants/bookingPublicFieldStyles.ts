@@ -41,7 +41,7 @@ export const BOOKING_PUBLIC_FIELD_BOX =
   'flex w-full min-h-[2.5rem] sm:min-h-[2.75rem] flex-row items-center gap-2 sm:gap-3 rounded-lg border border-slate-200 bg-white/75 backdrop-blur-sm px-3 py-1 sm:px-4 sm:py-1.5 text-left focus-within:border-warm-wood focus-within:ring-2 focus-within:ring-warm-wood/40'
 
 export const BOOKING_PUBLIC_FIELD_INNER_LABEL =
-  'pointer-events-none shrink-0 whitespace-nowrap text-left text-xs font-bold leading-tight text-warm-wood sm:text-sm'
+  'shrink-0 cursor-pointer whitespace-nowrap text-left text-xs font-bold leading-tight text-warm-wood sm:text-sm'
 
 export const BOOKING_PUBLIC_FIELD_INNER_INPUT =
   'w-full min-w-0 flex-1 border-0! bg-transparent p-0 text-left text-sm font-bold text-warm-wood shadow-none ring-0! focus:outline-none focus:ring-0! sm:text-base'

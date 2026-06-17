@@ -1231,6 +1231,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
             }
             composeCollapseKey={String(composeCollapseNonce)}
             showIngredientPrices={showIngredientPrices}
+            compilableCategoryKeys={activeSubTab?.compilable_category_keys}
             onPresetMenuChange={handlePresetMenuChange}
             onMenuChange={({ items, totalPerPerson }) => {
               const numGuests = formData.num_guests || 0

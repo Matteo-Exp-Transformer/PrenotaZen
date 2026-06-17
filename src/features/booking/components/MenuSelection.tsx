@@ -78,6 +78,12 @@ interface MenuSelectionProps {
   composeCollapseKey?: string
   /** false = sottotab con prezzo fisso: nasconde € per ingrediente. Default true. */
   showIngredientPrices?: boolean
+  /**
+   * Chiavi categoria compilabili (da SubTab.compilable_category_keys).
+   * Assente = tutte le categorie compilabili (backward compat).
+   * Presente = solo le chiavi elencate mostrano checkbox; le altre restano visibili ma bloccate.
+   */
+  compilableCategoryKeys?: string[]
 }
 
 type NormalizedMenuItem = ComposeMenuItem
@@ -105,6 +111,7 @@ export const MenuSelection: React.FC<MenuSelectionProps> = ({
   menuSelectionLockedOverride,
   composeCollapseKey,
   showIngredientPrices = true,
+  compilableCategoryKeys,
 }) => {
   const publicBlockClass = publicFormLayout ? BOOKING_PUBLIC_CONTENT_WIDTH : 'mx-auto w-full max-w-full'
   const { data: menuItems = [], isLoading, error } = useMenuItems()
@@ -469,6 +476,7 @@ export const MenuSelection: React.FC<MenuSelectionProps> = ({
             onToggleItem={handleItemToggle}
             composeCollapseKey={composeCollapseKey}
             showIngredientPrices={showIngredientPrices}
+            compilableCategoryKeys={compilableCategoryKeys}
           />
         </div>
       )}

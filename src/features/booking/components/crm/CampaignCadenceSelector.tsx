@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { Label } from '@/components/ui'
+import { Input, Label } from '@/components/ui'
 import type { CadenceType, CadenceConfig } from '@/features/booking/hooks/useEmailCampaignMutations'
 
 export type { CadenceType, CadenceConfig }
@@ -67,7 +67,7 @@ export const CampaignCadenceSelector: FC<Props> = ({ cadenceType, cadenceConfig,
       {cadenceType === 'monthly' && (
         <div className="space-y-1">
           <label className="text-sm text-slate-600">Giorno del mese (1–28)</label>
-          <input
+          <Input
             type="number"
             min={1}
             max={28}
@@ -75,7 +75,7 @@ export const CampaignCadenceSelector: FC<Props> = ({ cadenceType, cadenceConfig,
             onChange={(e) =>
               onChange('monthly', { day_of_month: Math.min(28, Math.max(1, Number(e.target.value))) })
             }
-            className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="w-28"
           />
         </div>
       )}
@@ -83,7 +83,7 @@ export const CampaignCadenceSelector: FC<Props> = ({ cadenceType, cadenceConfig,
       {cadenceType === 'custom' && (
         <div className="space-y-1">
           <label className="text-sm text-slate-600">Ogni quanti giorni</label>
-          <input
+          <Input
             type="number"
             min={1}
             max={365}
@@ -91,7 +91,7 @@ export const CampaignCadenceSelector: FC<Props> = ({ cadenceType, cadenceConfig,
             onChange={(e) =>
               onChange('custom', { interval_days: Math.max(1, Number(e.target.value)) })
             }
-            className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="w-28"
           />
         </div>
       )}

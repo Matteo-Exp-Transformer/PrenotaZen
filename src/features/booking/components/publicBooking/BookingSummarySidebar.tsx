@@ -26,6 +26,7 @@ interface BookingSummarySidebarProps {
     desired_date?: string
     desired_time?: string
     num_guests: number
+    client_phone?: string
     booking_type?: BookingRequestInput['booking_type']
     menu_selection?: BookingRequestInput['menu_selection']
     menu_total_per_person?: number
@@ -33,7 +34,6 @@ interface BookingSummarySidebarProps {
     preset_menu?: BookingRequestInput['preset_menu']
   }
   modes: BookingMode[]
-  contactPhone?: string
   activeSubTab?: SubTab | null
   /** Pulsante submit da mostrare in fondo al riepilogo (<1256px). */
   submitButton?: React.ReactNode
@@ -59,11 +59,11 @@ function formatCurrency(amount?: number): string {
 export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
   formData,
   modes,
-  contactPhone,
   activeSubTab,
   submitButton,
   className,
 }) => {
+  const displayClientPhone = formData.client_phone?.trim() ?? ''
   const { data: menuCategories = [] } = useMenuCategories()
   // Mostra menù/totali per CAPACITÀ, non per NOME: risolve la modalità dal booking_type (come
   // getModeLabelByType) e chiede a modeUsesMenu. Per le tipologie storiche (tavolo no, rinfresco/
@@ -174,6 +174,15 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
             <p className="text-base font-bold text-warm-wood">
               {formData.num_guests > 0 ? `${formData.num_guests} persone` : '—'}
             </p>
+          </div>
+        </div>
+
+        {/* Telefono cliente (non contatto ristorante — quello resta nel footer) */}
+        <div className="flex items-start gap-2.5">
+          <Phone className="h-4 w-4 text-warm-orange mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[13px] text-warm-wood-dark/60 font-semibold uppercase tracking-wide">Telefono</p>
+            <p className="text-base font-bold text-warm-wood">{displayClientPhone || '—'}</p>
           </div>
         </div>
 
@@ -289,13 +298,6 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
           </div>
         )}
 
-        {/* Telefono contatto */}
-        {contactPhone && (
-          <div className="border-t border-black/10 pt-3 flex items-center gap-2">
-            <Phone className="h-3.5 w-3.5 text-warm-orange shrink-0" />
-            <span className="text-sm text-warm-wood-dark font-medium">{contactPhone}</span>
-          </div>
-        )}
       </div>
 
       {/* Pulsante submit in fondo al riepilogo (sotto il breakpoint riepilogo laterale) */}

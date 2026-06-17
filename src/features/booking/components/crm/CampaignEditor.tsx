@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Input, Textarea, Label, Modal } from '@/components/ui'
 import { toast } from 'react-toastify'
 import { CampaignLinksEditor } from './CampaignLinksEditor'
@@ -51,9 +51,17 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
 
   const { registerUnsavedSource, registerUnsavedHandlers, clearUnsavedSource } = useUnsavedChangesGuard()
 
-  // Sincronizza se la prop campaign cambia
+  const loadedCampaignIdRef = useRef<string | null>(campaign?.id ?? null)
+
+  // Sincronizza solo al cambio campagna (id), non su refetch con stesso id — preserva draft locale
+  // (inclusi destinatari confermati nel picker ma non ancora salvati su DB).
   useEffect(() => {
-    if (!campaign) return
+    if (!campaign) {
+      loadedCampaignIdRef.current = null
+      return
+    }
+    if (loadedCampaignIdRef.current === campaign.id) return
+    loadedCampaignIdRef.current = campaign.id
     setName(campaign.name)
     setSubject(campaign.subject)
     setBody(campaign.body)
@@ -296,6 +304,7 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
       {/* Picker destinatari */}
       <PromoRecipientPicker
         isOpen={pickerOpen}
+        initialRecipients={recipients}
         onClose={() => setPickerOpen(false)}
         onConfirm={(selected) => setRecipients(selected)}
       />

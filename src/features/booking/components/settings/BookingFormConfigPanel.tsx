@@ -5,6 +5,7 @@ import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
 import { EyeIcon } from '@phosphor-icons/react/dist/csr/Eye'
 import { EyeSlashIcon } from '@phosphor-icons/react/dist/csr/EyeSlash'
+import { PencilLineIcon } from '@phosphor-icons/react/dist/csr/PencilLine'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
@@ -580,6 +581,7 @@ export const BookingFormConfigPanel = forwardRef<
       hidden_item_ids: [],
       hidden_category_keys: [],
       category_order_keys: undefined,
+      compilable_category_keys: undefined, // reset on import: all compilable (backward compat)
       field_overrides: overrides,
     }
   }
@@ -791,8 +793,13 @@ export const BookingFormConfigPanel = forwardRef<
       ...m,
       sub_tabs_overrides: undefined,
     }))
+    // Header da `config` in memoria: dopo saveHeaderSection la cache react-query può essere
+    // ancora stale (PROD senza autosave); `saved` qui riporterebbe page_description/titolo vecchi.
     const normalized = normalizeBookingPublicFormConfig({
       ...saved,
+      page_title: config.page_title,
+      page_description: config.page_description,
+      header_styles: config.header_styles,
       booking_modes: modesForDb,
     })
     await upsert.mutateAsync([{ key: 'booking_public_form_config', value: normalized }])
@@ -929,7 +936,7 @@ export const BookingFormConfigPanel = forwardRef<
               className={headerControlClass}
             >
               {BOOKING_HEADER_FONT_OPTIONS.map((font) => (
-                <option key={font.id} value={font.id}>
+                <option key={font.id} value={font.id} style={{ fontFamily: font.fontFamily }}>
                   {font.label}
                 </option>
               ))}
@@ -1067,6 +1074,20 @@ export const BookingFormConfigPanel = forwardRef<
       if (hidden.has(itemId)) hidden.delete(itemId)
       else hidden.add(itemId)
       patchTab({ hidden_item_ids: Array.from(hidden) })
+    }
+    // compilable_category_keys — solo visibile con menù personalizzabile ON (§3 FIX 9)
+    const isCategoryCompilable = (catKey: string): boolean => {
+      if (tab.compilable_category_keys === undefined) return true
+      return tab.compilable_category_keys.includes(catKey)
+    }
+    const toggleCompilableCategory = (catKey: string, allPresetCategoryKeys: string[]) => {
+      const current = tab.compilable_category_keys ?? allPresetCategoryKeys
+      const compilable = new Set(current)
+      if (compilable.has(catKey)) compilable.delete(catKey)
+      else compilable.add(catKey)
+      const nextKeys = Array.from(compilable)
+      const allCompilable = allPresetCategoryKeys.every((k) => compilable.has(k))
+      patchTab({ compilable_category_keys: allCompilable ? undefined : nextKeys })
     }
     const linkedPreset = tab.preset_id
       ? relevantPresets.find((preset) => preset.id === tab.preset_id)
@@ -1424,6 +1445,34 @@ export const BookingFormConfigPanel = forwardRef<
                           <EyeIcon weight="regular" className="h-4 w-4" />
                         )}
                       </button>
+                      {/* Compilabile: visibile solo con menù personalizzabile ON e categoria visibile (§3 FIX 9) */}
+                      {!isFixedMenu && !catHidden ? (
+                        <button
+                          type="button"
+                          aria-label={
+                            isCategoryCompilable(cat.key)
+                              ? `Disabilita compilazione ${cat.label}`
+                              : `Abilita compilazione ${cat.label}`
+                          }
+                          title={
+                            isCategoryCompilable(cat.key)
+                              ? 'Cliente può selezionare piatti da questa categoria'
+                              : 'Cliente vede la categoria ma non può selezionare piatti'
+                          }
+                          onClick={(e) => {
+                            e.preventDefault()
+                            toggleCompilableCategory(cat.key, presetCategoryKeys)
+                          }}
+                          className={cn(
+                            'rounded-md border p-1.5',
+                            isCategoryCompilable(cat.key)
+                              ? 'border-primary-200 bg-primary-50 text-primary-700'
+                              : 'border-slate-300 text-slate-400',
+                          )}
+                        >
+                          <PencilLineIcon weight="regular" className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">
                         {cat.label}
                       </span>
@@ -1479,11 +1528,14 @@ export const BookingFormConfigPanel = forwardRef<
               type="button"
               role="switch"
               aria-checked={!isFixedMenu}
+              aria-label="Menù personalizzabile"
               onClick={() => {
                 const nextCustomizable = isFixedMenu
                 patchTab({
                   is_fixed_menu: nextCustomizable ? false : undefined,
                   ...(nextCustomizable ? { price_per_person: undefined } : {}),
+                  // turning OFF personalizzabile: strip compilable_category_keys (§3 FIX 9)
+                  ...(!nextCustomizable ? { compilable_category_keys: undefined } : {}),
                 })
               }}
               className={cn(

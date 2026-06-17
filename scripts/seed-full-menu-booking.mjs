@@ -11,10 +11,11 @@
  *   RANDOM_MENU_MIN — numero minimo di voci estratte (default 3)
  *   RANDOM_MENU_MAX — numero massimo di voci estratte (default 12, mai oltre le voci disponibili)
  *
- * Credenziali: VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY, TENANT_SLUG.
+ * Env: .env.local.test (come Playwright) — E2E_TENANT_SLUG / MANUAL_TENANT_SLUG (default da-tommaso),
+ *   VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY, E2E_SUPABASE_SERVICE_KEY o SUPABASE_SERVICE_ROLE_KEY.
  * Nome prenotazione: env CLIENT_NAME oppure nome persona casuale (lista in bookingSeedShared).
- * Se la lettura anon di menu_items resta vuota (RLS sul progetto remoto), usa anche
- * SUPABASE_SERVICE_ROLE_KEY: lo script la usa per caricare organizations + menu_items e per INSERT PENDING.
+ * Se la lettura anon di menu_items resta vuota (RLS sul progetto remoto), usa anche la service role
+ * per caricare organizations + menu_items e per INSERT PENDING.
  */
 
 import { createClient } from '@supabase/supabase-js'

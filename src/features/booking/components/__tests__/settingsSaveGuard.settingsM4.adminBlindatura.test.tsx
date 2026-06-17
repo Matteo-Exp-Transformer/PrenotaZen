@@ -221,6 +221,21 @@ describe('settings-save-guard M4 — footer, modale pubblica, guard', () => {
     expect(screen.queryAllByRole('dialog', { name: /salva modifiche pubbliche/i })).toHaveLength(0)
   })
 
+  it('footer dirty → pulse su Salva modifiche e Annulla tutte', async () => {
+    const user = userEvent.setup()
+    renderSettingsTab()
+
+    const nameInput = await screen.findByLabelText(/nome ristorante/i)
+    await user.type(nameInput, 'X')
+
+    const footer = await screen.findByRole('region', { name: /modifiche non salvate/i })
+    const saveBtn = within(footer).getByRole('button', { name: /salva modifiche/i })
+    const cancelBtn = within(footer).getByRole('button', { name: /annulla tutte/i })
+
+    expect(saveBtn).toHaveClass('settings-save-footer-btn-attention')
+    expect(cancelBtn).toHaveClass('settings-save-footer-btn-attention')
+  })
+
   it('Salva apre una sola PublicDataSaveConfirmModal', async () => {
     const user = userEvent.setup()
     renderSettingsTab()

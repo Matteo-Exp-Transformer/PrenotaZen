@@ -14,6 +14,7 @@ import {
   getMenuCategoryLimitMessage,
   getMenuProductPerCategoryLimitMessage,
   getMenuQrCodeLimitMessage,
+  getMenuMagazzinoSavePropagationMessage,
   getStaffPresetLimitMessage,
 } from '../menuMagazzinoLimits'
 
@@ -82,6 +83,22 @@ describe('@admin-blindatura menu-magazzino-limits — conteggio prodotti per cat
     ]
     expect(countMenuProductsInCategory(items, 'pizza', 'Pizza')).toBe(2)
     expect(countMenuProductsInCategory(items, 'birre', 'Birre')).toBe(1)
+  })
+})
+
+describe('@admin-blindatura menu-magazzino-limits — avviso propagazione save (edition-aware)', () => {
+  it('Classic senza QR: cita solo Pagina Prenota + snapshot', () => {
+    const message = getMenuMagazzinoSavePropagationMessage(false)
+    expect(message).toContain('Pagina Prenota')
+    expect(message).not.toContain('Menu QR')
+    expect(message).toContain('prenotazioni già inviate')
+  })
+
+  it('tenant con qrMenu: cita Pagina Prenota e Menu QR + snapshot', () => {
+    const message = getMenuMagazzinoSavePropagationMessage(true)
+    expect(message).toContain('Pagina Prenota')
+    expect(message).toContain('Menu QR')
+    expect(message).toContain('prenotazioni già inviate')
   })
 })
 

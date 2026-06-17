@@ -208,6 +208,7 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     desired_date: sharedFormData.desired_date,
     desired_time: sharedFormData.desired_time,
     num_guests: sharedFormData.num_guests ?? 0,
+    client_phone: sharedFormData.client_phone,
     booking_type: sharedFormData.booking_type,
     menu_selection: sharedFormData.menu_selection,
     menu_total_per_person: sharedFormData.menu_total_per_person,
@@ -231,7 +232,6 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     <BookingSummarySidebar
       formData={summaryFormData}
       modes={formConfig.booking_modes}
-      contactPhone={displayContactPhone || undefined}
       activeSubTab={activeSubTab}
       submitButton={summarySubmitButton}
       // Full-page: riepilogo sotto il form in flusso normale (niente sticky).
@@ -248,7 +248,6 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
     <BookingSummarySidebar
       formData={summaryFormData}
       modes={formConfig.booking_modes}
-      contactPhone={displayContactPhone || undefined}
       activeSubTab={activeSubTab}
       submitButton={summarySubmitButton}
       // Istanza esterna ≥1600px: colonna laterale sticky.

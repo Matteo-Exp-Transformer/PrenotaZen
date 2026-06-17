@@ -29,6 +29,12 @@ export interface BookingMenuComposeGridProps {
   composeCollapseKey?: string
   /** false = sottotab con prezzo fisso: nasconde € per ingrediente. Default true. */
   showIngredientPrices?: boolean
+  /**
+   * Chiavi categoria compilabili (da SubTab.compilable_category_keys).
+   * Assente = tutte le categorie compilabili (backward compat).
+   * Presente = solo le chiavi elencate mostrano checkbox; le altre restano visibili ma non selezionabili.
+   */
+  compilableCategoryKeys?: string[]
 }
 
 type VisibleCategory = { key: string; label: string; items: ComposeMenuItem[] }
@@ -40,6 +46,7 @@ function ComposeCategoryCards({
   categoryImageByKey,
   selectedItems,
   locked,
+  compilableCategoryKeys,
   formatPrice,
   onToggleItem,
   resetKey,
@@ -52,6 +59,7 @@ function ComposeCategoryCards({
   categoryImageByKey: Record<string, string | null | undefined>
   selectedItems: SelectedMenuItem[]
   locked: boolean
+  compilableCategoryKeys?: string[]
   formatPrice: (item: ComposeMenuItem) => string
   onToggleItem: (item: ComposeMenuItem) => void
   resetKey?: string
@@ -60,24 +68,30 @@ function ComposeCategoryCards({
 }) {
   return (
     <>
-      {categories.map(({ key, label, items }) => (
-        <BookingMenuCategoryCard
-          key={key}
-          categoryKey={key}
-          categoryLabel={label}
-          imageUrl={categoryImageByKey[key]}
-          items={items}
-          selectedItems={selectedItems}
-          locked={locked}
-          formatPrice={formatPrice}
-          onToggleItem={onToggleItem}
-          layout={layout}
-          compact={compact}
-          resetKey={resetKey}
-          horizontalScrollRef={horizontalScrollRef}
-          showIngredientPrices={showIngredientPrices}
-        />
-      ))}
+      {categories.map(({ key, label, items }) => {
+        // Locked globale (preset fisso) OPPURE categoria non in compilable_category_keys
+        const categoryLocked =
+          locked ||
+          (compilableCategoryKeys !== undefined && !compilableCategoryKeys.includes(key))
+        return (
+          <BookingMenuCategoryCard
+            key={key}
+            categoryKey={key}
+            categoryLabel={label}
+            imageUrl={categoryImageByKey[key]}
+            items={items}
+            selectedItems={selectedItems}
+            locked={categoryLocked}
+            formatPrice={formatPrice}
+            onToggleItem={onToggleItem}
+            layout={layout}
+            compact={compact}
+            resetKey={resetKey}
+            horizontalScrollRef={horizontalScrollRef}
+            showIngredientPrices={showIngredientPrices}
+          />
+        )
+      })}
     </>
   )
 }
@@ -88,6 +102,7 @@ function ComposeScrollRow({
   categoryImageByKey,
   selectedItems,
   locked,
+  compilableCategoryKeys,
   formatPrice,
   onToggleItem,
   resetKey,
@@ -98,6 +113,7 @@ function ComposeScrollRow({
   categoryImageByKey: Record<string, string | null | undefined>
   selectedItems: SelectedMenuItem[]
   locked: boolean
+  compilableCategoryKeys?: string[]
   formatPrice: (item: ComposeMenuItem) => string
   onToggleItem: (item: ComposeMenuItem) => void
   resetKey?: string
@@ -155,6 +171,7 @@ function ComposeScrollRow({
           categoryImageByKey={categoryImageByKey}
           selectedItems={selectedItems}
           locked={locked}
+          compilableCategoryKeys={compilableCategoryKeys}
           formatPrice={formatPrice}
           onToggleItem={onToggleItem}
           resetKey={resetKey}
@@ -189,6 +206,7 @@ export const BookingMenuComposeGrid: React.FC<BookingMenuComposeGridProps> = ({
   onToggleItem,
   composeCollapseKey,
   showIngredientPrices = true,
+  compilableCategoryKeys,
 }) => {
   const allowedItemIds = useMemo(
     () =>
@@ -211,6 +229,7 @@ export const BookingMenuComposeGrid: React.FC<BookingMenuComposeGridProps> = ({
     categoryImageByKey,
     selectedItems,
     locked,
+    compilableCategoryKeys,
     formatPrice,
     onToggleItem,
     resetKey: `${presetMenu ?? 'no-preset'}:${composeCollapseKey ?? '0'}`,

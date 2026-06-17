@@ -27,8 +27,8 @@
     "db:diff": "supabase db diff",
     "db:types": "supabase gen types typescript --local > src/types/database.ts",
     "db:types:linked": "supabase gen types typescript --linked > src/types/database.ts",
-    "seed:booking-menu-full": "node --env-file=.env.local scripts/seed-full-menu-booking.mjs",
-    "seed:booking-table": "node --env-file=.env.local scripts/seed-table-booking.mjs"
+    "seed:booking-menu-full": "node --env-file=.env.local.test scripts/seed-full-menu-booking.mjs",
+    "seed:booking-table": "node --env-file=.env.local.test scripts/seed-table-booking.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

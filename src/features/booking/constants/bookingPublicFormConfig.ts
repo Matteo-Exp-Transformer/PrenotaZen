@@ -347,6 +347,13 @@ export interface SubTab {
   hidden_item_ids?: string[]
   /** Ordine card categorie in Pagina Prenota (solo sub-tab con preset). */
   category_order_keys?: string[]
+  /**
+   * Chiavi categoria compilabili dal cliente (solo card personalizzabili, `is_fixed_menu === false`).
+   * Assente = tutte le categorie visibili sono compilabili (backward compatibility).
+   * Array vuoto = nessuna categoria compilabile.
+   * Con «Menù personalizzabile» OFF: non salvare/persistere questo campo.
+   */
+  compilable_category_keys?: string[]
   carousel_items?: CarouselItem[]
   /**
    * Carosello: se `false`, il riepilogo Prenota nasconde il nome carosello (`label`) nelle righe
@@ -599,6 +606,15 @@ export function parseSubTabFromUnknown(raw: unknown): SubTab | null {
       ? o.show_offer_details_in_summary
       : undefined
 
+  const is_fixed_menu = typeof o.is_fixed_menu === 'boolean' ? o.is_fixed_menu : undefined
+  // compilable_category_keys: solo per card personalizzabili (is_fixed_menu === false)
+  const compilable_category_keys =
+    display === 'cards' && is_fixed_menu === false && Array.isArray(o.compilable_category_keys)
+      ? (o.compilable_category_keys as unknown[])
+          .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+          .map((v) => v.trim())
+      : undefined
+
   const parsed: SubTab = {
     id,
     display,
@@ -606,12 +622,13 @@ export function parseSubTabFromUnknown(raw: unknown): SubTab | null {
     icon,
     preset_id,
     price_per_person,
-    is_fixed_menu: typeof o.is_fixed_menu === 'boolean' ? o.is_fixed_menu : undefined,
+    is_fixed_menu,
     description: display === 'carousel' ? undefined : description,
     courses_label: display === 'carousel' ? undefined : courses_label,
     hidden_category_keys,
     hidden_item_ids,
     category_order_keys,
+    compilable_category_keys,
     carousel_items,
     show_offer_details_in_summary:
       display === 'carousel' ? show_offer_details_in_summary : undefined,
@@ -755,6 +772,10 @@ export function normalizeBookingPublicFormConfig(
           hidden_category_keys: tab.hidden_category_keys?.filter((v) => v.trim()) ?? undefined,
           hidden_item_ids: tab.hidden_item_ids?.filter((v) => v.trim()) ?? undefined,
           category_order_keys: tab.category_order_keys?.filter((v) => v.trim()) ?? undefined,
+          // compilable_category_keys: solo per card personalizzabili; strip se menu fisso
+          compilable_category_keys: isPersonalizzabileCard
+            ? tab.compilable_category_keys?.filter((v) => typeof v === 'string' && v.trim().length > 0) ?? undefined
+            : undefined,
           carousel_items: tab.carousel_items,
           courses_label:
             display === 'cards' && tab.courses_label?.trim()

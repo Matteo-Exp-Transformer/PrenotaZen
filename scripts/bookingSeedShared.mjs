@@ -16,8 +16,33 @@ export const PLACEHOLDER_SLUGS = new Set([
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+/** Stesso ordine di playwright.config.ts: E2E/QA prima, poi slug dev. */
+const ENV_FILES = ['.env.local.test', '.env.local', '.env']
+
+const TENANT_SLUG_ENV_KEYS = [
+  'E2E_TENANT_SLUG',
+  'E2E_PUBLIC_BOOKING_SLUG',
+  'MANUAL_TENANT_SLUG',
+  'TENANT_SLUG',
+  'VITE_TENANT_SLUG',
+]
+
+/** Slug predefinito allineato a TESTING_SKILL (smoke pubblici / account tomas@t.com). */
+export const DEFAULT_SEED_TENANT_SLUG = 'da-tommaso'
+
+function unquoteEnvValue(raw) {
+  let v = raw.trim()
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1)
+  }
+  return v.trim()
+}
+
 export function parseTenantSlugFromProjectRoot() {
-  for (const name of ['.env.local', '.env']) {
+  for (const name of ENV_FILES) {
     const p = join(PROJECT_ROOT, name)
     if (!existsSync(p)) continue
     let text = readFileSync(p, 'utf8')
@@ -25,17 +50,12 @@ export function parseTenantSlugFromProjectRoot() {
     for (let line of text.split(/\r?\n/)) {
       line = line.trim()
       if (!line || line.startsWith('#')) continue
-      const m = /^(?:export\s+)?(TENANT_SLUG|VITE_TENANT_SLUG)\s*=\s*(.*)$/.exec(line)
-      if (!m) continue
-      let v = m[2].trim()
-      if (
-        (v.startsWith('"') && v.endsWith('"')) ||
-        (v.startsWith("'") && v.endsWith("'"))
-      ) {
-        v = v.slice(1, -1)
+      for (const key of TENANT_SLUG_ENV_KEYS) {
+        const m = new RegExp(`^(?:export\\s+)?${key}\\s*=\\s*(.*)$`).exec(line)
+        if (!m) continue
+        const slug = unquoteEnvValue(m[1])
+        if (slug) return slug
       }
-      const slug = v.trim()
-      if (slug) return slug
     }
   }
   return null
@@ -49,7 +69,7 @@ export function parseEnvVarFromProjectRoot(varName) {
   const escaped = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const lineRe = new RegExp(`^(?:export\\s+)?${escaped}\\s*=\\s*(.*)$`)
 
-  for (const name of ['.env.local', '.env']) {
+  for (const name of ENV_FILES) {
     const p = join(PROJECT_ROOT, name)
     if (!existsSync(p)) continue
     let text = readFileSync(p, 'utf8')
@@ -59,42 +79,40 @@ export function parseEnvVarFromProjectRoot(varName) {
       if (!line || line.startsWith('#')) continue
       const m = lineRe.exec(line)
       if (!m) continue
-      let v = m[1].trim()
-      if (
-        (v.startsWith('"') && v.endsWith('"')) ||
-        (v.startsWith("'") && v.endsWith("'"))
-      ) {
-        v = v.slice(1, -1)
-      }
-      const out = v.trim()
+      const out = unquoteEnvValue(m[1])
       if (out) return out
     }
   }
   return null
 }
 
-/** Service role: prima process.env, poi file (nome esatto SUPABASE_SERVICE_ROLE_KEY). */
+/** Service role: alias Playwright E2E_SUPABASE_SERVICE_KEY, poi SUPABASE_SERVICE_ROLE_KEY. */
 export function resolveServiceRoleKey() {
-  const fromShell = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
-  if (fromShell) return fromShell
-  const fromFile = parseEnvVarFromProjectRoot('SUPABASE_SERVICE_ROLE_KEY')
-  return (fromFile || '').trim()
+  for (const key of ['E2E_SUPABASE_SERVICE_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) {
+    const fromShell = (process.env[key] || '').trim()
+    if (fromShell) return fromShell
+    const fromFile = parseEnvVarFromProjectRoot(key)
+    if ((fromFile || '').trim()) return fromFile.trim()
+  }
+  return ''
 }
 
 export function serviceRoleKeyOrigin() {
-  if ((process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()) return 'process.env (--env-file o shell)'
-  if (parseEnvVarFromProjectRoot('SUPABASE_SERVICE_ROLE_KEY')) return 'file .env.local / .env (lettura diretta)'
+  for (const key of ['E2E_SUPABASE_SERVICE_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) {
+    if ((process.env[key] || '').trim()) return `process.env ${key} (--env-file o shell)`
+    if (parseEnvVarFromProjectRoot(key)) return `file ${key} (.env.local.test / .env.local)`
+  }
   return 'assente'
 }
 
 export function resolveTenantSlugFromEnv() {
+  for (const key of TENANT_SLUG_ENV_KEYS) {
+    const fromShell = (process.env[key] || '').trim()
+    if (fromShell) return fromShell
+  }
   const slugFromFile = parseTenantSlugFromProjectRoot()
-  return (
-    slugFromFile ||
-    process.env.TENANT_SLUG ||
-    process.env.VITE_TENANT_SLUG ||
-    ''
-  ).trim()
+  if (slugFromFile) return slugFromFile
+  return DEFAULT_SEED_TENANT_SLUG
 }
 
 export function createBookingDateTime(dateStr, timeStr, isStart = true, startTime) {

@@ -67,6 +67,20 @@ vi.mock('../../hooks/useBookingMutations', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useRestaurantSetting', () => ({
+  useRestaurantSetting: (key: string) => ({
+    data:
+      key === 'booking_public_form_config'
+        ? { booking_modes: [] }
+        : key === 'booking_custom_staff_presets'
+          ? []
+          : key === 'booking_menu_promos'
+            ? []
+            : null,
+    isLoading: false,
+  }),
+}))
+
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
