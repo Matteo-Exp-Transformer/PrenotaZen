@@ -61,6 +61,7 @@ import {
   BOOKING_PUBLIC_FIELD_ATTENTION_CLASS,
   BOOKING_PUBLIC_FIELD_SCROLL_MARGIN,
   dispatchBookingMenuComposeCollapse,
+  resolveBookingPublicErrorElementId,
   shouldDismissBookingPublicAttention,
 } from '../utils/bookingPublicFormAttention'
 import { useFormValidationAttention } from '../hooks/useFormValidationAttention'
@@ -310,6 +311,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   } = useFormValidationAttention({
     errorFieldIds: BOOKING_PUBLIC_ERROR_FIELD_IDS,
     onCollapsePanels: dispatchBookingMenuComposeCollapse,
+    resolveElementId: resolveBookingPublicErrorElementId,
   })
 
   const enabledBookingModes = useMemo(

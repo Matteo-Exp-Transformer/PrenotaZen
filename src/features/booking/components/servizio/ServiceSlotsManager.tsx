@@ -1,7 +1,7 @@
 import type { FC, FormEvent, ReactNode } from 'react'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Plus, Pencil, Trash2, AlertCircle, Clock, Users, CalendarClock, ChevronDown, X, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, Trash2, AlertCircle, Clock, Users, CalendarClock, ChevronUp, ChevronDown, X, RotateCcw } from 'lucide-react'
 import { Modal, Button, Input, TimePicker24h } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { CollapsibleCard } from '@/components/ui/CollapsibleCard'
@@ -1003,6 +1003,11 @@ interface SlotRowProps {
   activeOverrides: ServiceSlotOverride[]
   onRemoveOverride: (id: string) => void
   isRemovingOverride: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+  canMoveUp: boolean
+  canMoveDown: boolean
+  isMoving: boolean
 }
 
 /** Badge coperti/turni + azioni modifica/elimina fascia. Condiviso tra riga semplice e card. */
@@ -1013,7 +1018,12 @@ const SlotControls: FC<{
   onToggleClosed: (slot: ServiceSlot) => void
   isDeleting: boolean
   isTogglingClosed: boolean
-}> = ({ slot, onEdit, onDelete, onToggleClosed, isDeleting, isTogglingClosed }) => {
+  onMoveUp: () => void
+  onMoveDown: () => void
+  canMoveUp: boolean
+  canMoveDown: boolean
+  isMoving: boolean
+}> = ({ slot, onEdit, onDelete, onToggleClosed, isDeleting, isTogglingClosed, onMoveUp, onMoveDown, canMoveUp, canMoveDown, isMoving }) => {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const closed = isServiceSlotClosed(slot)
   const busy = isDeleting || isTogglingClosed
@@ -1058,6 +1068,26 @@ const SlotControls: FC<{
         </>
       ) : (
         <>
+          <div className="flex flex-col gap-0.5">
+            <button
+              type="button"
+              aria-label={`Sposta su fascia ${slot.name}`}
+              disabled={!canMoveUp || isMoving || busy}
+              onClick={onMoveUp}
+              className="rounded p-0.5 text-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronUp className="h-4 w-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label={`Sposta giù fascia ${slot.name}`}
+              disabled={!canMoveDown || isMoving || busy}
+              onClick={onMoveDown}
+              className="rounded p-0.5 text-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
           <Button
             type="button"
             variant={closed ? 'outline' : 'ghost'}
@@ -1109,6 +1139,11 @@ const SlotRow: FC<SlotRowProps> = ({
   activeOverrides,
   onRemoveOverride,
   isRemovingOverride,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
+  isMoving,
 }) => {
   const closed = isServiceSlotClosed(slot)
   const timeLabel = `${slot.start_time.slice(0, 5)} → ${slot.end_time.slice(0, 5)}`
@@ -1130,6 +1165,11 @@ const SlotRow: FC<SlotRowProps> = ({
           onToggleClosed={onToggleClosed}
           isDeleting={isDeleting}
           isTogglingClosed={isTogglingClosed}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          isMoving={isMoving}
         />
       </div>
     )
@@ -1177,6 +1217,11 @@ const SlotRow: FC<SlotRowProps> = ({
             onToggleClosed={onToggleClosed}
             isDeleting={isDeleting}
             isTogglingClosed={isTogglingClosed}
+            onMoveUp={onMoveUp}
+            onMoveDown={onMoveDown}
+            canMoveUp={canMoveUp}
+            canMoveDown={canMoveDown}
+            isMoving={isMoving}
           />
         </>
       }
@@ -1202,9 +1247,33 @@ export const ServiceSlotsManager: FC = () => {
   const deleteOverride = useDeleteServiceSlotOverride()
   const updateSlot = useUpdateServiceSlot()
   const [togglingClosedId, setTogglingClosedId] = useState<string | null>(null)
+  const [isMovingSlot, setIsMovingSlot] = useState(false)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ServiceSlot | null>(null)
+
+  function persistSlotOrder(reordered: ServiceSlot[]) {
+    setIsMovingSlot(true)
+    Promise.all(
+      reordered.map((slot, displayOrder) =>
+        updateSlot.mutateAsync({ id: slot.id, display_order: displayOrder, skipToast: true })
+      )
+    ).finally(() => setIsMovingSlot(false))
+  }
+
+  function moveSlotUp(idx: number) {
+    if (idx <= 0 || isMovingSlot) return
+    const reordered = [...slots]
+    ;[reordered[idx - 1], reordered[idx]] = [reordered[idx], reordered[idx - 1]]
+    persistSlotOrder(reordered)
+  }
+
+  function moveSlotDown(idx: number) {
+    if (idx >= slots.length - 1 || isMovingSlot) return
+    const reordered = [...slots]
+    ;[reordered[idx], reordered[idx + 1]] = [reordered[idx + 1], reordered[idx]]
+    persistSlotOrder(reordered)
+  }
 
   function openAdd() {
     setEditing(null)
@@ -1289,7 +1358,7 @@ export const ServiceSlotsManager: FC = () => {
 
       {!isLoading && !error && slots.length > 0 && (
         <div className="space-y-2">
-          {slots.map((slot) => (
+          {slots.map((slot, idx) => (
             <SlotRow
               key={slot.id}
               slot={slot}
@@ -1301,6 +1370,11 @@ export const ServiceSlotsManager: FC = () => {
               activeOverrides={getActiveOverrides(overrides, slot.id)}
               onRemoveOverride={(id) => deleteOverride.mutate(id)}
               isRemovingOverride={deleteOverride.isPending}
+              onMoveUp={() => moveSlotUp(idx)}
+              onMoveDown={() => moveSlotDown(idx)}
+              canMoveUp={idx > 0}
+              canMoveDown={idx < slots.length - 1}
+              isMoving={isMovingSlot}
             />
           ))}
         </div>

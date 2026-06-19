@@ -8,6 +8,8 @@ export type UseFormValidationAttentionOptions = {
   errorFieldIds: Record<string, string>
   /** Chiusura pannelli espansi prima dello scroll (es. card ingredienti Prenota). */
   onCollapsePanels?: () => void
+  /** Resolver custom per l'id DOM — utile quando un elemento può essere assente e serve un fallback. */
+  resolveElementId?: (key: string) => string | null
 }
 
 /**
@@ -17,6 +19,7 @@ export type UseFormValidationAttentionOptions = {
 export function useFormValidationAttention({
   errorFieldIds,
   onCollapsePanels,
+  resolveElementId,
 }: UseFormValidationAttentionOptions) {
   const [attentionFieldKey, setAttentionFieldKey] = useState<string | null>(null)
   const [composeCollapseNonce, setComposeCollapseNonce] = useState(0)
@@ -32,10 +35,10 @@ export function useFormValidationAttention({
       onCollapsePanels?.()
       if (!firstErrorKey) return
       runAfterTripleAnimationFrame(() => {
-        scrollToFormValidationError(firstErrorKey, errorFieldIds)
+        scrollToFormValidationError(firstErrorKey, errorFieldIds, resolveElementId)
       })
     },
-    [errorFieldIds, onCollapsePanels],
+    [errorFieldIds, onCollapsePanels, resolveElementId],
   )
 
   return {

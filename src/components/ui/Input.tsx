@@ -1,20 +1,43 @@
-import React from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { mergeWheelHandlers, suppressNumberInputWheel } from '@/lib/suppressNumberInputWheel'
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement>
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, dir, style, onWheel, ...props }, ref) => {
-    const handleWheel =
-      type === 'number'
-        ? mergeWheelHandlers(suppressNumberInputWheel, onWheel)
-        : onWheel
+    const innerRef = useRef<HTMLInputElement | null>(null)
+
+    const combinedRef = useCallback(
+      (node: HTMLInputElement | null) => {
+        innerRef.current = node
+        if (typeof ref === 'function') {
+          ref(node)
+        } else if (ref != null) {
+          ;(ref as React.MutableRefObject<HTMLInputElement | null>).current = node
+        }
+      },
+      [ref],
+    )
+
+    // Usa listener nativo con { passive: false } perché l'onWheel di React viene delegato
+    // alla radice e i browser moderni ignorano preventDefault() su wheel passivo.
+    useEffect(() => {
+      if (type !== 'number') return
+      const el = innerRef.current
+      if (!el) return
+      const handler = (e: WheelEvent) => {
+        if (document.activeElement === e.currentTarget) {
+          e.preventDefault()
+        }
+      }
+      el.addEventListener('wheel', handler, { passive: false })
+      return () => el.removeEventListener('wheel', handler)
+    }, [type])
 
     return (
       <input
         type={type}
-        ref={ref}
+        ref={combinedRef}
         dir={dir ?? 'ltr'}
         style={{
           direction: 'ltr',
@@ -29,7 +52,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           'transition-colors duration-150',
           className
         )}
-        onWheel={handleWheel}
+        onWheel={onWheel}
         {...props}
       />
     )

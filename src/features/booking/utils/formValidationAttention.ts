@@ -29,8 +29,11 @@ export function resolveFormErrorElementId(
 export function scrollToFormValidationError(
   errorKey: string,
   errorFieldIds: Record<string, string>,
+  resolveId?: (key: string) => string | null,
 ): void {
-  const fieldId = resolveFormErrorElementId(errorKey, errorFieldIds)
+  const fieldId = resolveId
+    ? resolveId(errorKey)
+    : resolveFormErrorElementId(errorKey, errorFieldIds)
   if (!fieldId) return
 
   const element = document.getElementById(fieldId)
