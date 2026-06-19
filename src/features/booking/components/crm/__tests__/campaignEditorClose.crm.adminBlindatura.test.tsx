@@ -26,10 +26,18 @@ const baseCampaign = (): EmailCampaign => ({
   updated_at: '2026-01-01T00:00:00Z',
 })
 
-const { mockMutateCreate, mockMutateUpdate, mockConfirmNavigation } = vi.hoisted(() => ({
+const {
+  mockMutateCreate,
+  mockMutateUpdate,
+  mockMutatePrune,
+  mockConfirmNavigation,
+  mockFilterEmailsWithMarketingConsent,
+} = vi.hoisted(() => ({
   mockMutateCreate: vi.fn(),
   mockMutateUpdate: vi.fn(),
+  mockMutatePrune: vi.fn(),
   mockConfirmNavigation: vi.fn().mockResolvedValue(true),
+  mockFilterEmailsWithMarketingConsent: vi.fn(),
 }))
 
 vi.mock('react-toastify', () => ({
@@ -48,19 +56,34 @@ vi.mock('@/contexts/UnsavedChangesContext', () => ({
 vi.mock('@/features/booking/hooks/useEmailCampaignMutations', () => ({
   useCreateCampaign: () => ({ mutate: mockMutateCreate, isPending: false }),
   useUpdateCampaign: () => ({ mutate: mockMutateUpdate, isPending: false }),
+  usePruneCampaignRecipients: () => ({ mutate: mockMutatePrune, isPending: false }),
   useDeleteCampaign: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
+vi.mock('@/features/booking/utils/promoRecipientEligibility', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/booking/utils/promoRecipientEligibility')>()
+  return {
+    ...actual,
+    filterEmailsWithMarketingConsent: mockFilterEmailsWithMarketingConsent,
+  }
+})
+
 vi.mock('@/features/booking/hooks/useCustomers', () => ({
-  useCustomers: () => ({ customers: [] }),
+  useCustomers: () => ({ customers: [], isLoading: false }),
 }))
 
 describe('CampaignEditor — chiusura dopo Salva / Annulla', () => {
   beforeEach(() => {
     mockMutateCreate.mockReset()
     mockMutateUpdate.mockReset()
+    mockMutatePrune.mockReset()
     mockConfirmNavigation.mockReset()
+    mockFilterEmailsWithMarketingConsent.mockReset()
     mockConfirmNavigation.mockResolvedValue(true)
+    mockFilterEmailsWithMarketingConsent.mockImplementation(async (_tenantId, emails: string[]) => ({
+      allowed: emails,
+      skipped: 0,
+    }))
 
     mockMutateCreate.mockImplementation((_payload, { onSuccess }) => onSuccess?.())
     mockMutateUpdate.mockImplementation((_payload, { onSuccess }) => onSuccess?.())

@@ -8,6 +8,7 @@ import { PromoRecipientPicker } from './PromoRecipientPicker'
 import {
   useCreateCampaign,
   useUpdateCampaign,
+  usePruneCampaignRecipients,
   useDeleteCampaign,
   type CadenceType,
   type CadenceConfig,
@@ -18,6 +19,8 @@ import {
   parseCampaignRecipients,
   type EmailCampaign,
 } from '@/features/booking/hooks/useEmailCampaigns'
+import { filterEmailsWithMarketingConsent, filterRecipientsToEligible, isEligiblePromoRecipient } from '@/features/booking/utils/promoRecipientEligibility'
+import { useCustomers } from '@/features/booking/hooks/useCustomers'
 import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
 
 interface Props {
@@ -38,6 +41,9 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
   const [recipients, setRecipients] = useState<string[]>(
     campaign ? parseCampaignRecipients(campaign.recipient_emails) : [],
   )
+  const [baseRecipients, setBaseRecipients] = useState<string[]>(
+    campaign ? parseCampaignRecipients(campaign.recipient_emails) : [],
+  )
   const [cadenceType, setCadenceType] = useState<CadenceType>(
     (campaign?.cadence_type as CadenceType) ?? 'none',
   )
@@ -56,7 +62,23 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
     confirmNavigation,
   } = useUnsavedChangesGuard()
 
+  const { customers, isLoading: customersLoading } = useCustomers()
+  const eligibleEmailsFromCustomers = useMemo(
+    () => new Set(customers.filter(isEligiblePromoRecipient).map((c) => c.email)),
+    [customers],
+  )
+
+  const displayRecipientCount = useMemo(() => {
+    if (customersLoading) return recipients.length
+    return filterRecipientsToEligible(recipients, eligibleEmailsFromCustomers).length
+  }, [recipients, eligibleEmailsFromCustomers, customersLoading])
+
   const loadedCampaignIdRef = useRef<string | null>(campaign?.id ?? null)
+  const prunedForCampaignIdRef = useRef<string | null>(null)
+  const campaignRecipientsForLoad = useMemo(
+    () => (campaign ? parseCampaignRecipients(campaign.recipient_emails) : []),
+    [campaign],
+  )
 
   // Sincronizza solo al cambio campagna (id), non su refetch con stesso id — preserva draft locale
   // (inclusi destinatari confermati nel picker ma non ancora salvati su DB).
@@ -72,14 +94,96 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
     setBody(campaign.body)
     setHeading(campaign.heading ?? '')
     setLinks(parseCampaignLinks(campaign.links))
-    setRecipients(parseCampaignRecipients(campaign.recipient_emails))
+    const nextRecipients = parseCampaignRecipients(campaign.recipient_emails)
+    setRecipients(nextRecipients)
+    setBaseRecipients(nextRecipients)
     setCadenceType((campaign.cadence_type as CadenceType) ?? 'none')
     setCadenceConfig((campaign.cadence_config as CadenceConfig | null) ?? null)
   }, [campaign])
 
   const create = useCreateCampaign()
   const update = useUpdateCampaign()
+  const { mutate: pruneCampaignRecipients } = usePruneCampaignRecipients()
   const remove = useDeleteCampaign()
+
+  useEffect(() => {
+    if (!campaign) {
+      prunedForCampaignIdRef.current = null
+      setBaseRecipients([])
+      return
+    }
+    if (prunedForCampaignIdRef.current === campaign.id) return
+
+    const savedRecipients = campaignRecipientsForLoad
+    if (savedRecipients.length === 0) {
+      prunedForCampaignIdRef.current = campaign.id
+      setRecipients([])
+      setBaseRecipients([])
+      return
+    }
+
+    let cancelled = false
+
+    void filterEmailsWithMarketingConsent(campaign.tenant_id, savedRecipients)
+      .then(({ allowed }) => {
+        if (cancelled) return
+
+        prunedForCampaignIdRef.current = campaign.id
+
+        if (JSON.stringify(allowed) === JSON.stringify(savedRecipients)) return
+
+        setRecipients(allowed)
+        setBaseRecipients(allowed)
+
+        pruneCampaignRecipients(
+          { id: campaign.id, recipient_emails: allowed },
+          {
+            onError: (e) => {
+              toast.error(`Gruppo destinatari aggiornato solo in lettura: ${e.message}`)
+            },
+          },
+        )
+      })
+      .catch((e: Error) => {
+        if (cancelled) return
+        toast.error(`Impossibile verificare il consenso marketing: ${e.message}`)
+      })
+
+    return () => {
+      cancelled = true
+      prunedForCampaignIdRef.current = null
+    }
+  }, [campaign, campaignRecipientsForLoad, pruneCampaignRecipients])
+
+  // Riallineamento live su revoca consenso (refetch rubrica) — solo con picker chiuso.
+  useEffect(() => {
+    if (!campaign || pickerOpen || customersLoading) return
+
+    const pruned = filterRecipientsToEligible(recipients, eligibleEmailsFromCustomers)
+    if (JSON.stringify(pruned) === JSON.stringify(recipients)) return
+
+    setRecipients(pruned)
+    setBaseRecipients(pruned)
+
+    const savedInDb = parseCampaignRecipients(campaign.recipient_emails)
+    if (JSON.stringify(pruned) !== JSON.stringify(savedInDb)) {
+      pruneCampaignRecipients(
+        { id: campaign.id, recipient_emails: pruned },
+        {
+          onError: (e) => {
+            toast.error(`Gruppo destinatari aggiornato solo in lettura: ${e.message}`)
+          },
+        },
+      )
+    }
+  }, [
+    campaign,
+    pickerOpen,
+    customersLoading,
+    eligibleEmailsFromCustomers,
+    recipients,
+    pruneCampaignRecipients,
+  ])
 
   const dirty = useMemo(() => {
     if (isNew) {
@@ -91,11 +195,11 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
       body !== (campaign?.body ?? '') ||
       heading !== (campaign?.heading ?? '') ||
       JSON.stringify(links) !== JSON.stringify(parseCampaignLinks(campaign!.links)) ||
-      JSON.stringify(recipients) !== JSON.stringify(parseCampaignRecipients(campaign!.recipient_emails)) ||
+      JSON.stringify(recipients) !== JSON.stringify(baseRecipients) ||
       cadenceType !== ((campaign?.cadence_type as CadenceType) ?? 'none') ||
       JSON.stringify(cadenceConfig) !== JSON.stringify((campaign?.cadence_config as CadenceConfig | null) ?? null)
     )
-  }, [isNew, name, subject, body, heading, links, recipients, cadenceType, cadenceConfig, campaign])
+  }, [isNew, name, subject, body, heading, links, recipients, baseRecipients, cadenceType, cadenceConfig, campaign])
 
   const guardId = `campaign-editor-${campaign?.id ?? 'new'}`
   const guardLabel = isNew ? 'Nuova campagna' : `Email personalizzata: ${campaign!.name}`
@@ -145,10 +249,10 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
     setBody(campaign?.body ?? '')
     setHeading(campaign?.heading ?? '')
     setLinks(campaign ? parseCampaignLinks(campaign.links) : [])
-    setRecipients(campaign ? parseCampaignRecipients(campaign.recipient_emails) : [])
+    setRecipients(campaign ? baseRecipients : [])
     setCadenceType((campaign?.cadence_type as CadenceType) ?? 'none')
     setCadenceConfig((campaign?.cadence_config as CadenceConfig | null) ?? null)
-  }, [campaign])
+  }, [campaign, baseRecipients])
 
   useEffect(() => {
     registerUnsavedSource(guardId, guardLabel, dirty)
@@ -247,8 +351,8 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
         <Label>Gruppo destinatari salvato</Label>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-slate-600">
-            {recipients.length > 0
-              ? `${recipients.length} contatt${recipients.length === 1 ? 'o' : 'i'} salvat${recipients.length === 1 ? 'o' : 'i'}`
+            {displayRecipientCount > 0
+              ? `${displayRecipientCount} contatt${displayRecipientCount === 1 ? 'o' : 'i'} salvat${displayRecipientCount === 1 ? 'o' : 'i'}`
               : 'Nessun destinatario salvato'}
           </span>
           <Button
@@ -257,10 +361,10 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
             size="sm"
             onClick={() => setPickerOpen(true)}
           >
-            {recipients.length > 0 ? 'Modifica gruppo…' : 'Scegli gruppo…'}
+            {displayRecipientCount > 0 ? 'Modifica gruppo…' : 'Scegli gruppo…'}
           </Button>
         </div>
-        {recipients.length > 0 && (
+        {displayRecipientCount > 0 && (
           <p className="text-xs text-slate-400">
             Nota: il gruppo è fisso alla creazione e non si aggiorna con i nuovi clienti.
           </p>

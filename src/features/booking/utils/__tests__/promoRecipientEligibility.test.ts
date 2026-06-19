@@ -16,6 +16,8 @@ vi.mock('@/lib/logger', () => ({
 import {
   isEligiblePromoRecipient,
   filterEmailsWithMarketingConsent,
+  filterRecipientsToEligible,
+  countEligibleRecipients,
 } from '../promoRecipientEligibility'
 
 function profile(overrides: Partial<CustomerProfile> = {}): CustomerProfile {
@@ -41,6 +43,28 @@ describe('promoRecipientEligibility', () => {
       expect(isEligiblePromoRecipient(profile({ marketing_consent: false }))).toBe(false)
       expect(isEligiblePromoRecipient(profile({ source: 'manual' }))).toBe(false)
       expect(isEligiblePromoRecipient(profile({ email: '' }))).toBe(false)
+    })
+  })
+
+  describe('filterRecipientsToEligible', () => {
+    it('tiene solo email presenti nel set eleggibili', () => {
+      const eligible = new Set(['alice@example.com', 'bob@example.com'])
+      expect(
+        filterRecipientsToEligible(
+          ['alice@example.com', 'revoked@example.com', 'bob@example.com'],
+          eligible,
+        ),
+      ).toEqual(['alice@example.com', 'bob@example.com'])
+    })
+
+    it('countEligibleRecipients conta la intersezione', () => {
+      const eligible = new Set(['alice@example.com'])
+      expect(
+        countEligibleRecipients(['alice@example.com', 'ghost@example.com'], eligible),
+      ).toBe(1)
+      expect(countEligibleRecipients(new Set(['alice@example.com', 'ghost@example.com']), eligible)).toBe(
+        1,
+      )
     })
   })
 

@@ -32,14 +32,37 @@ const campaigns = [
   baseCampaign({ id: 'camp-2', name: 'Inverno', subject: 'Offerta inverno' }),
 ]
 
-const { mockConfirmNavigation, mockSendMutate } = vi.hoisted(() => ({
+const {
+  mockConfirmNavigation,
+  mockSendMutate,
+  mockRefetchQueries,
+  mockPruneAsync,
+  mockFilterEmailsWithMarketingConsent,
+} = vi.hoisted(() => ({
   mockConfirmNavigation: vi.fn().mockResolvedValue(true),
   mockSendMutate: vi.fn(),
+  mockRefetchQueries: vi.fn().mockResolvedValue(undefined),
+  mockPruneAsync: vi.fn().mockResolvedValue(undefined),
+  mockFilterEmailsWithMarketingConsent: vi.fn(),
 }))
 
 vi.mock('react-toastify', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warn: vi.fn() },
 }))
+
+vi.mock('@/contexts/TenantContext', () => ({
+  useTenantContext: () => ({ tenantId: 'tenant-1' }),
+}))
+
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>()
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      refetchQueries: mockRefetchQueries,
+    }),
+  }
+})
 
 vi.mock('@/contexts/UnsavedChangesContext', () => ({
   useUnsavedChangesGuard: () => ({
@@ -49,9 +72,14 @@ vi.mock('@/contexts/UnsavedChangesContext', () => ({
 
 vi.mock('@/features/booking/hooks/useEmailCampaigns', () => ({
   useEmailCampaigns: () => ({ data: campaigns, isLoading: false }),
+  EMAIL_CAMPAIGNS_QUERY_KEY: 'email-campaigns',
   EMAIL_CAMPAIGNS_MAX: 5,
   parseCampaignLinks: () => [],
   parseCampaignRecipients: (raw: unknown) => (Array.isArray(raw) ? raw : []),
+}))
+
+vi.mock('@/features/booking/hooks/useEmailCampaignMutations', () => ({
+  usePruneCampaignRecipients: () => ({ mutateAsync: mockPruneAsync, isPending: false }),
 }))
 
 vi.mock('@/features/booking/hooks/useSendCampaignEmail', () => ({
@@ -61,6 +89,35 @@ vi.mock('@/features/booking/hooks/useSendCampaignEmail', () => ({
 vi.mock('@/features/booking/hooks/useEmailNotifications', () => ({
   areEmailNotificationsEnabled: () => true,
 }))
+
+vi.mock('@/features/booking/hooks/useCustomers', () => ({
+  CRM_QUERY_KEY: 'crm-customer-profiles',
+  useCustomers: () => ({
+    customers: [
+      {
+        email: 'alice@example.com',
+        name: 'Alice',
+        source: 'booking' as const,
+        booking_count: 1,
+        total_guests: 2,
+        bookings: [],
+        accepted_count: 1,
+        pending_count: 0,
+        cancelled_count: 0,
+        marketing_consent: true,
+      },
+    ],
+    isLoading: false,
+  }),
+}))
+
+vi.mock('@/features/booking/utils/promoRecipientEligibility', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/booking/utils/promoRecipientEligibility')>()
+  return {
+    ...actual,
+    filterEmailsWithMarketingConsent: mockFilterEmailsWithMarketingConsent,
+  }
+})
 
 vi.mock('../CampaignEditor', () => ({
   CampaignEditor: ({ onClose }: { onClose: () => void }) => (
@@ -81,6 +138,17 @@ describe('CampaignsManager — toggle riga campagna', () => {
     mockConfirmNavigation.mockReset()
     mockConfirmNavigation.mockResolvedValue(true)
     mockSendMutate.mockReset()
+    mockRefetchQueries.mockReset()
+    mockRefetchQueries.mockResolvedValue(undefined)
+    mockPruneAsync.mockReset()
+    mockPruneAsync.mockResolvedValue(undefined)
+    mockFilterEmailsWithMarketingConsent.mockReset()
+    mockFilterEmailsWithMarketingConsent.mockImplementation(
+      async (_tenantId: string, emails: string[]) => ({
+        allowed: emails,
+        skipped: 0,
+      }),
+    )
   })
 
   it('apre l\'editor al primo clic sulla riga campagna', async () => {

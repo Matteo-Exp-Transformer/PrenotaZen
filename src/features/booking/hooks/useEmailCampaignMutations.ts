@@ -29,6 +29,11 @@ export interface UpdateCampaignInput extends CreateCampaignInput {
   id: string
 }
 
+export interface PruneCampaignRecipientsInput {
+  id: string
+  recipient_emails: string[]
+}
+
 export function useCreateCampaign() {
   const queryClient = useQueryClient()
   const { tenantId } = useTenantContext()
@@ -86,6 +91,29 @@ export function useUpdateCampaign() {
           cadence_config: (input.cadence_config ?? null) as unknown as Json,
           enabled: input.enabled ?? true,
           heading: input.heading?.trim() || null,
+        })
+        .eq('id', input.id)
+        .eq('tenant_id', tenantId)
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [EMAIL_CAMPAIGNS_QUERY_KEY, tenantId] })
+    },
+  })
+}
+
+export function usePruneCampaignRecipients() {
+  const queryClient = useQueryClient()
+  const { tenantId } = useTenantContext()
+
+  return useMutation({
+    mutationFn: async (input: PruneCampaignRecipientsInput) => {
+      if (!tenantId) throw new Error('Tenant non disponibile')
+
+      const { error } = await supabase
+        .from('email_campaigns')
+        .update({
+          recipient_emails: input.recipient_emails as unknown as Json,
         })
         .eq('id', input.id)
         .eq('tenant_id', tenantId)

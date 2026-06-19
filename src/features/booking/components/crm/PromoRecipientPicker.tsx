@@ -2,7 +2,11 @@ import type { FC } from 'react'
 import { useState, useMemo, useEffect } from 'react'
 import { Button, Modal, Input } from '@/components/ui'
 import { useCustomers } from '@/features/booking/hooks/useCustomers'
-import { isEligiblePromoRecipient } from '@/features/booking/utils/promoRecipientEligibility'
+import {
+  countEligibleRecipients,
+  filterRecipientsToEligible,
+  isEligiblePromoRecipient,
+} from '@/features/booking/utils/promoRecipientEligibility'
 
 interface Props {
   isOpen: boolean
@@ -25,12 +29,27 @@ export const PromoRecipientPicker: FC<Props> = ({
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialRecipients))
   const [search, setSearch] = useState('')
 
-  // Seed draft solo all'apertura: resta stabile durante refetch clienti o edit campagna.
+  const eligibleSelectedCount = useMemo(
+    () => countEligibleRecipients(selected, eligibleEmails),
+    [selected, eligibleEmails],
+  )
+
+  // Seed draft solo all'apertura: intersect con eleggibili, stabile fino a Conferma/Annulla.
   useEffect(() => {
     if (!isOpen) return
-    setSelected(new Set(initialRecipients))
+    setSelected(new Set(filterRecipientsToEligible(initialRecipients, eligibleEmails)))
     setSearch('')
   }, [isOpen])
+
+  // Revoca consenso con modale aperto: togli solo email non più eleggibili, preserva draft valido.
+  useEffect(() => {
+    if (!isOpen) return
+    setSelected((prev) => {
+      const pruned = filterRecipientsToEligible(Array.from(prev), eligibleEmails)
+      if (pruned.length === prev.size && pruned.every((email) => prev.has(email))) return prev
+      return new Set(pruned)
+    })
+  }, [eligibleEmails, isOpen])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -122,7 +141,7 @@ export const PromoRecipientPicker: FC<Props> = ({
 
         <div className="flex items-center justify-between pt-2">
           <span className="text-sm text-slate-600">
-            {selected.size} selezionat{selected.size === 1 ? 'o' : 'i'}
+            {eligibleSelectedCount} selezionat{eligibleSelectedCount === 1 ? 'o' : 'i'}
           </span>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={handleClose}>

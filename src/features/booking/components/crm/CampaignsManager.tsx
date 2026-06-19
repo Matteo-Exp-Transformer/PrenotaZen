@@ -1,18 +1,28 @@
 import type { FC } from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button, Modal } from '@/components/ui'
 import { toast } from 'react-toastify'
+import { useTenantContext } from '@/contexts/TenantContext'
 import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
 import { CampaignEditor } from './CampaignEditor'
 import {
   useEmailCampaigns,
+  EMAIL_CAMPAIGNS_QUERY_KEY,
   EMAIL_CAMPAIGNS_MAX,
   type EmailCampaign,
   parseCampaignLinks,
   parseCampaignRecipients,
 } from '@/features/booking/hooks/useEmailCampaigns'
+import { usePruneCampaignRecipients } from '@/features/booking/hooks/useEmailCampaignMutations'
 import { useSendCampaignEmail } from '@/features/booking/hooks/useSendCampaignEmail'
 import { areEmailNotificationsEnabled } from '@/features/booking/hooks/useEmailNotifications'
+import { CRM_QUERY_KEY, useCustomers } from '@/features/booking/hooks/useCustomers'
+import {
+  filterEmailsWithMarketingConsent,
+  filterRecipientsToEligible,
+  isEligiblePromoRecipient,
+} from '@/features/booking/utils/promoRecipientEligibility'
 
 const CADENCE_LABEL: Record<string, string> = {
   none: 'Solo manuale',
@@ -22,21 +32,90 @@ const CADENCE_LABEL: Record<string, string> = {
 }
 
 export const CampaignsManager: FC = () => {
+  const queryClient = useQueryClient()
+  const { tenantId } = useTenantContext()
   const { data: campaigns = [], isLoading } = useEmailCampaigns()
+  const { customers } = useCustomers()
+  const { mutateAsync: pruneCampaignRecipients } = usePruneCampaignRecipients()
+  const eligibleEmails = useMemo(
+    () => new Set(customers.filter(isEligiblePromoRecipient).map((c) => c.email)),
+    [customers],
+  )
   const [selected, setSelected] = useState<EmailCampaign | null | 'new'>(null)
   const [confirmCampaign, setConfirmCampaign] = useState<EmailCampaign | null>(null)
   const { confirmNavigation } = useUnsavedChangesGuard()
+
+  const countEligibleRecipients = useCallback(
+    (c: EmailCampaign) =>
+      filterRecipientsToEligible(parseCampaignRecipients(c.recipient_emails), eligibleEmails)
+        .length,
+    [eligibleEmails],
+  )
+
+  const refreshCampaignDataOnClose = useCallback(
+    async (campaign?: EmailCampaign) => {
+      if (!tenantId) return
+
+      if (campaign) {
+        const savedRecipients = parseCampaignRecipients(campaign.recipient_emails)
+        if (savedRecipients.length > 0) {
+          try {
+            const { allowed } = await filterEmailsWithMarketingConsent(
+              tenantId,
+              savedRecipients,
+            )
+            if (JSON.stringify(allowed) !== JSON.stringify(savedRecipients)) {
+              try {
+                await pruneCampaignRecipients({
+                  id: campaign.id,
+                  recipient_emails: allowed,
+                })
+              } catch (e) {
+                toast.error(
+                  `Gruppo destinatari aggiornato solo in lettura: ${e instanceof Error ? e.message : String(e)}`,
+                )
+              }
+            }
+          } catch (e) {
+            toast.error(
+              `Impossibile verificare il consenso marketing: ${e instanceof Error ? e.message : String(e)}`,
+            )
+          }
+        }
+      }
+
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: [EMAIL_CAMPAIGNS_QUERY_KEY, tenantId] }),
+        queryClient.refetchQueries({ queryKey: [CRM_QUERY_KEY, tenantId] }),
+      ])
+    },
+    [tenantId, pruneCampaignRecipients, queryClient],
+  )
+
+  const handleCloseCampaignEditor = useCallback(
+    async (campaign?: EmailCampaign) => {
+      await refreshCampaignDataOnClose(campaign)
+      setSelected(null)
+    },
+    [refreshCampaignDataOnClose],
+  )
 
   const send = useSendCampaignEmail()
   const emailsEnabled = areEmailNotificationsEnabled()
 
   const navigateToSelection = useCallback(
     (next: EmailCampaign | null | 'new') => {
-      void confirmNavigation().then((ok) => {
-        if (ok) setSelected(next)
+      void confirmNavigation().then(async (ok) => {
+        if (!ok) return
+        const closingCampaign =
+          selected !== null && selected !== 'new' ? selected : undefined
+        if (closingCampaign) {
+          await refreshCampaignDataOnClose(closingCampaign)
+        }
+        setSelected(next)
       })
     },
-    [confirmNavigation],
+    [confirmNavigation, refreshCampaignDataOnClose, selected],
   )
 
   const handleRowClick = useCallback(
@@ -101,8 +180,8 @@ export const CampaignsManager: FC = () => {
       )}
 
       {campaigns.map((c) => {
-        const recipients = parseCampaignRecipients(c.recipient_emails)
-        const noRecipients = recipients.length === 0
+        const eligibleRecipientCount = countEligibleRecipients(c)
+        const noRecipients = eligibleRecipientCount === 0
         const sendDisabled = noRecipients || !emailsEnabled || send.isPending
         const isOpen = selected !== null && selected !== 'new' && selected.id === c.id
 
@@ -157,7 +236,10 @@ export const CampaignsManager: FC = () => {
 
             {isOpen && (
               <div className="border-t border-slate-200 px-4 pb-4 pt-3">
-                <CampaignEditor campaign={c} onClose={() => setSelected(null)} />
+                <CampaignEditor
+                  campaign={c}
+                  onClose={() => void handleCloseCampaignEditor(c)}
+                />
               </div>
             )}
           </div>
@@ -167,7 +249,7 @@ export const CampaignsManager: FC = () => {
       {selected === 'new' && (
         <div className="rounded-xl border border-primary-300 bg-white p-5">
           <h3 className="font-semibold text-slate-800 mb-5">Nuova campagna</h3>
-          <CampaignEditor onClose={() => setSelected(null)} />
+          <CampaignEditor onClose={() => void handleCloseCampaignEditor()} />
         </div>
       )}
 
@@ -193,7 +275,7 @@ export const CampaignsManager: FC = () => {
             <p className="text-slate-700">
               Inviare <em>«{confirmCampaign.name}»</em> a{' '}
               <strong>
-                {parseCampaignRecipients(confirmCampaign.recipient_emails).length}
+                {confirmCampaign ? countEligibleRecipients(confirmCampaign) : 0}
               </strong>{' '}
               contatti del gruppo?
             </p>

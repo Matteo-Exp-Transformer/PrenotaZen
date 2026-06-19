@@ -15,7 +15,7 @@ function rowToBookingRequest(row: Record<string, unknown>): BookingRequest {
   return row as unknown as BookingRequest
 }
 
-function mergeProfiles(
+export function mergeProfiles(
   bookingRows: Record<string, unknown>[],
   customerRows: {
     id: string
@@ -105,8 +105,9 @@ function mergeProfiles(
     const source: CustomerProfile['source'] = bookings.length > 0 ? 'booking' : 'manual'
 
     const marketing_consent =
-      cust?.marketing_consent === true ||
-      bookings.some((b) => b.marketing_consent === true)
+      cust !== undefined
+        ? cust.marketing_consent === true
+        : bookings.some((b) => b.marketing_consent === true)
 
     out.push({
       email,

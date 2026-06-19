@@ -192,8 +192,73 @@ describe('PromoRecipientPicker — stabilità selezione destinatari', () => {
       onConfirm,
     })
 
+    expect(screen.getByText(/1 selezionat/i)).toBeVisible()
+
     await user.click(screen.getByRole('button', { name: /^conferma$/i }))
 
     expect(onConfirm).toHaveBeenCalledWith(['alice@example.com'])
+  })
+
+  it('aggiorna contatore quando un cliente revoca il consenso con modale aperto', async () => {
+    // @admin-blindatura: crm
+    customersMock = [
+      bookingCustomer('alice@example.com', 'Alice', true),
+      bookingCustomer('bob@example.com', 'Bob', true),
+    ]
+
+    const { rerender } = renderPicker({
+      initialRecipients: ['alice@example.com', 'bob@example.com'],
+    })
+
+    expect(await screen.findByText(/2 selezionat/i)).toBeVisible()
+
+    customersMock = [
+      bookingCustomer('alice@example.com', 'Alice', true),
+      bookingCustomer('bob@example.com', 'Bob', false),
+    ]
+
+    rerender(
+      <PromoRecipientPicker
+        isOpen
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        initialRecipients={['alice@example.com', 'bob@example.com']}
+      />,
+    )
+
+    expect(screen.getByText(/1 selezionat/i)).toBeVisible()
+    expect(screen.queryByRole('checkbox', { name: /bob/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /alice/i })).toBeChecked()
+  })
+
+  it('mantiene il draft valido se l’admin seleziona Bob e poi Bob revoca il consenso', async () => {
+    // @admin-blindatura: crm
+    const user = userEvent.setup()
+    customersMock = [
+      bookingCustomer('alice@example.com', 'Alice', true),
+      bookingCustomer('bob@example.com', 'Bob', true),
+    ]
+
+    const { rerender } = renderPicker({ initialRecipients: ['alice@example.com'] })
+
+    await user.click(screen.getByRole('checkbox', { name: /bob/i }))
+    expect(screen.getByText(/2 selezionat/i)).toBeVisible()
+
+    customersMock = [
+      bookingCustomer('alice@example.com', 'Alice', true),
+      bookingCustomer('bob@example.com', 'Bob', false),
+    ]
+
+    rerender(
+      <PromoRecipientPicker
+        isOpen
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        initialRecipients={['alice@example.com']}
+      />,
+    )
+
+    expect(screen.getByText(/1 selezionat/i)).toBeVisible()
+    expect(screen.getByRole('checkbox', { name: /alice/i })).toBeChecked()
   })
 })

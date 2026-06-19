@@ -3,6 +3,23 @@ import { supabase } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import type { CustomerProfile } from '@/types/customer'
 
+/** Intersezione sincrona: solo email ancora eleggibili (consenso marketing + picker). */
+export function filterRecipientsToEligible(
+  emails: readonly string[],
+  eligibleEmails: ReadonlySet<string>,
+): string[] {
+  return emails.filter((email) => eligibleEmails.has(email))
+}
+
+/** Conteggio destinatari eleggibili — allinea lista visibile e contatori UI. */
+export function countEligibleRecipients(
+  emails: readonly string[] | ReadonlySet<string>,
+  eligibleEmails: ReadonlySet<string>,
+): number {
+  const list = Array.from(emails as Iterable<string>)
+  return filterRecipientsToEligible(list, eligibleEmails).length
+}
+
 /** Destinatario ammissibile per email personalizzate / campagne CRM. */
 export function isEligiblePromoRecipient(c: CustomerProfile): boolean {
   return (
