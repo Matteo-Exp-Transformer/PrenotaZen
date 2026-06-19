@@ -49,7 +49,12 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
-  const { registerUnsavedSource, registerUnsavedHandlers, clearUnsavedSource } = useUnsavedChangesGuard()
+  const {
+    registerUnsavedSource,
+    registerUnsavedHandlers,
+    clearUnsavedSource,
+    confirmNavigation,
+  } = useUnsavedChangesGuard()
 
   const loadedCampaignIdRef = useRef<string | null>(campaign?.id ?? null)
 
@@ -126,7 +131,7 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
         update.mutate(
           { id: campaign!.id, ...payload },
           {
-            onSuccess: () => { toast.success('Campagna aggiornata'); resolve() },
+            onSuccess: () => { toast.success('Campagna aggiornata'); resolve(); onClose() },
             onError: (e) => { toast.error(e.message); reject(e) },
           },
         )
@@ -168,6 +173,17 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
     : ''
 
   const isSaving = create.isPending || update.isPending
+
+  const requestClose = useCallback(() => {
+    if (isSaving) return
+    if (!dirty) {
+      onClose()
+      return
+    }
+    void confirmNavigation().then((ok) => {
+      if (ok) onClose()
+    })
+  }, [dirty, isSaving, onClose, confirmNavigation])
 
   return (
     <div className="space-y-5">
@@ -283,7 +299,7 @@ export const CampaignEditor: FC<Props> = ({ campaign, onClose }) => {
           {isSaving ? 'Salvataggio…' : isNew ? 'Crea campagna' : 'Salva'}
         </Button>
 
-        <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+        <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
           Annulla
         </Button>
 

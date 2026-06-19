@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  resolveAppPublicUrl,
+  UNSUBSCRIBE_PLACEHOLDER,
+  UNSUBSCRIBE_PLACEHOLDER_RE,
+} from "../_shared/unsubscribeLink.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +30,6 @@ const ALLOWED_EMAIL_TYPES = new Set([
 
 // Solo questi tipi ricevono il link di disiscrizione nel footer
 const MARKETING_EMAIL_TYPES = new Set(["promo"]);
-
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -128,27 +132,53 @@ Deno.serve(async (req: Request) => {
         : "manual";
 
     // Per email marketing con destinatario singolo: genera token disiscrizione e sostituisce il
-    // placeholder {{UNSUBSCRIBE_URL}} nell'HTML. Degrada silenziosamente in caso di errore.
+    // placeholder {{UNSUBSCRIBE_URL}} nell'HTML. Se non riesce, l'invio si ferma: meglio un errore
+    // in admin che un footer finto/non cliccabile al cliente.
     let finalHtml = html;
-    if (MARKETING_EMAIL_TYPES.has(emailType) && recipients.length === 1) {
-      try {
-        const appPublicUrl = Deno.env.get("APP_PUBLIC_URL")?.trim() ?? "";
-        if (appPublicUrl) {
-          const unsubToken = crypto.randomUUID();
-          await supabase.from("unsubscribe_tokens").insert({
-            token: unsubToken,
-            tenant_id: tenantId,
-            email: recipients[0],
-          });
-          finalHtml = html.replace(
-            /\{\{UNSUBSCRIBE_URL\}\}/g,
-            `${appPublicUrl}/disiscrivi?t=${unsubToken}`,
-          );
-        }
-      } catch (tokenErr) {
-        console.error(
-          "unsubscribe_token_failed",
-          tokenErr instanceof Error ? tokenErr.message : String(tokenErr),
+    if (MARKETING_EMAIL_TYPES.has(emailType)) {
+      if (recipients.length !== 1) {
+        return jsonResponse({ error: "Le email marketing devono essere inviate uno-a-uno" }, 400);
+      }
+
+      if (!html.includes(UNSUBSCRIBE_PLACEHOLDER)) {
+        return jsonResponse(
+          { error: "Disiscrizione non disponibile: footer mancante" },
+          503,
+        );
+      }
+
+      const appPublicUrl = resolveAppPublicUrl(req);
+      if (!appPublicUrl) {
+        return jsonResponse(
+          { error: "Disiscrizione non configurata: APP_PUBLIC_URL mancante" },
+          503,
+        );
+      }
+
+      const unsubToken = crypto.randomUUID();
+      const { error: tokenErr } = await supabase.from("unsubscribe_tokens").insert({
+        token: unsubToken,
+        tenant_id: tenantId,
+        email: recipients[0],
+      });
+
+      if (tokenErr) {
+        console.error("unsubscribe_token_failed", tokenErr.message);
+        return jsonResponse(
+          { error: "Disiscrizione non disponibile: token non creato" },
+          503,
+        );
+      }
+
+      finalHtml = html.replace(
+        UNSUBSCRIBE_PLACEHOLDER_RE,
+        `${appPublicUrl}/disiscrivi?t=${unsubToken}`,
+      );
+
+      if (finalHtml.includes(UNSUBSCRIBE_PLACEHOLDER)) {
+        return jsonResponse(
+          { error: "Disiscrizione non disponibile: link non generato" },
+          503,
         );
       }
     }
