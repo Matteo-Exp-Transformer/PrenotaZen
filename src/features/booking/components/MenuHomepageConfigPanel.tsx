@@ -493,47 +493,50 @@ export function MenuQrCategoryCardsSection({
                 </div>
               ) : null}
             </div>
-            <div className="flex items-center gap-3">
-              {imgUrl ? (
-                <img src={imgUrl} alt={cat.label} className="h-12 w-16 shrink-0 rounded-lg object-cover" />
-              ) : (
-                <div
-                  className="flex h-12 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500"
-                  aria-hidden
-                >
-                  <MenuQrCategoryIconGlyph
-                    iconKey={draft.icon}
-                    categoryKey={cat.key}
-                    className="h-6 w-6"
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-gray-600">Foto categoria</p>
+              <div className="flex items-center gap-3">
+                {imgUrl ? (
+                  <img src={imgUrl} alt={cat.label} className="h-12 w-16 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <div
+                    className="flex h-12 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500"
+                    aria-hidden
+                  >
+                    <MenuQrCategoryIconGlyph
+                      iconKey={draft.icon}
+                      categoryKey={cat.key}
+                      className="h-6 w-6"
+                    />
+                  </div>
+                )}
+                <label className={canUpload ? 'is-clickable shrink-0' : 'shrink-0 opacity-50'}>
+                  <input
+                    type="file"
+                    accept="image/webp,image/jpeg,image/png,image/avif"
+                    className="hidden"
+                    disabled={isUp || !canUpload}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      e.target.value = ''
+                      if (f) void handleFile(cat.key, f)
+                    }}
                   />
-                </div>
-              )}
-              <label className={canUpload ? 'is-clickable shrink-0' : 'shrink-0 opacity-50'}>
-                <input
-                  type="file"
-                  accept="image/webp,image/jpeg,image/png,image/avif"
-                  className="hidden"
-                  disabled={isUp || !canUpload}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    e.target.value = ''
-                    if (f) void handleFile(cat.key, f)
-                  }}
-                />
-                <span className="rounded-full border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:border-gray-500">
-                  {isUp ? 'Upload…' : imgUrl ? 'Cambia' : 'Carica'}
-                </span>
-              </label>
-              {imgUrl && canUpload && (
-                <button
-                  type="button"
-                  onClick={() => setPhotoToRemove(cat.key)}
-                  className="shrink-0 rounded p-1 text-red-400 hover:text-red-600"
-                  aria-label={`Rimuovi foto ${cat.label}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
+                  <span className="rounded-full border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:border-gray-500">
+                    {isUp ? 'Upload…' : imgUrl ? 'Cambia' : 'Carica'}
+                  </span>
+                </label>
+                {imgUrl && canUpload && (
+                  <button
+                    type="button"
+                    onClick={() => setPhotoToRemove(cat.key)}
+                    className="shrink-0 rounded p-1 text-red-400 hover:text-red-600"
+                    aria-label={`Rimuovi foto ${cat.label}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
             {!imgUrl ? (
               <div className="space-y-1.5">

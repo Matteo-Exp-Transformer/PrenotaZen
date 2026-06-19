@@ -43,6 +43,12 @@ interface BookingSummarySidebarProps {
    * lo lascia vuoto dove il riepilogo deve stare sotto il form in flusso normale.
    */
   className?: string
+  /**
+   * Attiva scroll interno + cap altezza quando la sidebar è in posizione sticky (≥1256px).
+   * NON attivare per il layout full-page stacked (1256-1599px) dove la sidebar è in flusso
+   * normale e lo scroll deve restare sulla pagina, non dentro la card.
+   */
+  stickyScrollable?: boolean
 }
 
 function formatDate(dateStr?: string): string {
@@ -62,6 +68,7 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
   activeSubTab,
   submitButton,
   className,
+  stickyScrollable,
 }) => {
   const displayClientPhone = formData.client_phone?.trim() ?? ''
   const { data: menuCategories = [] } = useMenuCategories()
@@ -138,6 +145,7 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
         className={cn(
           'w-full max-w-full rounded-2xl border border-slate-100 bg-white px-4 py-5 shadow-xl transition-all duration-300 ease-out',
           'space-y-4 min-[1256px]:min-h-[320px]',
+          stickyScrollable && 'min-[1256px]:overflow-y-auto min-[1256px]:max-h-[calc(100vh-2rem)]',
         )}
         data-testid="booking-summary-sidebar"
       >
@@ -302,7 +310,7 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
 
       {/* Pulsante submit in fondo al riepilogo (sotto il breakpoint riepilogo laterale) */}
       {submitButton && (
-        <div className="border-t border-black/10 pt-4 block min-[1256px]:hidden">
+        <div className="border-t border-black/10 pt-4 block min-[1600px]:hidden">
           {submitButton}
         </div>
       )}

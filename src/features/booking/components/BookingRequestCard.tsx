@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import type { BookingRequest } from '@/types/booking'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -38,6 +38,9 @@ import {
   formatDietaryGuestCountLabel,
   shouldShowDietaryGuestCount,
 } from '../utils/dietaryRestrictionsText'
+import {
+  stripSubTabAutoPrefix,
+} from '../utils/buildBookingEmailSummary'
 
 interface BookingRequestCardProps {
   booking: BookingRequest
@@ -128,6 +131,8 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
   const showDigestStrip = Boolean(eventTypeLabel)
   const menuPromoLabels = resolveMenuPromoLabelsForBooking(booking, menuPromos)
 
+  const cleanedSpecialRequests = stripSubTabAutoPrefix(booking.special_requests)
+
   const phoneDigestRow = booking.client_phone ? (
     <div className="flex items-center gap-2">
       <Phone className="h-4 w-4 shrink-0 text-primary-500" />
@@ -172,107 +177,103 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
                 !isExpanded ? 'rounded-2xl' : 'rounded-t-2xl',
               )}
             >
-              <div className="relative w-full min-w-0">
-                {/* Badge+chevron fuori dal flusso: il testo digest usa tutta la larghezza e può andare sotto quest’area */}
-                <div className="pointer-events-none absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
-                  <span
-                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}
-                  >
-                    {statusConfig.label}
-                  </span>
-                  {isExpanded ? (
-                    <ChevronUp className="h-6 w-6 text-primary-700" aria-hidden />
-                  ) : (
-                    <ChevronDown className="h-6 w-6 text-primary-700" aria-hidden />
-                  )}
-                </div>
-
+              <div className="w-full min-w-0">
                 <div className="flex w-full min-w-0 flex-col gap-3">
-                  <div className="flex min-w-0 w-full items-start gap-4 pr-29">
+                  {/* Riga 1: icona tipologia + badge + chevron in-flow */}
+                  <div className="flex w-full items-center gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary-200 bg-[var(--color-bg)] shadow-md">
                       <DigestIcon className="h-4 w-4 text-primary-500" aria-hidden />
                     </div>
-                    <div className="min-w-0 flex-1 text-left">
-                      <div className="grid grid-cols-1 gap-x-6 gap-y-3 min-[659px]:grid-cols-2">
-                        <div className="space-y-3">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <User className="h-4 w-4 shrink-0 text-primary-500" />
-                            <span className="min-w-0 break-words text-base font-semibold text-primary-900">
-                              {booking.client_name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 shrink-0 text-primary-500" />
-                            <span className="text-base font-semibold text-primary-900">
-                              {formatDate(booking.desired_date)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 shrink-0 text-primary-500" />
-                            <span className="text-base font-semibold text-primary-900">
-                              {formatTime(booking.desired_time)}
-                            </span>
-                          </div>
-                          {menuPromoLabels.length > 0 && (
-                            <div className="flex min-w-0 w-full items-start gap-2">
-                              <Tag className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden />
-                              <span className="min-w-0 flex-1 break-words text-sm italic leading-snug text-gray-700">
-                                Promo visualizzate da cliente :{AFTER_COLON}
-                                {menuPromoLabels.join(', ')}
-                              </span>
-                            </div>
-                          )}
-                          {phoneDigestRow ? <div className="min-[659px]:hidden">{phoneDigestRow}</div> : null}
-                        </div>
+                    <div className="min-w-0 flex-1" />
+                    <span
+                      className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}
+                    >
+                      {statusConfig.label}
+                    </span>
+                    {isExpanded ? (
+                      <ChevronUp className="h-6 w-6 text-primary-700" aria-hidden />
+                    ) : (
+                      <ChevronDown className="h-6 w-6 text-primary-700" aria-hidden />
+                    )}
+                  </div>
 
-                        <div
-                          className={cn(
-                            'min-w-0 space-y-3',
-                            'max-[599px]:-ml-12 max-[599px]:w-[calc(100%+3rem+7.25rem)]',
-                          )}
-                        >
-                          <div className="hidden min-[659px]:flex items-center gap-2">
-                            <Users className="h-4 w-4 shrink-0 text-primary-500" />
-                            <span className="text-base font-semibold text-primary-900">
-                              {booking.num_guests} ospiti
-                            </span>
-                          </div>
-                          {phoneDigestRow ? (
-                            <div className="hidden min-[659px]:block">{phoneDigestRow}</div>
-                          ) : null}
-                          {booking.special_requests && (
-                            <div className="flex min-w-0 w-full items-start gap-2">
-                              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-                              <span className="line-clamp-2 max-[599px]:line-clamp-none min-w-0 flex-1 text-sm italic text-gray-700">
-                                {booking.special_requests}
-                              </span>
-                            </div>
-                          )}
-                          {digestMenuPrice && (
-                            <div className="flex min-w-0 w-full items-start gap-2">
-                              <UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden />
-                              <span className="min-w-0 flex-1 break-words text-sm italic leading-snug text-gray-700">
-                                Menù :{AFTER_COLON}
-                                {digestMenuPrice.prezzoMenuLabel}
-                              </span>
-                            </div>
-                          )}
+                  {/* Righe dati: larghezza piena, nessun affiancamento con icona */}
+                  <div className="min-w-0 w-full text-left">
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-3 min-[659px]:grid-cols-2">
+                      <div className="space-y-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <User className="h-4 w-4 shrink-0 text-primary-500" />
+                          <span className="min-w-0 break-words text-sm font-semibold text-primary-900 sm:text-base">
+                            {booking.client_name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 shrink-0 text-primary-500" />
+                          <span className="text-sm font-semibold text-primary-900 sm:text-base">
+                            {formatDate(booking.desired_date)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 shrink-0 text-primary-500" />
+                          <span className="text-sm font-semibold text-primary-900 sm:text-base">
+                            {formatTime(booking.desired_time)}
+                          </span>
+                        </div>
+                        {menuPromoLabels.length > 0 && (
                           <div className="flex min-w-0 w-full items-start gap-2">
-                            <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-                            <span className="line-clamp-2 max-[599px]:line-clamp-none min-w-0 flex-1 break-words text-sm italic text-gray-700">
-                              {booking.client_email}
+                            <Tag className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden />
+                            <span className="min-w-0 flex-1 break-words text-sm italic leading-snug text-gray-700">
+                              Promo visualizzate da cliente :{' '}
+                              {menuPromoLabels.join(', ')}
                             </span>
                           </div>
-                          <div className="flex min-[659px]:hidden items-center gap-2">
-                            <Users className="h-4 w-4 shrink-0 text-primary-500" />
-                            <span className="text-base font-semibold text-primary-900">
-                              {booking.num_guests} ospiti
+                        )}
+                        {phoneDigestRow ? <div className="min-[659px]:hidden">{phoneDigestRow}</div> : null}
+                      </div>
+
+                      <div className="min-w-0 space-y-3">
+                        <div className="hidden min-[659px]:flex items-center gap-2">
+                          <Users className="h-4 w-4 shrink-0 text-primary-500" />
+                          <span className="text-sm font-semibold text-primary-900 sm:text-base">
+                            {booking.num_guests} ospiti
+                          </span>
+                        </div>
+                        {phoneDigestRow ? (
+                          <div className="hidden min-[659px]:block">{phoneDigestRow}</div>
+                        ) : null}
+                        {cleanedSpecialRequests && (
+                          <div className="flex min-w-0 w-full items-start gap-2">
+                            <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+                            <span className="line-clamp-2 min-w-0 flex-1 text-sm italic text-gray-700">
+                              {cleanedSpecialRequests}
                             </span>
                           </div>
+                        )}
+                        {digestMenuPrice && (
+                          <div className="flex min-w-0 w-full items-start gap-2">
+                            <UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden />
+                            <span className="min-w-0 flex-1 break-words text-sm italic leading-snug text-gray-700">
+                              Menù :{AFTER_COLON}
+                              {digestMenuPrice.prezzoMenuLabel}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex min-w-0 w-full items-start gap-2">
+                          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+                          <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm italic text-gray-700">
+                            {booking.client_email}
+                          </span>
+                        </div>
+                        <div className="flex min-[659px]:hidden items-center gap-2">
+                          <Users className="h-4 w-4 shrink-0 text-primary-500" />
+                          <span className="text-sm font-semibold text-primary-900 sm:text-base">
+                            {booking.num_guests} ospiti
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
+
 
                   {booking.created_at && (
                     <div className="flex min-w-0 w-full items-start gap-2">
@@ -423,11 +424,11 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
           )}
 
           {/* Note Richieste Speciali - Fuori dalla griglia */}
-          {booking.special_requests && (
+          {cleanedSpecialRequests && (
             <div className="pt-6 mt-6 border-t border-[var(--color-border)]">
               <p className="mb-3 text-[0.82em] font-semibold tracking-wide text-gray-500 uppercase">Richieste Speciali</p>
               <p className="leading-snug text-gray-700">
-                {booking.special_requests}
+                {cleanedSpecialRequests}
               </p>
             </div>
           )}

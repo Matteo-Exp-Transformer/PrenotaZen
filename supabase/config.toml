@@ -385,6 +385,10 @@ deno_version = 2
 [functions.create-booking]
 verify_jwt = false
 
+# Pubblica: riceve token di disiscrizione marketing via query param, no login.
+[functions.unsubscribe]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

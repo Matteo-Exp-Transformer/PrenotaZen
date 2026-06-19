@@ -131,7 +131,10 @@ describe('BookingRequestForm — cambio tipologia resetta lo stato (§2-bis + §
     await waitFor(() => {
       expect(updates[updates.length - 1]?.booking_type).toBe('menu_prezzo_fisso')
     })
-    expect(screen.getByTestId('booking-mode-card-menu')).toHaveClass('border-warm-orange')
+    // Con 1 sola modalità abilitata la card è un div non interattivo: niente bordo arancione.
+    const card = screen.getByTestId('booking-mode-card-menu')
+    expect(card.tagName).toBe('DIV')
+    expect(card).not.toHaveClass('border-warm-orange')
   })
 
   it('passando a una modalità SENZA intolleranze (tavolo) le intolleranze si svuotano', () => {

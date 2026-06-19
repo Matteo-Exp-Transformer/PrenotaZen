@@ -435,7 +435,8 @@ export const getPromoEmail = (
 
         <p>${buildSignature(tenantInfo)}</p>
 
-        <p class="privacy-note">Hai ricevuto questa email perché sei nostro cliente. Per non riceverne più, contattaci.</p>
+        <p class="privacy-note">Hai ricevuto questa email perché sei nostro cliente.
+          <a href="{{UNSUBSCRIBE_URL}}" style="color:#9ca3af;text-decoration:underline">Per non riceverne più, clicca qui</a>.</p>
       </div>
 
       <div class="footer">
@@ -562,7 +563,8 @@ export const getCampaignEmail = (
 
         <p>${buildSignature(tenantInfo)}</p>
 
-        <p class="privacy-note">Hai ricevuto questa email perché sei nostro cliente. Per non riceverne più, contattaci.</p>
+        <p class="privacy-note">Hai ricevuto questa email perché sei nostro cliente.
+          <a href="{{UNSUBSCRIBE_URL}}" style="color:#9ca3af;text-decoration:underline">Per non riceverne più, clicca qui</a>.</p>
       </div>
 
       <div class="footer">

@@ -1398,8 +1398,8 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
           summarySidebar
         ))}
 
-      {/* Submit grande — solo ≥1256px; sotto il submit è nel riepilogo / sticky bar */}
-      <div className="order-3 col-span-1 hidden min-[1256px]:flex w-full max-w-full justify-center items-center mt-3 mb-6 min-[1256px]:col-span-2">
+      {/* Submit grande — solo ≥1600px; sotto il submit è nel riepilogo */}
+      <div className="order-3 col-span-1 hidden min-[1600px]:flex w-full max-w-full justify-center items-center mt-3 mb-6 min-[1600px]:col-span-2">
         <button
             type="submit"
             disabled={isPending || isBlocked || isSubmitting}

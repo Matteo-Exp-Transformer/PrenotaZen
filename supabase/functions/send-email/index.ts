@@ -23,6 +23,9 @@ const ALLOWED_EMAIL_TYPES = new Set([
   "promo",
 ]);
 
+// Solo questi tipi ricevono il link di disiscrizione nel footer
+const MARKETING_EMAIL_TYPES = new Set(["promo"]);
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -124,6 +127,32 @@ Deno.serve(async (req: Request) => {
         ? body.emailType.trim()
         : "manual";
 
+    // Per email marketing con destinatario singolo: genera token disiscrizione e sostituisce il
+    // placeholder {{UNSUBSCRIBE_URL}} nell'HTML. Degrada silenziosamente in caso di errore.
+    let finalHtml = html;
+    if (MARKETING_EMAIL_TYPES.has(emailType) && recipients.length === 1) {
+      try {
+        const appPublicUrl = Deno.env.get("APP_PUBLIC_URL")?.trim() ?? "";
+        if (appPublicUrl) {
+          const unsubToken = crypto.randomUUID();
+          await supabase.from("unsubscribe_tokens").insert({
+            token: unsubToken,
+            tenant_id: tenantId,
+            email: recipients[0],
+          });
+          finalHtml = html.replace(
+            /\{\{UNSUBSCRIBE_URL\}\}/g,
+            `${appPublicUrl}/disiscrivi?t=${unsubToken}`,
+          );
+        }
+      } catch (tokenErr) {
+        console.error(
+          "unsubscribe_token_failed",
+          tokenErr instanceof Error ? tokenErr.message : String(tokenErr),
+        );
+      }
+    }
+
     // Chiamata Brevo
     let brevoRes: Response;
     try {
@@ -138,7 +167,7 @@ Deno.serve(async (req: Request) => {
           sender: { name: senderName, email: senderEmail },
           to: recipients.map((email) => ({ email })),
           subject,
-          htmlContent: html,
+          htmlContent: finalHtml,
           tags: [emailType],
         }),
       });

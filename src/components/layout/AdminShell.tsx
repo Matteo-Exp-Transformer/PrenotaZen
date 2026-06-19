@@ -107,12 +107,22 @@ function sidebarItemForSection(section: AdminShellSection): SidebarActiveItem {
   return null
 }
 
+const SIDEBAR_HIDDEN_KEY = 'admin-sidebar-hidden'
+
 const AdminShellInner: FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isNarrow = useIsNarrow()
   const features = useFeatures()
-  const [sidebarMode, setSidebarMode] = useState<'hidden' | 'icons' | 'expanded'>('icons')
+  // Legge 'hidden' da sessionStorage per sopravvivere ai remount tra /admin e /admin/:adminSection.
+  // Solo 'hidden' è persistito: la prima apertura (nessuna chiave) parte sempre da 'icons'.
+  const [sidebarMode, setSidebarMode] = useState<'hidden' | 'icons' | 'expanded'>(() => {
+    try {
+      return sessionStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1' ? 'hidden' : 'icons'
+    } catch {
+      return 'icons'
+    }
+  })
   // section e activeSidebarItem sono DERIVATI dall'URL (unica fonte di verità).
   // Tenerli come stato sincronizzato via effetto causava un flash: setSection e
   // navigate (in openSection / exit) non sono atomici, quindi per 1-2 render la
@@ -132,6 +142,31 @@ const AdminShellInner: FC = () => {
     document.documentElement.setAttribute('data-admin-theme', resolved)
     // nessun cleanup: il tema deve persistere per tutta la sessione admin
   }, [savedAppTheme, isAppThemePending])
+
+  // Persiste solo 'hidden' in sessionStorage: alla prossima mount (navigazione tra route)
+  // lo stato viene ripristinato, evitando che la sidebar si riapra da sola.
+  useEffect(() => {
+    try {
+      if (sidebarMode === 'hidden') {
+        sessionStorage.setItem(SIDEBAR_HIDDEN_KEY, '1')
+      } else {
+        sessionStorage.removeItem(SIDEBAR_HIDDEN_KEY)
+      }
+    } catch {}
+  }, [sidebarMode])
+
+  // inert impedisce il focus da Tab sui bottoni nell'aside quando è nascosto
+  // (aria-hidden da solo non blocca il focus). Imperativo perché @types/react 18
+  // non espone inert su HTMLAttributes<HTMLElement>.
+  useEffect(() => {
+    const el = asideRef.current
+    if (!el) return
+    if (sidebarMode === 'hidden') {
+      el.setAttribute('inert', '')
+    } else {
+      el.removeAttribute('inert')
+    }
+  }, [sidebarMode])
 
   const isDrawerOpen = sidebarMode === 'expanded'
 

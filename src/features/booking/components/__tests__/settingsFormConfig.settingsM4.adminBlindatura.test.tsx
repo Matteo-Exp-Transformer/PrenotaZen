@@ -476,8 +476,9 @@ describe('settings-form-config legacy/null safe', () => {
     )
 
     expect(container.querySelector('#booking-request-form')).toBeTruthy()
+    // Con 1 sola modalità la card è un div non interattivo (niente button).
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /tavolo storico/i })).toBeInTheDocument()
+      expect(screen.getByTestId('booking-mode-card-tavolo')).toBeInTheDocument()
     })
   })
 })

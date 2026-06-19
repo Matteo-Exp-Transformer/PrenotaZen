@@ -133,7 +133,6 @@ export const PromoRecipientPicker: FC<Props> = ({
               variant="primary"
               size="sm"
               onClick={handleConfirm}
-              disabled={selected.size === 0}
             >
               Conferma
             </Button>

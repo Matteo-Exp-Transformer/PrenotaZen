@@ -9,6 +9,7 @@ import { AdminAuthProvider } from './contexts/AdminAuthContext'
 import { TenantProvider } from './contexts/TenantContext'
 import { PublicMenuPage } from './pages/PublicMenuPage'
 import { PublicMenuCategoryPage } from './pages/PublicMenuCategoryPage'
+import { UnsubscribePage } from './pages/Unsubscribe'
 
 const RootLayout = () => (
   <TenantProvider>
@@ -88,6 +89,11 @@ export const router = createBrowserRouter([
       {
         path: '/privacy',
         element: <PrivacyPolicyPage />
+      },
+      // Disiscrizione marketing via link email (token opaco)
+      {
+        path: '/disiscrivi',
+        element: <UnsubscribePage />
       },
       // Auth
       {

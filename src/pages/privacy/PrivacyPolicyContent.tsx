@@ -17,8 +17,8 @@ import React from 'react'
  * Modifiche al CONTENUTO di questo file: passare per skill `legal-production`
  * (`docs/Legal-Production-Skill/`).
  */
-export const PRIVACY_POLICY_VERSION = '2.1'
-export const PRIVACY_POLICY_LAST_UPDATE = '2026-06-18'
+export const PRIVACY_POLICY_VERSION = '2.2'
+export const PRIVACY_POLICY_LAST_UPDATE = '2026-06-19'
 
 interface PrivacyPolicyContentProps {
   /** Nome del ristorante (Titolare del trattamento) da mostrare nel testo. */
@@ -37,7 +37,7 @@ export const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({ rest
         comunicazione abituali.
       </p>
       <p>
-        Il ristorante utilizza la piattaforma tecnologica CalendarBackup
+        Il ristorante utilizza la piattaforma tecnologica PrenotaZen
         (di seguito, la &quot;Piattaforma&quot;) per gestire le prenotazioni.
         Il gestore della Piattaforma agisce come <strong>Responsabile del trattamento</strong>{' '}
         ai sensi dell&apos;art. 28 GDPR, trattando i dati esclusivamente per conto
@@ -100,7 +100,8 @@ export const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({ rest
       </p>
       <p>
         <strong>Revoca del consenso</strong>: puoi revocare in qualsiasi momento questo
-        consenso contattando direttamente <strong>{restaurantName}</strong> tramite i recapiti
+        consenso cliccando il link di disiscrizione presente in ogni email promozionale,
+        oppure contattando direttamente <strong>{restaurantName}</strong> tramite i recapiti
         pubblicati. La revoca non pregiudica la liceità del trattamento effettuato prima
         della revoca stessa.
       </p>

@@ -111,21 +111,11 @@ export function parseSubTabPrefixFromSpecialRequests(
 /** Rimuove il prefisso sottotab da note cliente (evita duplicato con «Opzione menu»). */
 export function stripSubTabAutoPrefix(
   specialRequests: string | undefined | null,
-  subTabLabel?: string,
 ): string {
   if (!specialRequests?.trim()) return ''
-  let text = specialRequests.trim()
+  const text = specialRequests.trim()
   const parsed = parseSubTabPrefixFromSpecialRequests(text)
-  if (parsed) {
-    text = text.slice(parsed.rawPrefix.length).trim()
-  }
-  if (subTabLabel?.trim()) {
-    const plain = `[${subTabLabel.trim()}]`
-    if (text.startsWith(plain)) {
-      text = text.slice(plain.length).trim()
-    }
-  }
-  return text
+  return parsed ? text.slice(parsed.rawPrefix.length).trim() : text
 }
 
 function resolveModeSubTabs(
@@ -356,7 +346,7 @@ export function buildBookingEmailSummarySections(
     })
   }
 
-  const clientNotes = stripSubTabAutoPrefix(booking.special_requests, subTabLabel)
+  const clientNotes = stripSubTabAutoPrefix(booking.special_requests)
   if (clientNotes) {
     sections.push({ kind: 'note', label: 'Note', value: clientNotes })
   }

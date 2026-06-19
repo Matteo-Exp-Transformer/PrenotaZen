@@ -25,6 +25,7 @@ export const BookingModeCards: React.FC<BookingModeCardsProps> = ({
   const enabledModes = modes.filter((m) => m.enabled)
   if (enabledModes.length === 0) return null
 
+  const isSingleMode = enabledModes.length === 1
   const useFixedRowWidths =
     fullPageFormCapLayout && enabledModes.length >= 2 && enabledModes.length <= 4
   const rowCardWidthClass = useFixedRowWidths
@@ -36,34 +37,33 @@ export const BookingModeCards: React.FC<BookingModeCardsProps> = ({
       <div
         className={cn(
           'flex w-full gap-1.5 sm:gap-2',
-          enabledModes.length === 1 ? 'flex-col' : 'flex-row',
+          isSingleMode ? 'flex-col' : 'flex-row',
         )}
       >
         {enabledModes.map((mode) => {
           const isActive = mode.id === activeModeId
-          return (
-            <button
-              key={mode.id}
-              type="button"
-              data-testid={`booking-mode-card-${mode.id}`}
-              onClick={() => onChange(mode.id, mode.booking_type)}
-              className={cn(
-                'relative flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-3 text-center transition-all duration-200',
-                rowCardWidthClass,
-                'min-h-[120px] sm:min-h-[110px] sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-4',
-                !fullPageFormCapLayout && 'lg:px-16',
-                'bg-white/85 backdrop-blur-[1px] shadow-sm',
-                isActive
-                  ? 'border-warm-orange ring-2 ring-warm-orange/30 shadow-md'
-                  : 'border-black/15 hover:border-warm-orange/50 hover:shadow-md',
-              )}
-            >
+
+          const cardClasses = cn(
+            'relative flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-3 text-center transition-all duration-200',
+            rowCardWidthClass,
+            'min-h-[120px] sm:min-h-[110px] sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-4',
+            !fullPageFormCapLayout && 'lg:px-16',
+            'bg-white/85 backdrop-blur-[1px] shadow-sm',
+            isSingleMode
+              ? 'border-black/15'
+              : isActive
+                ? 'border-warm-orange ring-2 ring-warm-orange/30 shadow-md'
+                : 'border-black/15 hover:border-warm-orange/50 hover:shadow-md',
+          )
+
+          const cardContent = (
+            <>
               <div
                 className={cn(
                   'flex h-8 w-8 shrink-0 items-center justify-center transition-colors sm:h-10 sm:w-10',
                   !fullPageFormCapLayout &&
                     'lg:absolute lg:left-4 lg:top-1/2 lg:-translate-y-1/2',
-                  isActive ? 'text-warm-orange' : 'text-warm-wood/80',
+                  !isSingleMode && isActive ? 'text-warm-orange' : 'text-warm-wood/80',
                 )}
               >
                 <MenuQrCategoryIconGlyph iconKey={mode.icon} className="h-6 w-6 sm:h-7 sm:w-7" />
@@ -72,7 +72,7 @@ export const BookingModeCards: React.FC<BookingModeCardsProps> = ({
                 <p
                   className={cn(
                     'text-[16px] font-bold leading-tight sm:text-[19px] lg:text-[17px] xl:text-[19px]',
-                    isActive ? 'text-warm-orange' : 'text-warm-wood',
+                    !isSingleMode && isActive ? 'text-warm-orange' : 'text-warm-wood',
                   )}
                 >
                   {mode.label}
@@ -83,6 +83,26 @@ export const BookingModeCards: React.FC<BookingModeCardsProps> = ({
                   </p>
                 )}
               </div>
+            </>
+          )
+
+          if (isSingleMode) {
+            return (
+              <div key={mode.id} data-testid={`booking-mode-card-${mode.id}`} className={cardClasses}>
+                {cardContent}
+              </div>
+            )
+          }
+
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              data-testid={`booking-mode-card-${mode.id}`}
+              onClick={() => onChange(mode.id, mode.booking_type)}
+              className={cardClasses}
+            >
+              {cardContent}
             </button>
           )
         })}

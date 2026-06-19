@@ -78,10 +78,10 @@ const NavItem: React.FC<NavItemProps> = ({
   const inner = (
     <>
       <Icon className={cn('h-4 w-4 flex-shrink-0', active ? 'text-white' : 'text-primary-900')} />
-      <span className="hidden min-w-0 truncate text-center sm:inline">{label}</span>
-      <span className="min-w-0 truncate text-center sm:hidden">{mobileLabel ?? label.split(' ')[0]}</span>
+      <span className="hidden min-w-0 truncate text-center sm:inline text-sm">{label}</span>
+      <span className="min-w-0 truncate text-center sm:hidden text-xs">{mobileLabel ?? label.split(' ')[0]}</span>
       {badge != null && badge > 0 && (
-        <span className="inline-flex flex-shrink-0 items-center justify-center min-w-[20px] h-5 text-xs font-bold px-1.5 rounded-full border border-primary-200 bg-primary-100 text-primary-900">
+        <span className="absolute -top-1.5 -right-1.5 inline-flex flex-shrink-0 items-center justify-center min-w-[20px] h-5 text-xs font-bold px-1.5 rounded-full border border-primary-200 bg-primary-100 text-primary-900 sm:static sm:ml-auto">
           {badge}
         </span>
       )}
@@ -94,13 +94,13 @@ const NavItem: React.FC<NavItemProps> = ({
         type="button"
         onClick={onClick}
         className={cn(
-          'admin-nav-item admin-nav-tab-active relative w-full min-h-11 flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-2.5 text-sm font-semibold text-white cursor-pointer',
+          'admin-nav-item admin-nav-tab-active relative w-full min-h-11 flex flex-col sm:flex-row items-center justify-center sm:justify-center gap-0.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-2 sm:py-2.5 text-white cursor-pointer',
           'border-solid shadow-none',
           showNotifyDecor && 'overflow-hidden',
         )}
       >
         {showNotifyDecor && <NotifyNavShinyLayers />}
-        <span className="relative z-10 flex min-w-0 w-full items-center justify-center gap-1.5 sm:gap-2">
+        <span className="relative z-10 flex flex-col sm:flex-row min-w-0 w-full items-center justify-center gap-0.5 sm:gap-2">
           {inner}
         </span>
       </button>
@@ -120,13 +120,13 @@ const NavItem: React.FC<NavItemProps> = ({
       type="button"
       onClick={onClick}
       className={cn(
-        'admin-nav-item relative w-full min-h-11 flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl border px-2 sm:px-3 py-2.5 text-sm font-medium text-primary-900 transition-all duration-150 cursor-pointer',
+        'admin-nav-item relative w-full min-h-11 flex flex-col sm:flex-row items-center justify-center sm:justify-center gap-0.5 sm:gap-2 rounded-xl border px-2 sm:px-3 py-2 sm:py-2.5 font-medium text-primary-900 transition-all duration-150 cursor-pointer',
         showNotifyDecor && 'overflow-hidden admin-nav-notify-shiny-on-inactive',
       )}
     >
       {showNotifyDecor && <NotifyNavShinyLayers />}
       {showNotifyDecor ? (
-        <span className="relative z-10 flex min-w-0 w-full items-center justify-center gap-1.5 sm:gap-2">
+        <span className="relative z-10 flex flex-col sm:flex-row min-w-0 w-full items-center justify-center gap-0.5 sm:gap-2">
           {inner}
         </span>
       ) : (
@@ -357,7 +357,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <NavItem
                 icon={Store}
                 label="Impostazioni"
-                mobileLabel="Impost."
                 active={activeTab === 'settings-restaurant'}
                 onClick={() => handleTabClick('settings-restaurant')}
               />

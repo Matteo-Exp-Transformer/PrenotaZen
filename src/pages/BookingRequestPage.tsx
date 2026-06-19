@@ -242,6 +242,9 @@ const BookingRequestPageContent: React.FC<BookingRequestPageContentProps> = ({ t
           ? 'mb-6'
           : 'order-2 mb-6 min-[1256px]:mb-0 min-[1256px]:sticky min-[1256px]:top-4'
       }
+      // Scroll interno attivo solo quando la card è sticky (striscia/light ≥1256px).
+      // Full-page stacked: niente sticky → niente scroll interno, la pagina scrolla normalmente.
+      stickyScrollable={!useFullPageDesktopFreezeLayout}
     />
   ) : null
   const summarySidebarDesktopExternal = formConfig && hasEnabledBookingModes ? (
