@@ -1,5 +1,5 @@
 // @admin-blindatura: settings-registry
-// Copre: nome obbligatorio, contatti opzionali, cap 45/65/30/120, daily_guest_limit vuoto/0
+// Copre: nome obbligatorio, contatti opzionali, cap 45/65/30/120, interruttori limiti per-fascia/orario
 
 import { describe, expect, it } from 'vitest'
 import {
@@ -12,7 +12,8 @@ describe('settings-registry M4 — anagrafica e limiti', () => {
   const email = restaurantSettingRegistry.contact_email
   const phone = restaurantSettingRegistry.contact_phone
   const address = restaurantSettingRegistry.contact_address
-  const daily = restaurantSettingRegistry.daily_guest_limit
+  const slotLimitEnabled = restaurantSettingRegistry.slot_limit_enabled
+  const rejectOutOfSlot = restaurantSettingRegistry.booking_reject_out_of_slot
 
   it('cap costanti allineati M4 (45/65/30/120)', () => {
     expect(BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.restaurantName).toBe(45)
@@ -47,9 +48,12 @@ describe('settings-registry M4 — anagrafica e limiti', () => {
     expect(address.validate('x'.repeat(121))).not.toBeNull()
   })
 
-  it('daily_guest_limit: 0/vuoto = nessun limite', () => {
-    expect(daily.validate(0)).toBeNull()
-    expect(daily.validate('')).toBeNull()
-    expect(daily.validate(null)).toBeNull()
+  it('interruttori limiti per-fascia/orario: default false, boolean', () => {
+    expect(slotLimitEnabled.parseFromDb(null)).toBe(false)
+    expect(rejectOutOfSlot.parseFromDb(null)).toBe(false)
+    expect(slotLimitEnabled.parseFromDb(true)).toBe(true)
+    expect(rejectOutOfSlot.parseFromDb('true')).toBe(true)
+    expect(slotLimitEnabled.validate(true)).toBeNull()
+    expect(rejectOutOfSlot.validate('nope')).not.toBeNull()
   })
 })

@@ -6,6 +6,7 @@ import { useRateLimit } from '@/hooks/useRateLimit'
 import { Send, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { MenuSelection } from './MenuSelection'
 import { DietaryRestrictionsSection } from './DietaryRestrictionsSection'
+import { DietaryConsentModal } from './DietaryConsentModal'
 import {
   dietaryRestrictionsToText,
   dietaryTextToRestrictions,
@@ -291,6 +292,9 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   const [formData, setFormData] = useState<BookingRequestInput>(createInitialFormData)
 
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  const [marketingConsent, setMarketingConsent] = useState(false)
+  const [dietaryConsent, setDietaryConsent] = useState(false)
+  const [showDietaryConsentModal, setShowDietaryConsentModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false) // Stato per triggerare re-render e disabilitare button
@@ -532,6 +536,104 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   }
   
 
+  // Helper che esegue il submit effettivo dopo aver risolto il consenso dietary.
+  // Gestisce lock, isSubmitting e payload; chiamato sia da handleSubmit diretto
+  // sia dai callback della DietaryConsentModal.
+  const doMutate = (extraFields: Partial<typeof formData> & {
+    dietary_data_consent?: boolean
+    dietary_off_platform_notice?: boolean
+    dietary_data_consent_at?: string | null
+  } = {}) => {
+    const lockId = acquireGlobalLock()
+    if (!lockId) return
+    submitLockIdRef.current = lockId
+
+    if (isSubmittingRef.current || isPending) {
+      releaseGlobalLock(lockId)
+      return
+    }
+
+    isSubmittingRef.current = true
+    setIsSubmitting(true)
+
+    const finalSubTabPromo = resolveMenuPromoForBookingView({
+      bookingType: formData.booking_type ?? initialBookingType,
+      modeId: activeModeId,
+      subTabId: activeSubTabId,
+      promos: menuPromos,
+    })
+    const menuPromoLabels = collectMenuPromoLabelsForSubmit({
+      viewedPromoIds: viewedPromoIdsRef.current,
+      finalSubTabPromoId: finalSubTabPromo?.id,
+      promos: menuPromos,
+    })
+
+    let specialRequests = formData.special_requests?.trim() ?? ''
+    if (activeSubTab && !activeSubTab.preset_id && activeSubTab.label.trim()) {
+      const subTabNote = activeSubTab.price_per_person
+        ? `[${activeSubTab.label.trim()} - €${activeSubTab.price_per_person}/p]`
+        : `[${activeSubTab.label.trim()}]`
+      if (!specialRequests.includes(subTabNote)) {
+        specialRequests = specialRequests ? `${subTabNote} ${specialRequests}` : subTabNote
+      }
+    }
+
+    mutate(
+      {
+        ...formData,
+        special_requests: specialRequests,
+        dietary_restrictions: normalizeDietaryRestrictionsForSubmit(formData.dietary_restrictions),
+        tenantSlug,
+        menu_promo_labels: menuPromoLabels.length > 0 ? menuPromoLabels : null,
+        marketing_consent: marketingConsent,
+        dietary_data_consent: false,
+        dietary_off_platform_notice: false,
+        dietary_data_consent_at: null,
+        ...extraFields,
+      },
+      {
+        onSuccess: () => {
+          setFormData({
+            client_name: '',
+            client_email: '',
+            client_phone: '',
+            booking_type: initialBookingType,
+            desired_date: getCurrentDate(),
+            desired_time: getDefaultTime(),
+            num_guests: 0,
+            special_requests: '',
+            menu_selection: { items: [] },
+            dietary_restrictions: [],
+            preset_menu: null,
+          })
+          setSelectedPreset(null)
+          setActiveSubTabId(null)
+          resetViewedPromos()
+          setPrivacyAccepted(false)
+          setMarketingConsent(false)
+          setDietaryConsent(false)
+
+          const savedLockId = submitLockIdRef.current
+          isSubmittingRef.current = false
+          submitLockIdRef.current = null
+          setIsSubmitting(false)
+          if (savedLockId) releaseGlobalLock(savedLockId)
+
+          setShowSuccessModal(true)
+          onSubmit?.()
+        },
+        onError: (error) => {
+          logger.error('[BookingForm] Mutation error:', error)
+          const savedLockId = submitLockIdRef.current
+          isSubmittingRef.current = false
+          submitLockIdRef.current = null
+          setIsSubmitting(false)
+          if (savedLockId) releaseGlobalLock(savedLockId)
+        },
+      },
+    )
+  }
+
   // Reset num_guests to 0 when cleared - only allow numeric input
   const handleNumGuestsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value.trim()
@@ -740,7 +842,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
 
   const { mutate, isPending } = useCreateBookingRequest()
   const { checkRateLimit, isBlocked } = useRateLimit({
-    maxAttempts: 3,
+    maxAttempts: 7,
     timeWindow: 60000 // 1 minuto
   })
   const { data: staffPresetsDropdownVisible = true } = useRestaurantSetting('booking_staff_presets_visible')
@@ -991,89 +1093,36 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
       return
     }
 
-    // Imposta tutti i flag per prevenire doppi submit
-    isSubmittingRef.current = true
-    setIsSubmitting(true)
-
-    // Chiama mutate — il guard server-side in create-booking è la garanzia definitiva
-    const finalSubTabPromo = resolveMenuPromoForBookingView({
-      bookingType: formData.booking_type ?? initialBookingType,
-      modeId: activeModeId,
-      subTabId: activeSubTabId,
-      promos: menuPromos,
-    })
-    const menuPromoLabels = collectMenuPromoLabelsForSubmit({
-      viewedPromoIds: viewedPromoIdsRef.current,
-      finalSubTabPromoId: finalSubTabPromo?.id,
-      promos: menuPromos,
-    })
-
-    let specialRequests = formData.special_requests?.trim() ?? ''
-    if (activeSubTab && !activeSubTab.preset_id && activeSubTab.label.trim()) {
-      const subTabNote = activeSubTab.price_per_person
-        ? `[${activeSubTab.label.trim()} - €${activeSubTab.price_per_person}/p]`
-        : `[${activeSubTab.label.trim()}]`
-      if (!specialRequests.includes(subTabNote)) {
-        specialRequests = specialRequests ? `${subTabNote} ${specialRequests}` : subTabNote
-      }
+    // Intercezione consenso dietary: se l'utente ha inserito intolleranze
+    // ma non ha ancora dato il consenso art. 9 GDPR, mostriamo la modale.
+    const dietaryText = dietaryRestrictionsToText(formData.dietary_restrictions)
+    if (dietaryText.trim().length > 0 && !dietaryConsent) {
+      releaseGlobalLock(lockId)
+      setShowDietaryConsentModal(true)
+      return
     }
 
-    mutate(
-      {
-        ...formData,
-        special_requests: specialRequests,
-        dietary_restrictions: normalizeDietaryRestrictionsForSubmit(formData.dietary_restrictions),
-        tenantSlug,
-        menu_promo_labels: menuPromoLabels.length > 0 ? menuPromoLabels : null,
-      },
-      {
-        onSuccess: () => {
-        
-        // Reset form (keep default date and time)
-        setFormData({
-          client_name: '',
-          client_email: '',
-          client_phone: '',
-          booking_type: initialBookingType,
-          desired_date: getCurrentDate(),
-          desired_time: getDefaultTime(),
-          num_guests: 0,
-          special_requests: '',
-          menu_selection: { items: [] },
-          dietary_restrictions: [],
-          preset_menu: null
-        })
-        setSelectedPreset(null)
-        setActiveSubTabId(null)
-        resetViewedPromos()
-        setPrivacyAccepted(false)
-        
-        // Reset tutti i flag di submit e rilascia lock
-        const savedLockId = submitLockIdRef.current
-        isSubmittingRef.current = false
-        submitLockIdRef.current = null
-        setIsSubmitting(false)
-        if (savedLockId) {
-          releaseGlobalLock(savedLockId)
-        }
-        
-        // Mostra la modal di conferma invece del toast
-        setShowSuccessModal(true)
-        onSubmit?.()
-        },
-        onError: (error) => {
-          logger.error('[BookingForm] Mutation error:', error)
-          // Reset tutti i flag in caso di errore per permettere nuovo tentativo
-          const savedLockId = submitLockIdRef.current
-          isSubmittingRef.current = false
-          submitLockIdRef.current = null
-          setIsSubmitting(false)
-          if (savedLockId) {
-            releaseGlobalLock(savedLockId)
-          }
-        },
-      },
+    // Nessuna intercezione necessaria: submit diretto.
+    // Rilasciamo il lock acquisito qui perché doMutate ne acquisirà uno nuovo.
+    releaseGlobalLock(lockId)
+    doMutate(
+      dietaryConsent
+        ? { dietary_data_consent: true, dietary_data_consent_at: new Date().toISOString() }
+        : {},
     )
+  }
+
+  const handleDietaryAuthorize = () => {
+    setShowDietaryConsentModal(false)
+    setDietaryConsent(true)
+    doMutate({ dietary_data_consent: true, dietary_data_consent_at: new Date().toISOString() })
+  }
+
+  const handleDietaryDecline = () => {
+    setShowDietaryConsentModal(false)
+    // Svuota dietary nello state del form (il cliente comunicherà direttamente)
+    setFormData((prev) => ({ ...prev, dietary_restrictions: [] }))
+    doMutate({ dietary_restrictions: [], dietary_off_platform_notice: true })
   }
 
   if (enabledBookingModes.length === 0) return null
@@ -1310,6 +1359,8 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
                 ...formData,
                 dietary_restrictions: dietaryTextToRestrictions(text),
               })
+              // Se l'utente cancella il testo dietary, azzera il consenso già dato
+              if (!text.trim()) setDietaryConsent(false)
             }}
             specialRequests={formData.special_requests || ''}
             onSpecialRequestsChange={(value) => {
@@ -1325,9 +1376,12 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
             privacyError={errors.privacyAccepted}
             showPrivacyAttention={attentionFieldKey === 'privacyAccepted'}
             onPrivacyAttentionInteract={clearAttentionField}
+            marketingConsent={marketingConsent}
+            onMarketingConsentChange={setMarketingConsent}
+            dietaryConsentAccepted={dietaryConsent}
+            onDietaryConsentChange={setDietaryConsent}
             publicFormFields
             lightTextOnDarkBackground={publicFormLightTextOnDarkBackground}
-            tenantSlug={tenantSlug}
           />
         </div>
       </div>
@@ -1394,6 +1448,13 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
           </button>
         </div>
     </form>
+
+    <DietaryConsentModal
+      isOpen={showDietaryConsentModal}
+      onAuthorize={handleDietaryAuthorize}
+      onCancel={() => setShowDietaryConsentModal(false)}
+      onDecline={handleDietaryDecline}
+    />
 
     {/* Modal di Conferma Successo */}
     {showSuccessModal && (

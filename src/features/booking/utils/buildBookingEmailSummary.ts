@@ -342,9 +342,18 @@ export function buildBookingEmailSummarySections(
     }
   }
 
-  const dietaryText = dietaryRestrictionsToText(booking.dietary_restrictions)
-  if (dietaryText.trim()) {
-    sections.push({ kind: 'intolleranze', label: 'Intolleranze', value: dietaryText })
+  // Dietary: includi solo se c'è consenso esplicito art. 9 GDPR
+  if (booking.dietary_data_consent === true) {
+    const dietaryText = dietaryRestrictionsToText(booking.dietary_restrictions)
+    if (dietaryText.trim()) {
+      sections.push({ kind: 'intolleranze', label: 'Intolleranze', value: dietaryText })
+    }
+  } else if (booking.dietary_off_platform_notice === true) {
+    sections.push({
+      kind: 'intolleranze',
+      label: 'Intolleranze',
+      value: 'Il cliente comunicherà eventuali esigenze alimentari direttamente',
+    })
   }
 
   const clientNotes = stripSubTabAutoPrefix(booking.special_requests, subTabLabel)

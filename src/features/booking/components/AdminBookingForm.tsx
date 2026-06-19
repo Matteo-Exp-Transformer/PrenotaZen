@@ -25,7 +25,6 @@ import {
 import { shouldShowComposeMenuHeader } from '../constants/presetMenus'
 import { useAcceptedBookings } from '../hooks/useBookingQueries'
 import { useCapacityCheck } from '../hooks/useCapacityCheck'
-import { sumGuestsByDate } from '../utils/capacityCalculator'
 import { CapacityWarningModal } from './CapacityWarningModal'
 import { PastStartTimeWarningModal } from './PastStartTimeWarningModal'
 import { isWallClockStartBeforeNow, trimTimeToHHmm } from '../utils/dateUtils'
@@ -159,7 +158,6 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   }, [features.servizio, placementAreasSetting])
 
   const { data: acceptedBookings = [] } = useAcceptedBookings()
-  const { data: dailyGuestLimit = null } = useRestaurantSetting('daily_guest_limit', { authenticated: true })
 
   // Convert desired_time to startTime and endTime for capacity check
   // Default endTime is startTime + 3 hours (same as AcceptBookingModal)
@@ -368,27 +366,6 @@ export const AdminBookingForm: React.FC<AdminBookingFormProps> = ({
   /** Dopo eventuale OK su orario passato: capienza → modale → creazione. */
   const continueSubmitAfterPastTimeCheck = () => {
     setCapacityWarningOverride(null)
-
-    if (
-      dailyGuestLimit != null &&
-      dailyGuestLimit > 0 &&
-      formData.desired_date &&
-      (formData.num_guests || 0) > 0
-    ) {
-      const guestsByDate = sumGuestsByDate(acceptedBookings)
-      const currentGuests = guestsByDate[formData.desired_date] ?? 0
-      const totalOccupied = currentGuests + (formData.num_guests || 0)
-      if (totalOccupied > dailyGuestLimit) {
-        setCapacityWarningOverride({
-          exceededBy: totalOccupied - dailyGuestLimit,
-          slotName: 'giornata',
-          totalOccupied,
-          capacity: dailyGuestLimit,
-        })
-        setShowCapacityWarning(true)
-        return
-      }
-    }
 
     if (!capacityCheck.isAvailable) {
       if (capacityCheck.exceededSlots && capacityCheck.exceededSlots.length > 0) {

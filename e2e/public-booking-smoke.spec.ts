@@ -186,19 +186,16 @@ test.describe('Pagina Prenota smoke', () => {
 
     const privacyLink = page.getByRole('link', { name: /privacy policy/i })
     await expect(privacyLink).toHaveAttribute('href', new RegExp(`/privacy\\?from=%2Fprenota%2F${tenantSlug}$`))
+    await expect(privacyLink).not.toHaveAttribute('target', '_blank')
 
-    const popupPromise = page.waitForEvent('popup')
     await privacyLink.click()
-    const privacyPage = await popupPromise
+    await expect(page).toHaveURL(new RegExp(`/privacy\\?from=%2Fprenota%2F${tenantSlug}$`))
 
-    await expect(privacyPage).toHaveURL(new RegExp(`/privacy\\?from=%2Fprenota%2F${tenantSlug}$`))
-    await expect(privacyPage.getByRole('link', { name: /torna alla prenotazione/i })).toHaveAttribute(
-      'href',
-      new RegExp(`/prenota/${tenantSlug}$`),
-    )
+    await page.getByRole('button', { name: /torna alla prenotazione/i }).click()
+    await expect(page).toHaveURL(new RegExp(`/prenota/${tenantSlug}$`))
 
-    await privacyPage.getByRole('link', { name: /torna alla prenotazione/i }).click()
-    await expect(privacyPage).toHaveURL(new RegExp(`/prenota/${tenantSlug}$`))
+    await page.goBack()
+    await expect(page).not.toHaveURL(new RegExp(`/prenota/${tenantSlug}$`))
   })
 
   // @prenota-blindatura: e2e-summary-total-label

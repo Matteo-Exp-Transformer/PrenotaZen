@@ -91,4 +91,21 @@ describe('useCapacityCheck — no-show esclusi da occupazione (admin-blindatura 
     expect(result.current.isAvailable).toBe(false)
     expect(result.current.exceededSlots?.[0]?.exceededBy).toBe(1)
   })
+
+  it('fasce disattivate (Classic): nessun sforo per-fascia anche con cap impostato', () => {
+    restaurantSettings.booking_time_slots_enabled = false
+    const { result } = renderHook(() =>
+      useCapacityCheck({
+        date: '2026-06-12',
+        startTime: '20:00',
+        endTime: '23:00',
+        numGuests: 50,
+        acceptedBookings: [acceptedBooking({ num_guests: 6 })],
+      }),
+    )
+
+    expect(result.current.isAvailable).toBe(true)
+    expect(result.current.exceededSlots).toBeUndefined()
+    expect(result.current.slotsStatus).toEqual([])
+  })
 })

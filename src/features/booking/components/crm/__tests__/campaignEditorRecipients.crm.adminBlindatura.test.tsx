@@ -55,6 +55,7 @@ const customersMock = [
     accepted_count: 1,
     pending_count: 0,
     cancelled_count: 0,
+    marketing_consent: true,
   },
   {
     email: 'bob@example.com',
@@ -66,6 +67,7 @@ const customersMock = [
     accepted_count: 1,
     pending_count: 0,
     cancelled_count: 0,
+    marketing_consent: true,
   },
 ]
 

@@ -14,7 +14,7 @@ interface RateLimitState {
 
 const RATE_LIMIT_KEY = 'booking-form-rate-limit'
 
-export const useRateLimit = (options: RateLimitOptions = { maxAttempts: 3, timeWindow: 60000 }) => {
+export const useRateLimit = (options: RateLimitOptions = { maxAttempts: 7, timeWindow: 60000 }) => {
   const [isBlocked, setIsBlocked] = useState(false)
 
   const checkRateLimit = useCallback((): boolean => {

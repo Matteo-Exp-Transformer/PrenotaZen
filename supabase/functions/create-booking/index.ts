@@ -19,25 +19,21 @@ const BOOKING_PUBLIC_CLIENT_TEXT_LIMITS = {
 
 const TEXT_TOO_LONG_ERROR = "Testo troppo lungo";
 
-/** Sync con `parseDailyGuestLimitFromDb` in `restaurantSettingRegistry.ts`. */
-const DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE = -1;
-
-function parseDailyGuestLimitFromDb(raw: unknown): number | null {
-  if (raw == null) return null;
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    if (raw === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || raw <= 0) return null;
-    return raw;
+/**
+ * Capienza coperti per-fascia letta da `restaurant_settings.slot_guest_capacities`
+ * (Record<slotId, number|null>). Fonte allineata al client (`useCapacityCheck`): la UI Classic
+ * scrive qui il limite "Coperti max" per fascia, non su `service_slots.max_guests`.
+ */
+function parseSlotGuestCapacitiesFromDb(raw: unknown): Record<string, number | null> {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const obj = raw as Record<string, unknown>;
+  const out: Record<string, number | null> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v == null) { out[k] = null; continue; }
+    const n = typeof v === "number" ? v : parseInt(String(v), 10);
+    out[k] = Number.isNaN(n) ? null : n;
   }
-  if (typeof raw === "string") {
-    const trimmed = raw.trim();
-    if (trimmed === "") return null;
-    const n = parseInt(trimmed, 10);
-    if (!Number.isNaN(n)) {
-      if (n === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || n <= 0) return null;
-      return n;
-    }
-  }
-  return null;
+  return out;
 }
 
 function getDietaryRestrictionsTextLength(
@@ -185,6 +181,10 @@ Deno.serve(async (req: Request) => {
       placement,
       menu,
       menu_promo_labels,
+      marketing_consent,
+      dietary_data_consent,
+      dietary_off_platform_notice,
+      dietary_data_consent_at,
     } = body;
 
     // DB: client_email è NOT NULL (default ''). Non usare `|| null`: stringa vuota è falsy e diventerebbe NULL.
@@ -248,6 +248,22 @@ Deno.serve(async (req: Request) => {
     ) {
       return new Response(
         JSON.stringify({ error: TEXT_TOO_LONG_ERROR }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Consenso art. 9 GDPR obbligatorio se sono presenti dati alimentari
+    if (getDietaryRestrictionsTextLength(dietary_restrictions) > 0 && dietary_data_consent !== true) {
+      return new Response(
+        JSON.stringify({ error: "Consenso per dati alimentari obbligatorio" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // off_platform e dati presenti sono in conflitto (non deve succedere dal client)
+    if (dietary_off_platform_notice === true && getDietaryRestrictionsTextLength(dietary_restrictions) > 0) {
+      return new Response(
+        JSON.stringify({ error: "Conflitto: off-platform con dati alimentari presenti" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -321,8 +337,9 @@ Deno.serve(async (req: Request) => {
         .eq("tenant_id", orgId)
         .in("setting_key", [
           "booking_time_slots_enabled",
-          "daily_guest_limit",
           "slot_limit_enabled",
+          "booking_reject_out_of_slot",
+          "slot_guest_capacities",
         ]);
 
       const sMap: Record<string, unknown> = {};
@@ -330,8 +347,14 @@ Deno.serve(async (req: Request) => {
       const timeSlotsEnabled: boolean =
         sMap["booking_time_slots_enabled"] === false ? false : true;
       // Blocco per-fascia: disattivato di default (decisione Matteo 11-06-26).
-      // Riattivabile impostando restaurant_settings.slot_limit_enabled = true.
-      const slotLimitEnabled: boolean = sMap["slot_limit_enabled"] === true;
+      // Interruttore globale: restaurant_settings.slot_limit_enabled = true.
+      const slotLimitEnabled: boolean =
+        sMap["slot_limit_enabled"] === true || sMap["slot_limit_enabled"] === "true";
+      // Vincolo orario: rifiuta gli orari fuori da ogni fascia. Default OFF (decisione Matteo 18-06-26).
+      const rejectOutOfSlot: boolean =
+        sMap["booking_reject_out_of_slot"] === true || sMap["booking_reject_out_of_slot"] === "true";
+      // Capienza per-fascia impostata dalla UI Classic (Record<slotId, number|null>).
+      const slotGuestCapacities = parseSlotGuestCapacitiesFromDb(sMap["slot_guest_capacities"]);
 
       // Prenotazioni accettate del giorno
       const dateStart = `${desired_date}T00:00:00`;
@@ -346,27 +369,8 @@ Deno.serve(async (req: Request) => {
         .gte("confirmed_start", dateStart)
         .lte("confirmed_start", dateEnd);
 
-      // --- Check limite GIORNALIERO coperti (esterno, verso il pubblico) ---
-      // Sentinella DB: -1 = nessun limite. Conta solo le accettate (sopra). Indipendente dal per-fascia.
-      const dailyLimit = parseDailyGuestLimitFromDb(sMap["daily_guest_limit"]);
-      if (dailyLimit != null) {
-        const dayTotal = (dayBookings ?? []).reduce(
-          (acc: number, b: { num_guests: number }) => acc + (b.num_guests ?? 0),
-          0
-        );
-        if (dayTotal + num_guests > dailyLimit) {
-          return new Response(
-            JSON.stringify({
-              error: "Spiacenti, abbiamo raggiunto il numero massimo di coperti per questa data.",
-              code: "DAILY_LIMIT",
-            }),
-            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      }
-
-      // Check per-fascia — disattivato di default, riattivabile via slot_limit_enabled
-      if (slotLimitEnabled && timeSlotsEnabled) {
+      // Check per-fascia / vincolo orario — entrambi opzionali (default OFF), bloccano solo il pubblico.
+      if ((slotLimitEnabled || rejectOutOfSlot) && timeSlotsEnabled) {
         const { data: slotsRows } = await supabaseAdmin
           .from("service_slots")
           .select("id, name, start_time, end_time, max_guests, display_order")
@@ -406,7 +410,18 @@ Deno.serve(async (req: Request) => {
               isInSlot(desired_time, s.start_time, s.end_time)
             );
 
-          if (matchedSlot) {
+          if (!matchedSlot) {
+            // Vincolo orario: l'orario non cade in nessuna fascia → rifiuta solo se il toggle è attivo.
+            if (rejectOutOfSlot) {
+              return new Response(
+                JSON.stringify({
+                  error: "Spiacenti, l'orario scelto non rientra negli orari di servizio.",
+                  code: "OUT_OF_SLOT",
+                }),
+                { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          } else if (slotLimitEnabled) {
             // Leggi override
             const { data: ovRow } = await supabaseAdmin
               .from("service_slot_overrides")
@@ -416,7 +431,10 @@ Deno.serve(async (req: Request) => {
               .eq("override_date", desired_date)
               .maybeSingle();
 
-            const cap: number | null = ovRow?.max_guests ?? matchedSlot.max_guests ?? null;
+            // Priorità cap allineata al client (useCapacityCheck): override → service_slots.max_guests
+            // → slot_guest_capacities[slotId] (dove la UI Classic scrive il limite per-fascia).
+            const cap: number | null =
+              ovRow?.max_guests ?? matchedSlot.max_guests ?? slotGuestCapacities[matchedSlot.id] ?? null;
 
             if (cap != null) {
               const occupied = (dayBookings ?? []).reduce(
@@ -518,6 +536,12 @@ Deno.serve(async (req: Request) => {
       menu_promo_labels: resolvedMenuPromoLabels,
       booking_source: "public",
       status: "pending",
+      marketing_consent: marketing_consent === true,
+      dietary_data_consent: dietary_data_consent === true,
+      dietary_off_platform_notice: dietary_off_platform_notice === true,
+      dietary_data_consent_at: dietary_data_consent === true
+        ? (dietary_data_consent_at ?? new Date().toISOString())
+        : null,
     };
 
     const { data: booking, error: insertError } = await supabaseAdmin
@@ -548,7 +572,12 @@ Deno.serve(async (req: Request) => {
       if (existingCustomer) {
         await supabaseAdmin
           .from("customers")
-          .update({ updated_at: new Date().toISOString() })
+          .update({
+            updated_at: new Date().toISOString(),
+            // Il consenso marketing si aggiorna solo a true: una prenotazione senza spunta
+            // non revoca un consenso già dato in precedenza (la revoca avviene via admin).
+            ...(marketing_consent === true ? { marketing_consent: true } : {}),
+          })
           .eq("id", existingCustomer.id);
       } else {
         await supabaseAdmin.from("customers").insert({
@@ -557,6 +586,7 @@ Deno.serve(async (req: Request) => {
           email: clientEmailNormalized,
           phone: client_phone || null,
           source: "synced",
+          marketing_consent: marketing_consent === true,
         });
       }
     }

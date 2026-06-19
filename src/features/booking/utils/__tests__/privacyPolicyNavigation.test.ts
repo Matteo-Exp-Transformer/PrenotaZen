@@ -3,6 +3,7 @@ import {
   buildPrenotaReturnPath,
   buildPrivacyPolicyLink,
   isValidPrivacyReturnPath,
+  resolvePrivacyBackAction,
   resolvePrivacyReturnPath,
 } from '../privacyPolicyNavigation'
 
@@ -35,5 +36,32 @@ describe('privacyPolicyNavigation', () => {
     )
     expect(resolvePrivacyReturnPath('?from=https://evil.example', null)).toBeNull()
     expect(resolvePrivacyReturnPath('', null)).toBeNull()
+  })
+
+  it('prefers history back when privacy was opened in-app from prenota (same tab)', () => {
+    expect(
+      resolvePrivacyBackAction('/prenota/demo-slug', {
+        historyLength: 2,
+        locationKey: 'abc123',
+      }),
+    ).toEqual({ kind: 'history-back' })
+  })
+
+  it('replaces to return path on a fresh standalone /privacy visit (no stacked entry)', () => {
+    expect(
+      resolvePrivacyBackAction('/prenota/demo-slug', {
+        historyLength: 1,
+        locationKey: 'default',
+      }),
+    ).toEqual({ kind: 'replace', path: '/prenota/demo-slug' })
+  })
+
+  it('navigates home when privacy opened without return path', () => {
+    expect(
+      resolvePrivacyBackAction(null, {
+        historyLength: 1,
+        locationKey: 'default',
+      }),
+    ).toEqual({ kind: 'navigate', path: '/' })
   })
 })

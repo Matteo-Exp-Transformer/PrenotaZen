@@ -10,10 +10,19 @@ export function dietaryRestrictionsToText(
     .join(', ')
 }
 
+/** Suffisso «- N ospite/i» in admin: solo se il conteggio è stato specificato (>= 1). */
+export function shouldShowDietaryGuestCount(restriction: Pick<DietaryRestriction, 'guest_count'>): boolean {
+  return restriction.guest_count >= 1
+}
+
+export function formatDietaryGuestCountLabel(guest_count: number): string {
+  return `${guest_count} ${guest_count === 1 ? 'ospite' : 'ospiti'}`
+}
+
 /** Salva il testo libero come singola voce in dietary_restrictions (JSONB). */
 export function dietaryTextToRestrictions(text: string): DietaryRestriction[] {
   if (!text.trim()) return []
-  return [{ restriction: text, guest_count: 1 }]
+  return [{ restriction: text, guest_count: 0 }]
 }
 
 /** Trim solo in invio prenotazione — mai in onChange, altrimenti la barra spaziatrice non funziona mentre si digita. */

@@ -12,7 +12,6 @@ import { UnsavedChangesProvider, useUnsavedChangesGuard } from '@/contexts/Unsav
 const { featuresState, restaurantSettings } = vi.hoisted(() => ({
   featuresState: { servizio: false },
   restaurantSettings: {
-    daily_guest_limit: null as number | null,
     booking_time_slots_enabled: true,
   },
 }))
@@ -51,6 +50,11 @@ vi.mock('../../hooks/useRestaurantSetting', () => ({
 vi.mock('../../hooks/useServiceSlots', () => ({
   useServiceSlots: () => ({ data: [] }),
   useDigestSlotConfigs: () => ({ data: [] }),
+}))
+
+vi.mock('../../hooks/useServiceSlotOverrides', () => ({
+  useServiceSlotOverrides: () => ({ data: [] }),
+  resolveSlotOverride: () => null,
 }))
 
 vi.mock('../../hooks/useTableAssignments', () => ({

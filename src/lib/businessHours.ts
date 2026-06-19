@@ -3,7 +3,10 @@
  * Validates booking date/time against restaurant opening hours
  */
 
-import { slotRangesOverlap } from '@/features/booking/utils/bookingTimeSlots'
+import {
+  isTimeInsideSlot,
+  slotRangesOverlap,
+} from '@/features/booking/utils/bookingTimeSlots'
 import { logger } from '@/lib/logger'
 
 export interface BusinessHourSlot {
@@ -43,48 +46,11 @@ export function getDayOfWeek(dateString: string): keyof BusinessHours {
 }
 
 /**
- * Parse time string "HH:mm" to minutes since midnight
+ * Check if a time falls within a business-hour slot (open→close).
+ * Delegates to isTimeInsideSlot — stessa logica overnight di slotRangesOverlap / admin.
  */
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number)
-  return hours * 60 + minutes
-}
-
-/**
- * Check if a time falls within a time slot, handling midnight crossover
- */
-function isTimeInSlot(
-  time: string,
-  slot: BusinessHourSlot
-): boolean {
-  const timeMinutes = timeToMinutes(time)
-  const openMinutes = timeToMinutes(slot.open)
-  let closeMinutes = timeToMinutes(slot.close)
-  
-  // Handle midnight crossover:
-  // - "00:00" means closing at end of day (24:00 = 1440 minutes)
-  // - "01:00" means closing at 1am next day (25:00 = 1500 minutes, wraps to 60)
-  if (closeMinutes === 0) {
-    // "00:00" = end of current day (24:00)
-    closeMinutes = 1440
-  } else if (closeMinutes === 60) {
-    // "01:00" = 1am next day, represented as 60 minutes (since it's after midnight)
-    closeMinutes = 1500 // 25:00
-  }
-  
-  // Determine if slot crosses midnight
-  // A slot crosses midnight if close time (after conversion) > 1440 (next day)
-  const crossesMidnight = closeMinutes > 1440
-  
-  if (crossesMidnight) {
-    // Slot crosses midnight (e.g., 22:00-01:00 or 11:00-01:00)
-    // Valid times: >= open OR < (close % 1440)
-    const closeNextDay = closeMinutes % 1440 // e.g., 1500 % 1440 = 60
-    return timeMinutes >= openMinutes || timeMinutes < closeNextDay
-  } else {
-    // Normal case: slot within same day (e.g., 11:00-00:00 means 11:00-24:00)
-    return timeMinutes >= openMinutes && timeMinutes < closeMinutes
-  }
+function isTimeInSlot(time: string, slot: BusinessHourSlot): boolean {
+  return isTimeInsideSlot(time, slot.open, slot.close)
 }
 
 /**

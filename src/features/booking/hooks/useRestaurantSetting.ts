@@ -19,7 +19,7 @@ export function useRestaurantSetting<K extends RestaurantSettingKeyV1>(
   return useQuery({
     queryKey: ['restaurant_settings', key, tenantId],
     queryFn: async (): Promise<RestaurantSettingValueMap[K]> => {
-      // Le chiavi solo-admin (es. app_theme, daily_guest_limit) vanno lette dal
+      // Le chiavi solo-admin (es. app_theme, slot_limit_enabled) vanno lette dal
       // client autenticato: la policy RLS anon le nasconde (whitelist sole 11
       // chiavi pubbliche). Le pagine pubbliche restano su supabasePublic.
       const client = options?.authenticated ? supabase : supabasePublic

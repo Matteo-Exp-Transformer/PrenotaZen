@@ -49,9 +49,12 @@ export const RESTAURANT_SETTING_KEYS_V1 = [
   'restaurant_name',
   'timezone',
   'booking_window_days',
-  'daily_guest_limit',
   /** Capienza massima coperti per fascia (Record<slotId, number|null>); null = nessun limite. */
   'slot_guest_capacities',
+  /** Interruttore globale dei limiti coperti per-fascia: blocca il pubblico solo se ON (default false). */
+  'slot_limit_enabled',
+  /** Vincolo orario: se ON, rifiuta la richiesta pubblica il cui orario non cade in nessuna fascia (default false). */
+  'booking_reject_out_of_slot',
   'business_hours',
   'contact_email',
   'contact_phone',
@@ -129,12 +132,6 @@ const bookingWindowDaysSchema = z.coerce
   .int('Deve essere un intero')
   .min(1, 'Minimo 1 giorno')
   .max(365, 'Massimo 365 giorni')
-const dailyGuestLimitSchema = z.coerce
-  .number()
-  .int('Deve essere un intero')
-  .min(0, 'Non può essere negativo') // 0 = nessun limite (gestito come "illimitato")
-  .max(1000, 'Massimo 1000 ospiti')
-
 const optionalSlotCapSchema = z.union([
   z.coerce.number().int().min(1, 'Minimo 1').max(5000, 'Massimo 5000'),
   z.null(),
@@ -181,9 +178,6 @@ function parseSlotGuestCapacitiesFromDb(raw: unknown): SlotGuestCapacities {
   return parsed.success ? parsed.data : {}
 }
 
-/** Valore JSON salvato su `restaurant_settings.setting_value` quando non c'e limite giornaliero (la colonna e NOT NULL). */
-export const DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE = -1
-
 function parseJsonScalarString(raw: unknown): string {
   if (raw == null) return ''
   if (typeof raw === 'string') return raw
@@ -206,28 +200,12 @@ function parseBookingWindowDaysFromDb(raw: unknown): number {
 
 export { parseBookingWindowDaysFromDb }
 
-/**
- * `daily_guest_limit` puo essere assente/`null` per indicare «nessun limite».
- * Restituisce `null` quando il valore non e impostato o non e un numero valido,
- * cosi l'app sa che non deve applicare alcun cap giornaliero.
- */
-function parseDailyGuestLimitFromDb(raw: unknown): number | null {
-  if (raw == null) return null
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    // -1 (sentinella) e 0 significano entrambi «nessun limite».
-    if (raw === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || raw <= 0) return null
-    return raw
-  }
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim()
-    if (trimmed === '') return null
-    const n = parseInt(trimmed, 10)
-    if (!Number.isNaN(n)) {
-      if (n === DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE || n <= 0) return null
-      return n
-    }
-  }
-  return null
+/** Boolean opzionale da DB con default configurabile (gestisce string 'true'/'false', boolean, null). */
+function parseBooleanSettingFromDb(raw: unknown, fallback: boolean): boolean {
+  if (raw == null) return fallback
+  if (raw === true || raw === 'true') return true
+  if (raw === false || raw === 'false') return false
+  return fallback
 }
 
 function parseBusinessHoursFromDb(raw: unknown): BusinessHours {
@@ -345,8 +323,11 @@ export type RestaurantSettingValueMap = {
   restaurant_name: string
   timezone: string
   booking_window_days: number
-  daily_guest_limit: number | null
   slot_guest_capacities: SlotGuestCapacities
+  /** Interruttore globale limiti coperti per-fascia (blocco pubblico solo se ON). Default false. */
+  slot_limit_enabled: boolean
+  /** Vincolo orario: rifiuta pubblico se l'orario non cade in nessuna fascia. Default false. */
+  booking_reject_out_of_slot: boolean
   business_hours: BusinessHours
   contact_email: string
   contact_phone: string
@@ -407,24 +388,6 @@ export const restaurantSettingRegistry: {
       return r.success ? null : r.error.issues[0]?.message ?? 'Valore non valido'
     },
   },
-  daily_guest_limit: {
-    key: 'daily_guest_limit',
-    parseFromDb: (raw) => parseDailyGuestLimitFromDb(raw),
-    serializeToDb: (value) => {
-      // La colonna DB e NOT NULL: usiamo -1 come sentinella per «nessun limite».
-      // null e 0 (e valori non positivi) significano «nessun limite».
-      if (value == null || (typeof value === 'number' && value <= 0)) {
-        return DAILY_GUEST_LIMIT_UNLIMITED_DB_VALUE as unknown as Json
-      }
-      return value as Json
-    },
-    validate: (value) => {
-      // Campo opzionale: vuoto/null = nessun limite, sempre valido
-      if (value == null || value === '') return null
-      const r = dailyGuestLimitSchema.safeParse(value)
-      return r.success ? null : r.error.issues[0]?.message ?? 'Valore non valido'
-    },
-  },
   slot_guest_capacities: {
     key: 'slot_guest_capacities',
     parseFromDb: (raw) => parseSlotGuestCapacitiesFromDb(raw),
@@ -433,6 +396,18 @@ export const restaurantSettingRegistry: {
       const r = slotGuestCapacitiesSchemaV2.safeParse(value)
       return r.success ? null : r.error.issues[0]?.message ?? 'Capienze fascia non valide'
     },
+  },
+  slot_limit_enabled: {
+    key: 'slot_limit_enabled',
+    parseFromDb: (raw) => parseBooleanSettingFromDb(raw, false),
+    serializeToDb: (value) => value as Json,
+    validate: (value) => (typeof value === 'boolean' ? null : 'Valore non valido'),
+  },
+  booking_reject_out_of_slot: {
+    key: 'booking_reject_out_of_slot',
+    parseFromDb: (raw) => parseBooleanSettingFromDb(raw, false),
+    serializeToDb: (value) => value as Json,
+    validate: (value) => (typeof value === 'boolean' ? null : 'Valore non valido'),
   },
   business_hours: {
     key: 'business_hours',

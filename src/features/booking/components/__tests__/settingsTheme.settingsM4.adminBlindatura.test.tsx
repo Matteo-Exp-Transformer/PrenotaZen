@@ -9,7 +9,6 @@ const mutateAsyncSpy = vi.fn()
 const restaurantSettingsData = vi.hoisted(() => ({
   restaurant_name: 'Locale Test',
   slot_guest_capacities: {} as Record<string, number | null>,
-  daily_guest_limit: null as number | null,
   booking_time_slots_enabled: true,
   business_hours: {
     monday: null,

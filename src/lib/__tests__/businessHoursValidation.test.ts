@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { BusinessHourSlot } from '@/lib/businessHours'
+import type { BusinessHourSlot, BusinessHours } from '@/lib/businessHours'
 import {
   getDefaultBusinessHours,
   hasAnyBusinessHoursConfigured,
+  isValidBookingDateTime,
   sortBusinessHourSlots,
   validateBusinessHourSlots,
   validateBusinessHours,
@@ -66,6 +67,47 @@ describe('validateBusinessHourSlots', () => {
     expect(validateBusinessHourSlots(slots(['14:00', '20:00'], ['11:00', '15:00']))).toBe(
       'Due fasce di apertura si sovrappongono'
     )
+  })
+})
+
+describe('isValidBookingDateTime', () => {
+  const sundayOvernight: BusinessHours = {
+    monday: null,
+    tuesday: null,
+    wednesday: null,
+    thursday: null,
+    friday: null,
+    saturday: null,
+    sunday: [{ open: '17:30', close: '04:00' }],
+  }
+
+  const lunchOnly: BusinessHours = {
+    monday: [{ open: '12:00', close: '15:00' }],
+    tuesday: null,
+    wednesday: null,
+    thursday: null,
+    friday: null,
+    saturday: null,
+    sunday: null,
+  }
+
+  it('accetta orario serale in fascia overnight (17:30→04:00)', () => {
+    expect(isValidBookingDateTime('2026-06-21', '23:00', sundayOvernight)).toBe(true)
+  })
+
+  it('accetta orario dopo mezzanotte nella stessa fascia overnight', () => {
+    expect(isValidBookingDateTime('2026-06-21', '03:00', sundayOvernight)).toBe(true)
+  })
+
+  it('rifiuta orario oltre la chiusura overnight', () => {
+    expect(isValidBookingDateTime('2026-06-21', '05:00', sundayOvernight)).toBe(false)
+  })
+
+  it('fasce diurne normali invariate (12:00–15:00)', () => {
+    expect(isValidBookingDateTime('2026-06-15', '12:30', lunchOnly)).toBe(true)
+    expect(isValidBookingDateTime('2026-06-15', '15:00', lunchOnly)).toBe(true)
+    expect(isValidBookingDateTime('2026-06-15', '11:30', lunchOnly)).toBe(false)
+    expect(isValidBookingDateTime('2026-06-15', '15:30', lunchOnly)).toBe(false)
   })
 })
 

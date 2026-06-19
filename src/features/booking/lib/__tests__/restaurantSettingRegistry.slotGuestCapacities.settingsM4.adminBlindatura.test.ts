@@ -1,13 +1,14 @@
 // @admin-blindatura: settings-time-slots
-// Copre: cap per-fascia (slot_guest_capacities) distinto da daily_guest_limit; vuoto/invalid/alto
+// Copre: cap per-fascia (slot_guest_capacities) — fonte autoritativa del limite per-fascia letta da
+//        edge e badge (modello 18-06-26); vuoto/invalid/alto + interruttore globale slot_limit_enabled.
 
 import { describe, expect, it } from 'vitest'
 import { restaurantSettingRegistry } from '../restaurantSettingRegistry'
 
 const slotCapEntry = restaurantSettingRegistry.slot_guest_capacities
-const dailyLimitEntry = restaurantSettingRegistry.daily_guest_limit
+const slotLimitEnabledEntry = restaurantSettingRegistry.slot_limit_enabled
 
-describe('settings-time-slots M4 — registry cap per-fascia vs limite giornaliero', () => {
+describe('settings-time-slots M4 — registry cap per-fascia + interruttore globale', () => {
   it('slot_guest_capacities: vuoto/null per fascia è valido (nessun tetto)', () => {
     expect(slotCapEntry.validate({})).toBeNull()
     expect(slotCapEntry.validate({ 'slot-1': null })).toBeNull()
@@ -26,10 +27,11 @@ describe('settings-time-slots M4 — registry cap per-fascia vs limite giornalie
     expect(slotCapEntry.validate({ 'slot-1': 5001 })).not.toBeNull()
   })
 
-  it('daily_guest_limit resta chiave separata: 0 = nessun limite pubblico, non cap fascia', () => {
-    expect(dailyLimitEntry.validate(0)).toBeNull()
-    expect(slotCapEntry.validate({ 'slot-1': 0 })).not.toBeNull()
-    expect(dailyLimitEntry.key).toBe('daily_guest_limit')
+  it('interruttore globale slot_limit_enabled: chiave separata, default false', () => {
+    expect(slotLimitEnabledEntry.key).toBe('slot_limit_enabled')
     expect(slotCapEntry.key).toBe('slot_guest_capacities')
+    // Il blocco pubblico per-fascia dipende dall'interruttore globale, non dai soli cap.
+    expect(slotLimitEnabledEntry.parseFromDb(null)).toBe(false)
+    expect(slotLimitEnabledEntry.parseFromDb(true)).toBe(true)
   })
 })

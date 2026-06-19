@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import { useState, useMemo, useEffect } from 'react'
 import { Button, Modal, Input } from '@/components/ui'
 import { useCustomers } from '@/features/booking/hooks/useCustomers'
-import type { CustomerProfile } from '@/types/customer'
+import { isEligiblePromoRecipient } from '@/features/booking/utils/promoRecipientEligibility'
 
 interface Props {
   isOpen: boolean
@@ -13,10 +13,6 @@ interface Props {
   initialRecipients?: string[]
 }
 
-function hasValidEmail(c: CustomerProfile): boolean {
-  return c.source === 'booking' && !!c.email && c.email.includes('@')
-}
-
 export const PromoRecipientPicker: FC<Props> = ({
   isOpen,
   onClose,
@@ -24,7 +20,8 @@ export const PromoRecipientPicker: FC<Props> = ({
   initialRecipients = [],
 }) => {
   const { customers } = useCustomers()
-  const eligible = useMemo(() => customers.filter(hasValidEmail), [customers])
+  const eligible = useMemo(() => customers.filter(isEligiblePromoRecipient), [customers])
+  const eligibleEmails = useMemo(() => new Set(eligible.map((c) => c.email)), [eligible])
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialRecipients))
   const [search, setSearch] = useState('')
 
@@ -71,7 +68,7 @@ export const PromoRecipientPicker: FC<Props> = ({
   }
 
   const handleConfirm = () => {
-    onConfirm(Array.from(selected))
+    onConfirm(Array.from(selected).filter((email) => eligibleEmails.has(email)))
     onClose()
   }
 
@@ -90,7 +87,7 @@ export const PromoRecipientPicker: FC<Props> = ({
         />
 
         <p className="text-sm text-slate-500">
-          {eligible.length} clienti con prenotazioni •{' '}
+          {eligible.length} clienti con consenso marketing •{' '}
           <button
             type="button"
             onClick={toggleAll}

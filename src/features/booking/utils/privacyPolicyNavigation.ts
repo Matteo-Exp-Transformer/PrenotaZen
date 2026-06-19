@@ -35,3 +35,25 @@ export function resolvePrivacyReturnPath(
 
   return null
 }
+
+export type PrivacyBackAction =
+  | { kind: 'history-back' }
+  | { kind: 'replace'; path: string }
+  | { kind: 'navigate'; path: string }
+
+/**
+ * Strategia «indietro» dalla pagina standalone `/privacy`: non impilare una nuova entry su Prenota.
+ * (Dal form Prenota la policy è una modale in-page, qui non passa.)
+ */
+export function resolvePrivacyBackAction(
+  returnPath: string | null,
+  context: { historyLength: number; locationKey: string | undefined },
+): PrivacyBackAction {
+  if (returnPath) {
+    if (context.historyLength > 1 && context.locationKey !== 'default') {
+      return { kind: 'history-back' }
+    }
+    return { kind: 'replace', path: returnPath }
+  }
+  return { kind: 'navigate', path: '/' }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -43,6 +43,7 @@ import {
 import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
 import { bookingTypeUsesMenuSelections } from '../utils/bookingTypeMenu'
 import { useServiceSlots, useDigestSlotConfigs, type SlotConfig } from '../hooks/useServiceSlots'
+import { useServiceSlotOverrides, resolveSlotOverride } from '../hooks/useServiceSlotOverrides'
 import { useTableAssignments, type BookingTableAssignment } from '../hooks/useTableAssignments'
 import { useFeatures } from '@/hooks/useFeatures'
 import { cn } from '@/lib/utils'
@@ -516,15 +517,40 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   const visibleBookings = bookings.filter((b) => !b.no_show)
   const events = transformBookingsToCalendarEvents(visibleBookings)
 
-  // Limite coperti giornaliero (esterno): null = nessun limite → nel calendario mostriamo solo il conteggio.
-  const dailyGuestLimitQuery = useRestaurantSetting('daily_guest_limit', {
+  // Limiti coperti PER-FASCIA (nuovo modello 18-06): il badge % usa la somma dei limiti per-fascia del
+  // giorno. % mostrata solo se i limiti per-fascia sono attivi e TUTTE le fasce del giorno hanno un cap.
+  const slotLimitEnabledQuery = useRestaurantSetting('slot_limit_enabled', {
     authenticated: true,
   })
-  const dailyGuestLimit = dailyGuestLimitQuery.data ?? null
+  const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities', {
+    authenticated: true,
+  })
+  const { data: slotOverrides = [] } = useServiceSlotOverrides()
+  const slotLimitEnabled = slotLimitEnabledQuery.data ?? false
+  const slotGuestCapacities = slotGuestCapacitiesQuery.data ?? {}
 
   // Somma coperti per data (YYYY-MM-DD) → alimenta % riempimento e badge cella-giorno.
   // Logica pura in sumGuestsByDate (testata): solo accettate, non no-show, con orario confermato.
   const guestsByDate = useMemo(() => sumGuestsByDate(bookings), [bookings])
+
+  // Cap per-fascia risolto come nel client (useCapacityCheck): override(data) → service_slots.max_guests
+  // → slot_guest_capacities[slotId]. Considera SOLO fasce esistenti (no chiavi orfane "appese").
+  const resolveDayDenominator = useCallback(
+    (cellDateStr: string): number | null => {
+      if (!slotLimitEnabled || !timeSlotsEnabled) return null
+      if (serviceSlots.length === 0) return null
+      let sum = 0
+      for (const slot of serviceSlots) {
+        const ov = resolveSlotOverride(slotOverrides, slot.id, cellDateStr)
+        const cap = ov ? ov.max_guests : (slot.max_guests ?? slotGuestCapacities[slot.id] ?? null)
+        // Se anche una sola fascia del giorno è senza limite → niente %, solo conteggio.
+        if (cap == null) return null
+        sum += cap
+      }
+      return sum > 0 ? sum : null
+    },
+    [slotLimitEnabled, timeSlotsEnabled, serviceSlots, slotOverrides, slotGuestCapacities],
+  )
 
 
   const handleEventClick = (clickInfo: any) => {
@@ -825,24 +851,25 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     setIsModalOpen(true)
   }
 
-  // Badge riempimento per cella-giorno (solo vista mese, deciso da Matteo 11-06):
-  //  - con limite giornaliero → SOLO la percentuale di occupazione (oltre 100% mostrata reale);
-  //  - senza limite → solo il conteggio coperti (niente percentuale finta).
+  // Badge riempimento per cella-giorno (solo vista mese, nuovo modello 18-06):
+  //  - con limiti per-fascia attivi e TUTTE le fasce del giorno con un cap → % sulla SOMMA dei cap
+  //    (oltre 100% mostrata reale, mai bloccante);
+  //  - altrimenti (limiti spenti / nessuna fascia / anche una fascia senza cap) → solo conteggio coperti.
   // Montato via dayCellDidMount come figlio del frame cella (non dentro il numero), così il
   // posizionamento assoluto si ancora alla cella e non resta ammassato accanto al numero giorno.
   const buildDayFillBadgesHtml = useCallback((cellDateStr: string): string => {
     const guests = guestsByDate[cellDateStr] ?? 0
     if (guests === 0) return ''
-    const hasLimit = dailyGuestLimit != null && dailyGuestLimit > 0
-    if (hasLimit) {
-      const pct = Math.round((guests / dailyGuestLimit!) * 100)
+    const denominator = resolveDayDenominator(cellDateStr)
+    if (denominator != null) {
+      const pct = Math.round((guests / denominator) * 100)
       // Onesto: oltre il 100% mostriamo il valore reale, senza cap. Mai bloccante.
       const tone =
         pct > 100 ? 'booking-day-fill--over' : pct >= 80 ? 'booking-day-fill--high' : 'booking-day-fill--ok'
-      return `<span class="booking-day-fill ${tone}" title="${guests} coperti su ${dailyGuestLimit}"><span class="booking-day-fill-num">${pct}</span><span class="booking-day-fill-sym" aria-hidden="true">%</span></span>`
+      return `<span class="booking-day-fill ${tone}" title="${guests} coperti su ${denominator}"><span class="booking-day-fill-num">${pct}</span><span class="booking-day-fill-sym" aria-hidden="true">%</span></span>`
     }
     return `<span class="booking-day-fill booking-day-fill--neutral" title="${guests} coperti">${guests}</span>`
-  }, [guestsByDate, dailyGuestLimit])
+  }, [guestsByDate, resolveDayDenominator])
 
   const mountDayFillBadge = useCallback(
     (frame: Element, cellDateStr: string) => {
@@ -857,7 +884,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     [buildDayFillBadgesHtml],
   )
 
-  // dayCellDidMount gira prima che dailyGuestLimit sia in cache → aggiorniamo i badge quando arriva.
+  // dayCellDidMount gira prima che i limiti per-fascia siano in cache → aggiorniamo i badge quando arrivano.
   useEffect(() => {
     if (currentView !== 'dayGridMonth') return
     const calendarRoot = document.querySelector('.booking-calendar-fc')
@@ -869,7 +896,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
       if (!frame) return
       mountDayFillBadge(frame, cellDateStr)
     })
-  }, [currentView, dailyGuestLimit, guestsByDate, mountDayFillBadge])
+  }, [currentView, guestsByDate, mountDayFillBadge])
 
   const config = {
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin],
@@ -922,7 +949,13 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
       minute: '2-digit' as const,
     },
     // Mobile: max 3 eventi in cella + «···» se ce ne sono altri (click = come dateClick sul giorno)
-    dayMaxEvents: isCalendarNarrowViewport ? 3 : false,
+    // Mobile: max 3 eventi; desktop: max 5. Indicatore overflow = informativo (nessun popover FC).
+    dayMaxEvents: isCalendarNarrowViewport ? 3 : 5,
+    moreLinkClick: (info: { date: Date }) => {
+      handleDateClick({ date: info.date })
+      const t = calendarRef.current?.getApi()?.view.type
+      return typeof t === 'string' ? t : 'dayGridMonth'
+    },
     ...(isCalendarNarrowViewport
       ? {
           moreLinkText: () => '···',
@@ -931,13 +964,10 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
               ? 'C’è un’altra prenotazione. Tocca per selezionare il giorno.'
               : `Ci sono altre ${num} prenotazioni. Tocca per selezionare il giorno.`,
           moreLinkClassNames: 'booking-calendar-more-dots',
-          moreLinkClick: (info: { date: Date }) => {
-            handleDateClick({ date: info.date })
-            const t = calendarRef.current?.getApi()?.view.type
-            return typeof t === 'string' ? t : 'dayGridMonth'
-          },
         }
-      : {}),
+      : {
+          moreLinkText: () => '…',
+        }),
     // Highlight today and selected date with stable CSS classes
     dayCellClassNames: (arg: any) => {
       const d = new Date(arg.date)

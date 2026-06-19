@@ -11,10 +11,13 @@ const createServiceSlotSpy = vi.fn()
 const updateServiceSlotSpy = vi.fn()
 const deleteServiceSlotSpy = vi.fn()
 
+const featuresState = vi.hoisted(() => ({ servizio: false }))
+
 const restaurantSettingsData = vi.hoisted(() => ({
   restaurant_name: 'Locale Test',
   slot_guest_capacities: {} as Record<string, number | null>,
-  daily_guest_limit: null as number | null,
+  slot_limit_enabled: false as boolean,
+  booking_reject_out_of_slot: false as boolean,
   booking_time_slots_enabled: true,
   business_hours: {
     monday: null,
@@ -89,14 +92,14 @@ vi.mock('@/contexts/TenantContext', () => ({
 
 vi.mock('@/hooks/useFeatures', () => ({
   useFeatures: () => ({
-    servizio: false,
-    noShow: false,
-    sidebar: false,
+    servizio: featuresState.servizio,
+    noShow: featuresState.servizio,
+    sidebar: featuresState.servizio,
     home: false,
     crm: false,
     analytics: false,
     walkIn: false,
-    tableAssignments: false,
+    tableAssignments: featuresState.servizio,
     qrMenu: false,
   }),
 }))
@@ -219,9 +222,12 @@ describe('settings-time-slots M4 — fasce Classic in RestaurantSettingsTab', ()
     updateServiceSlotSpy.mockResolvedValue(undefined)
     deleteServiceSlotSpy.mockResolvedValue(undefined)
 
+    featuresState.servizio = false
+
     restaurantSettingsData.restaurant_name = 'Locale Test'
     restaurantSettingsData.slot_guest_capacities = {}
-    restaurantSettingsData.daily_guest_limit = null
+    restaurantSettingsData.slot_limit_enabled = false
+    restaurantSettingsData.booking_reject_out_of_slot = false
     restaurantSettingsData.booking_time_slots_enabled = true
     restaurantSettingsData.business_hours = getDefaultBusinessHours()
     restaurantSettingsData.public_booking_page_background = DEFAULT_BOOKING_PAGE_BACKGROUND
@@ -355,7 +361,7 @@ describe('settings-time-slots M4 — fasce Classic in RestaurantSettingsTab', ()
     expect(screen.getByLabelText(/nome fascia 1/i)).toHaveValue('Notte')
   })
 
-  it('cap per-fascia e daily_guest_limit restano chiavi distinte al Salva', async () => {
+  it('cap per-fascia + interruttori limiti/orario salvati come chiavi distinte', async () => {
     const user = userEvent.setup()
     restaurantSettingsData.slot_guest_capacities = { 'slot-pranzo': 80 }
     renderSettingsTab()
@@ -364,9 +370,8 @@ describe('settings-time-slots M4 — fasce Classic in RestaurantSettingsTab', ()
     await user.clear(slotCapInput)
     await user.type(slotCapInput, '120')
 
-    const dailyInput = screen.getByLabelText(/coperti max al giorno/i)
-    await user.clear(dailyInput)
-    await user.type(dailyInput, '200')
+    await user.click(screen.getByRole('checkbox', { name: /attiva limiti coperti per fascia oraria/i }))
+    await user.click(screen.getByRole('checkbox', { name: /rifiuta richieste fuori dalle fasce orarie/i }))
 
     await confirmPublicSave(user)
 
@@ -376,10 +381,36 @@ describe('settings-time-slots M4 — fasce Classic in RestaurantSettingsTab', ()
 
     const slotCaps = getUpsertItemValue('slot_guest_capacities') as Record<string, number | null>
     expect(slotCaps['slot-pranzo']).toBe(120)
-    expect(getUpsertItemValue('daily_guest_limit')).toBe(200)
+    expect(getUpsertItemValue('slot_limit_enabled')).toBe(true)
+    expect(getUpsertItemValue('booking_reject_out_of_slot')).toBe(true)
     expect(getUpsertPayloadKeys()).toEqual(
-      expect.arrayContaining(['slot_guest_capacities', 'daily_guest_limit']),
+      expect.arrayContaining(['slot_guest_capacities', 'slot_limit_enabled', 'booking_reject_out_of_slot']),
     )
+  })
+
+  it('edition Pro (servizio): interruttori limiti/orario visibili e salvabili senza editor fasce Classic', async () => {
+    featuresState.servizio = true
+    const user = userEvent.setup()
+    renderSettingsTab()
+
+    expect(screen.queryByLabelText(/coperti max:/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /attiva \/ disattiva/i })).not.toBeInTheDocument()
+
+    const limitToggle = await screen.findByRole('checkbox', { name: /attiva limiti coperti per fascia oraria/i })
+    const rejectToggle = screen.getByRole('checkbox', { name: /rifiuta richieste fuori dalle fasce orarie/i })
+    expect(limitToggle).not.toBeChecked()
+    expect(rejectToggle).not.toBeChecked()
+
+    await user.click(limitToggle)
+    await user.click(rejectToggle)
+
+    await confirmPublicSave(user)
+
+    await waitFor(() => {
+      expect(mutateAsyncSpy).toHaveBeenCalled()
+    })
+    expect(getUpsertItemValue('slot_limit_enabled')).toBe(true)
+    expect(getUpsertItemValue('booking_reject_out_of_slot')).toBe(true)
   })
 
   it('cap per-fascia vuoto → null nel payload (nessun tetto)', async () => {
@@ -502,7 +533,8 @@ describe('settings-time-slots M4 — riordino manuale fasce (FIX 3, 16-06-26)', 
 
     restaurantSettingsData.restaurant_name = 'Locale Test'
     restaurantSettingsData.slot_guest_capacities = { 'slot-pranzo': 50 }
-    restaurantSettingsData.daily_guest_limit = null
+    restaurantSettingsData.slot_limit_enabled = false
+    restaurantSettingsData.booking_reject_out_of_slot = false
     restaurantSettingsData.booking_time_slots_enabled = true
     restaurantSettingsData.business_hours = getDefaultBusinessHours()
     restaurantSettingsData.public_booking_page_background = DEFAULT_BOOKING_PAGE_BACKGROUND
@@ -620,7 +652,8 @@ describe('settings-time-slots M4 — scroll+pulse al primo errore (FIX 4, 16-06-
 
     restaurantSettingsData.restaurant_name = 'Locale Test'
     restaurantSettingsData.slot_guest_capacities = {}
-    restaurantSettingsData.daily_guest_limit = null
+    restaurantSettingsData.slot_limit_enabled = false
+    restaurantSettingsData.booking_reject_out_of_slot = false
     restaurantSettingsData.booking_time_slots_enabled = true
     restaurantSettingsData.business_hours = getDefaultBusinessHours()
     restaurantSettingsData.public_booking_page_background = DEFAULT_BOOKING_PAGE_BACKGROUND

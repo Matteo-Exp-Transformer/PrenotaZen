@@ -12,6 +12,7 @@ import { PromoRecipientPicker } from '../PromoRecipientPicker'
 const bookingCustomer = (
   email: string,
   name: string,
+  marketing_consent = true,
 ): CustomerProfile => ({
   email,
   name,
@@ -22,6 +23,7 @@ const bookingCustomer = (
   accepted_count: 1,
   pending_count: 0,
   cancelled_count: 0,
+  marketing_consent,
 })
 
 let customersMock: CustomerProfile[] = [
@@ -165,5 +167,33 @@ describe('PromoRecipientPicker — stabilità selezione destinatari', () => {
 
     expect(await screen.findByRole('checkbox', { name: /alice/i })).toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: /manuale/i })).not.toBeInTheDocument()
+  })
+
+  it('esclude i clienti senza consenso marketing', async () => {
+    // @admin-blindatura: crm
+    customersMock = [
+      bookingCustomer('alice@example.com', 'Alice', true),
+      bookingCustomer('no-consent@example.com', 'No Consent', false),
+    ]
+
+    renderPicker()
+
+    expect(await screen.findByRole('checkbox', { name: /alice/i })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /no consent/i })).not.toBeInTheDocument()
+  })
+
+  it('non propaga in Conferma email senza consenso presenti in initialRecipients', async () => {
+    // @admin-blindatura: crm
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+
+    renderPicker({
+      initialRecipients: ['alice@example.com', 'no-consent@example.com'],
+      onConfirm,
+    })
+
+    await user.click(screen.getByRole('button', { name: /^conferma$/i }))
+
+    expect(onConfirm).toHaveBeenCalledWith(['alice@example.com'])
   })
 })

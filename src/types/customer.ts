@@ -23,4 +23,6 @@ export interface CustomerProfile {
   accepted_count: number
   pending_count: number
   cancelled_count: number
+  /** Consenso marketing email (art. 6.1.a GDPR) — da `customers.marketing_consent` o prenotazioni. */
+  marketing_consent?: boolean
 }

@@ -24,6 +24,7 @@ function mergeProfiles(
     phone: string | null
     notes: string | null
     source: string
+    marketing_consent: boolean
   }[],
 ): CustomerProfile[] {
   const byEmail = new Map<string, BookingRequest[]>()
@@ -47,7 +48,15 @@ function mergeProfiles(
 
   const customerByEmail = new Map<
     string,
-    { id: string; name: string; email: string; phone: string | null; notes: string | null; source: CustomerDbSource }
+    {
+      id: string
+      name: string
+      email: string
+      phone: string | null
+      notes: string | null
+      source: CustomerDbSource
+      marketing_consent: boolean
+    }
   >()
   for (const c of customerRows) {
     const key = normalizeCustomerEmail(c.email)
@@ -59,6 +68,7 @@ function mergeProfiles(
       phone: c.phone,
       notes: c.notes,
       source: c.source === 'synced' ? 'synced' : 'manual',
+      marketing_consent: c.marketing_consent === true,
     })
   }
 
@@ -94,6 +104,10 @@ function mergeProfiles(
 
     const source: CustomerProfile['source'] = bookings.length > 0 ? 'booking' : 'manual'
 
+    const marketing_consent =
+      cust?.marketing_consent === true ||
+      bookings.some((b) => b.marketing_consent === true)
+
     out.push({
       email,
       name: bookings.length > 0 ? nameFromBookings : cust?.name ?? '',
@@ -110,6 +124,7 @@ function mergeProfiles(
       accepted_count,
       pending_count,
       cancelled_count,
+      marketing_consent,
     })
   }
 
@@ -144,10 +159,10 @@ export function useCustomers() {
       const [bookingsRes, customersRes] = await Promise.all([
         supabase
           .from('booking_requests')
-          .select('id, client_email, client_name, client_phone, desired_date, updated_at, status, num_guests, cancelled_at, booking_type, event_type')
+          .select('id, client_email, client_name, client_phone, desired_date, updated_at, status, num_guests, cancelled_at, booking_type, event_type, marketing_consent')
           .eq('tenant_id', tenantId)
           .neq('status', 'deleted'),
-        supabase.from('customers').select('id,name,email,phone,notes,source').eq('tenant_id', tenantId),
+        supabase.from('customers').select('id,name,email,phone,notes,source,marketing_consent').eq('tenant_id', tenantId),
       ])
 
       if (bookingsRes.error) {
@@ -167,6 +182,7 @@ export function useCustomers() {
         phone: string | null
         notes: string | null
         source: string
+        marketing_consent: boolean
       }[]
 
       return mergeProfiles(bookingRows, customerRows)

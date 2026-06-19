@@ -21,10 +21,12 @@ const {
   fcPropsCapture: { current: null as Record<string, unknown> | null },
   featuresState: { servizio: false },
   restaurantSettings: {
-    daily_guest_limit: null as number | null,
+    // Nuovo modello (18-06): badge % su SOMMA cap per-fascia, gated dall'interruttore globale.
+    slot_limit_enabled: false as boolean,
     booking_time_slots_enabled: true,
+    slot_guest_capacities: {} as Record<string, number | null>,
   },
-  serviceSlotsState: { slots: [] as Array<{ id: string; name: string; start_time: string; end_time: string }> },
+  serviceSlotsState: { slots: [] as Array<{ id: string; name: string; start_time: string; end_time: string; max_guests?: number | null }> },
   tableAssignmentsState: { data: [] as Array<{ booking_id: string; turn_number: number; checked_out_at: string | null }> },
 }))
 
@@ -194,7 +196,8 @@ describe('@admin-blindatura calendario — solo accettate in vista', () => {
     vi.clearAllMocks()
     fcPropsCapture.current = null
     featuresState.servizio = false
-    restaurantSettings.daily_guest_limit = null
+    restaurantSettings.slot_limit_enabled = false
+    restaurantSettings.slot_guest_capacities = {}
     serviceSlotsState.slots = []
     tableAssignmentsState.data = []
     mockAcceptedBookingsState.data = []
@@ -269,8 +272,18 @@ describe('@admin-blindatura calendario — badge % riempimento (dayCellDidMount)
     setupMatchMedia(true)
   })
 
-  it('senza limite giornaliero: solo conteggio coperti, niente %', async () => {
-    restaurantSettings.daily_guest_limit = null
+  // Una sola fascia che copre la giornata; cap impostato via slot_guest_capacities (dove la UI scrive).
+  const SLOT_ID = 'slot-cena'
+  function setupCappedSlot(cap: number | null, limitOn = true) {
+    serviceSlotsState.slots = [
+      { id: SLOT_ID, name: 'Cena', start_time: '00:00', end_time: '23:59', max_guests: null },
+    ]
+    restaurantSettings.slot_limit_enabled = limitOn
+    restaurantSettings.slot_guest_capacities = { [SLOT_ID]: cap }
+  }
+
+  it('interruttore globale OFF: solo conteggio coperti, niente %', async () => {
+    setupCappedSlot(24, false)
     const bookings = [acceptedBooking({ num_guests: 18, confirmed_start: '2026-06-12T20:00:00+00:00' })]
 
     renderCalendar(<BookingCalendar bookings={bookings} initialDate="2026-06-12" />)
@@ -286,8 +299,24 @@ describe('@admin-blindatura calendario — badge % riempimento (dayCellDidMount)
     expect(frame.innerHTML).not.toContain('booking-day-fill-sym')
   })
 
-  it('con limite N: solo percentuale (niente N/Nmax)', async () => {
-    restaurantSettings.daily_guest_limit = 24
+  it('limite ON ma fascia senza cap: solo conteggio, niente %', async () => {
+    setupCappedSlot(null, true)
+    const bookings = [acceptedBooking({ num_guests: 18, confirmed_start: '2026-06-12T20:00:00+00:00' })]
+
+    renderCalendar(<BookingCalendar bookings={bookings} initialDate="2026-06-12" />)
+    await waitFor(() => expect(fcPropsCapture.current?.dayCellDidMount).toBeTypeOf('function'))
+
+    const frame = mountDayBadge(
+      fcPropsCapture.current!.dayCellDidMount as (arg: { date: Date; view: { type: string }; el: HTMLElement }) => void,
+      '2026-06-12',
+    )
+
+    expect(frame.textContent).toBe('18')
+    expect(frame.innerHTML).not.toContain('%')
+  })
+
+  it('limite per-fascia attivo con cap: percentuale sulla somma dei cap (niente N/Nmax)', async () => {
+    setupCappedSlot(24)
     const bookings = [acceptedBooking({ num_guests: 18, confirmed_start: '2026-06-12T20:00:00+00:00' })]
 
     renderCalendar(<BookingCalendar bookings={bookings} initialDate="2026-06-12" />)
@@ -304,7 +333,7 @@ describe('@admin-blindatura calendario — badge % riempimento (dayCellDidMount)
   })
 
   it('esattamente 100% usa tono high (pieno), non over', async () => {
-    restaurantSettings.daily_guest_limit = 100
+    setupCappedSlot(100)
     const bookings = [acceptedBooking({ num_guests: 100, confirmed_start: '2026-06-12T20:00:00+00:00' })]
 
     renderCalendar(<BookingCalendar bookings={bookings} initialDate="2026-06-12" />)
@@ -321,7 +350,7 @@ describe('@admin-blindatura calendario — badge % riempimento (dayCellDidMount)
   })
 
   it('oltre il 100% mostra valore reale (es. 108%), mai cappato', async () => {
-    restaurantSettings.daily_guest_limit = 100
+    setupCappedSlot(100)
     const bookings = [acceptedBooking({ num_guests: 108, confirmed_start: '2026-06-12T20:00:00+00:00' })]
 
     renderCalendar(<BookingCalendar bookings={bookings} initialDate="2026-06-12" />)
@@ -342,7 +371,8 @@ describe('@admin-blindatura calendario — gate tavolo Classic vs Pro', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     fcPropsCapture.current = null
-    restaurantSettings.daily_guest_limit = null
+    restaurantSettings.slot_limit_enabled = false
+    restaurantSettings.slot_guest_capacities = {}
     tableAssignmentsState.data = []
     setupMatchMedia(true)
   })
@@ -390,7 +420,8 @@ describe('@admin-blindatura calendario — crea da giorno (dateClick + pulsante)
     vi.clearAllMocks()
     fcPropsCapture.current = null
     featuresState.servizio = false
-    restaurantSettings.daily_guest_limit = 100
+    restaurantSettings.slot_limit_enabled = false
+    restaurantSettings.slot_guest_capacities = {}
     serviceSlotsState.slots = []
     tableAssignmentsState.data = []
     setupMatchMedia(true)
@@ -437,7 +468,8 @@ describe('@admin-blindatura calendario — navigazione mese FC (datesSet)', () =
     vi.clearAllMocks()
     fcPropsCapture.current = null
     featuresState.servizio = false
-    restaurantSettings.daily_guest_limit = null
+    restaurantSettings.slot_limit_enabled = false
+    restaurantSettings.slot_guest_capacities = {}
     setupMatchMedia(true)
   })
 
@@ -498,7 +530,8 @@ describe('@admin-blindatura calendario — elimina solo da modale dettaglio', ()
     vi.clearAllMocks()
     fcPropsCapture.current = null
     featuresState.servizio = false
-    restaurantSettings.daily_guest_limit = null
+    restaurantSettings.slot_limit_enabled = false
+    restaurantSettings.slot_guest_capacities = {}
     serviceSlotsState.slots = []
     tableAssignmentsState.data = []
     mockAcceptedBookingsState.data = []

@@ -20,6 +20,7 @@ import {
   trimTimeToHHmm,
 } from '../utils/dateUtils'
 import { logger } from '@/lib/logger'
+import { useFeatures } from '@/hooks/useFeatures'
 
 export const PendingRequestsTab: React.FC = () => {
   const { data: pendingBookings, isLoading, error, refetch } = usePendingBookings()
@@ -29,6 +30,11 @@ export const PendingRequestsTab: React.FC = () => {
   const { data: slotOverrides = [] } = useServiceSlotOverrides()
   const { data: slotGuestCapacities = DEFAULT_SLOT_GUEST_CAPACITIES } =
     useRestaurantSetting('slot_guest_capacities', { authenticated: true })
+  const { data: timeSlotsEnabledRaw = true } = useRestaurantSetting('booking_time_slots_enabled', {
+    authenticated: true,
+  })
+  const features = useFeatures()
+  const timeSlotsEnabled = features.servizio ? true : timeSlotsEnabledRaw
   const acceptMutation = useAcceptBooking()
   const rejectMutation = useRejectBooking()
 
@@ -70,7 +76,7 @@ export const PendingRequestsTab: React.FC = () => {
   ): { slotName: string; totalOccupied: number; capacity: number; exceededBy: number } | null => {
     const date = booking.desired_date
     const numGuests = booking.num_guests || 0
-    if (digestSlots.length === 0) return null
+    if (!timeSlotsEnabled || digestSlots.length === 0) return null
 
     const dayBookings = acceptedBookings.filter((b) => {
       if (!b.confirmed_start) return false

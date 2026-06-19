@@ -354,7 +354,7 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
         customDays: new Set(),
       })
     }
-  }, [isOpen, initial])
+  }, [isOpen, initial?.id, initial?.name, initial?.start_time, initial?.end_time, initial?.max_turns, initial?.max_guests, initial?.max_turns_resume])
 
   // Chiude il menu "Quando?" cliccando fuori.
   useEffect(() => {
@@ -1306,7 +1306,12 @@ export const ServiceSlotsManager: FC = () => {
         </div>
       )}
 
-      <SlotModal isOpen={modalOpen} onClose={closeModal} initial={editing} />
+      <SlotModal
+        key={editing?.id ?? 'new-slot'}
+        isOpen={modalOpen}
+        onClose={closeModal}
+        initial={editing}
+      />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { sendAndLogEmail } from '@/lib/email'
 import { getCampaignEmail, type CampaignLink, type TenantInfo } from '@/lib/emailTemplates'
 import { areEmailNotificationsEnabled } from './useEmailNotifications'
+import { filterEmailsWithMarketingConsent } from '@/features/booking/utils/promoRecipientEligibility'
 import { logger } from '@/lib/logger'
 
 export interface SendCampaignEmailInput {
@@ -43,6 +44,18 @@ export function useSendCampaignEmail() {
       if (!input.body.trim()) throw new Error('Corpo email obbligatorio')
       if (input.recipients.length === 0) throw new Error('Nessun destinatario selezionato')
 
+      const { allowed: recipients, skipped } = await filterEmailsWithMarketingConsent(
+        tenantId,
+        input.recipients,
+      )
+      if (recipients.length === 0) {
+        throw new Error(
+          skipped > 0
+            ? 'Nessun destinatario con consenso marketing valido'
+            : 'Nessun destinatario selezionato',
+        )
+      }
+
       const { data: settingsRows } = await supabase
         .from('restaurant_settings')
         .select('setting_key, setting_value')
@@ -69,8 +82,8 @@ export function useSendCampaignEmail() {
       let failed = 0
       const errors: string[] = []
 
-      for (let i = 0; i < input.recipients.length; i++) {
-        const to = input.recipients[i]
+      for (let i = 0; i < recipients.length; i++) {
+        const to = recipients[i]
 
         try {
           const result = await sendAndLogEmail(
@@ -92,7 +105,7 @@ export function useSendCampaignEmail() {
           logger.warn('[CampaignEmail] Eccezione per', to, msg)
         }
 
-        if (i < input.recipients.length - 1) {
+        if (i < recipients.length - 1) {
           await delay(INTER_SEND_DELAY_MS)
         }
       }
