@@ -28,6 +28,7 @@ export const BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS = {
   pageTitle: 50,
   pageDescription: 120,
   modeLabel: 40,
+  bookingBadgeLabel: 12,
   modeDescription: 61,
   subTabLabel: 24,
   subTabDescription: 79,

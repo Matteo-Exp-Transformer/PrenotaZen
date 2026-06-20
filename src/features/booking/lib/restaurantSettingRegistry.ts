@@ -597,6 +597,15 @@ export const restaurantSettingRegistry: {
             booking_type: (mode.booking_type as BookingPublicFormConfig['booking_modes'][number]['booking_type']) ?? dm.booking_type,
             enabled: typeof mode.enabled === 'boolean' ? mode.enabled : dm.enabled,
             label: typeof mode.label === 'string' ? mode.label : dm.label,
+            booking_badge_label:
+              typeof mode.booking_badge_label === 'string'
+                ? clampBookingText(
+                    mode.booking_badge_label.trim(),
+                    BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.bookingBadgeLabel,
+                  )
+                : undefined,
+            booking_badge_enabled:
+              typeof mode.booking_badge_enabled === 'boolean' ? mode.booking_badge_enabled : undefined,
             description: typeof mode.description === 'string' ? mode.description : dm.description,
             icon: resolveBookingStoredIconKey(
               typeof mode.icon === 'string' ? mode.icon : undefined,

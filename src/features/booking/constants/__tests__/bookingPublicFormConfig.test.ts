@@ -248,6 +248,59 @@ describe('icone Prenota — migrate-on-read', () => {
     expect(normalized.booking_modes[0].sub_tabs[0].description!.length).toBe(79)
     expect(normalized.booking_modes[0].sub_tabs[0].courses_label!.length).toBe(12)
   })
+
+  it('booking_badge_label: legacy senza campo funziona, valore nuovo viene trimmato e cappato', () => {
+    const long = 'B'.repeat(80)
+    const parsedLegacy = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [
+        {
+          id: 'm-legacy',
+          booking_type: 'tavolo',
+          enabled: true,
+          label: 'Tavolo',
+          description: 'D',
+          icon: 'fork_knife',
+          sub_tabs_enabled: true,
+          sub_tabs_presentation: 'cards',
+          sub_tabs: [{ id: 's-legacy', display: 'cards', label: 'Sala' }],
+        },
+      ],
+    })
+    expect(parsedLegacy).not.toBeNull()
+    expect(parsedLegacy!.booking_modes[0].booking_badge_label).toBeUndefined()
+    expect(parsedLegacy!.booking_modes[0].sub_tabs[0].booking_badge_label).toBeUndefined()
+
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [
+        {
+          id: 'm1',
+          booking_type: 'menu_prezzo_fisso',
+          enabled: true,
+          label: 'Menu degustazione',
+          booking_badge_label: ` ${long} `,
+          description: 'D',
+          icon: 'bowl_food',
+          sub_tabs_enabled: true,
+          sub_tabs_presentation: 'cards',
+          sub_tabs: [
+            {
+              id: 's1',
+              display: 'cards',
+              label: 'Cena lunga',
+              booking_badge_label: ` ${long} `,
+            },
+          ],
+        },
+      ],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].booking_badge_label).toBe('B'.repeat(12))
+    expect(parsed!.booking_modes[0].sub_tabs[0].booking_badge_label).toBe('B'.repeat(12))
+  })
 })
 
 describe('parseSubTabFromUnknown — show_offer_details_in_summary', () => {

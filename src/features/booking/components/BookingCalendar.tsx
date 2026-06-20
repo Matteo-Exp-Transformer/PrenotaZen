@@ -5,19 +5,13 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import {
-  BookOpen,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
-  GraduationCap,
   PenLine,
   Tag,
-  UtensilsCrossed,
-  UserRound,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
-import type { BookingRequest, BookingType } from '@/types/booking'
+import type { BookingRequest } from '@/types/booking'
 import { transformBookingsToCalendarEvents } from '../utils/bookingEventTransform'
 import {
   BookingDetailsModal,
@@ -36,13 +30,14 @@ import {
 } from '../utils/dateUtils'
 import { getResolvedMenuPriceDisplay } from '../utils/menuPricing'
 import { sumGuestsByDate } from '../utils/capacityCalculator'
-import {
-  getSlotLabel,
-  parseHmToMinutes,
-} from '../utils/bookingTimeSlots'
 import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
-import { bookingTypeUsesMenuSelections } from '../utils/bookingTypeMenu'
-import { useServiceSlots, useDigestSlotConfigs, type SlotConfig } from '../hooks/useServiceSlots'
+import { useServiceSlots, useDigestSlotConfigs } from '../hooks/useServiceSlots'
+import { digestBookingHasMenuContext } from '../utils/digestBookingUtils'
+import { DigestBookingTypeIcon } from './DigestBookingTypeIcon'
+import { BookingDigestCard } from './dayDigest/BookingDigestCard'
+import { DayServiceGroupCard } from './dayDigest/DayServiceGroupCard'
+import { DayDigestSummaryPanel } from './dayDigest/DayDigestSummary'
+import { buildDayDigestModel } from '../utils/dayDigestModel'
 import { useServiceSlotOverrides, resolveSlotOverride } from '../hooks/useServiceSlotOverrides'
 import { useTableAssignments, type BookingTableAssignment } from '../hooks/useTableAssignments'
 import { useFeatures } from '@/hooks/useFeatures'
@@ -63,15 +58,6 @@ const CALENDAR_MODAL_UNSAVED_SOURCE_ID = 'calendar-modal'
 /** Tab Calendario usa px-1 sul contenitore pagina: questo ripristina px-4 md:px-6 solo sulla card titolo. */
 const CALENDAR_TITLE_SECTION_INSET_CLASS = 'mx-auto w-full max-w-7xl px-3 md:px-[1.125rem]'
 
-/** Intestazione fascia digest — stile neutro allineato al resto dell'app. */
-function DigestSlotHeader({ label }: { label: string }) {
-  return (
-    <h6 className="flex items-center justify-center rounded-xl border border-(--color-border) bg-primary-50 px-3 shadow-sm text-[19px]! font-semibold tracking-wide leading-snug text-primary-900" style={{ height: 56 }}>
-      {label}
-    </h6>
-  )
-}
-
 type FullCalendarViewId = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek'
 
 function getDefaultCalendarViewForViewport(): FullCalendarViewId {
@@ -91,37 +77,6 @@ function getInitialCalendarEventIconOnly(): boolean {
   return window.matchMedia(`(max-width: ${CALENDAR_EVENT_ICON_ONLY_MAX_WIDTH_PX}px)`).matches
 }
 
-/** Icona lucide per la tipologia prenotazione (digest / card compatte). */
-function DigestBookingTypeIcon({
-  booking,
-  className,
-}: {
-  booking: BookingRequest
-  className?: string
-}) {
-  const features = useFeatures()
-  const t = (booking.booking_type ?? 'tavolo') as BookingType
-  const iconClass = cn('shrink-0', className)
-  if (features.walkIn && booking.source === 'walk_in') {
-    return <UserRound className={iconClass} aria-hidden />
-  }
-  if (t === 'rinfresco_laurea') {
-    return <GraduationCap className={iconClass} aria-hidden />
-  }
-  if (t === 'menu_prezzo_fisso') {
-    return <BookOpen className={iconClass} aria-hidden />
-  }
-  return <UtensilsCrossed className={iconClass} aria-hidden />
-}
-
-/** True se la prenotazione prevede menù / rinfresco (non “solo tavolo”). */
-function digestBookingHasMenuContext(booking: BookingRequest): boolean {
-  if (booking.menu?.trim()) return true
-  if (bookingTypeUsesMenuSelections(booking.booking_type)) return true
-  if (booking.preset_menu) return true
-  if ((booking.menu_total_per_person ?? 0) > 0) return true
-  return !!(booking.menu_selection?.items && booking.menu_selection.items.length > 0)
-}
 
 function DigestBookingListRow({
   booking,
@@ -359,44 +314,6 @@ function DigestBookingListRow({
   )
 }
 
-/** Navigazione turni: freccia sx, count centrale, freccia dx */
-function DigestTurnNav({
-  turn,
-  maxTurn,
-  onPrev,
-  onNext,
-}: {
-  turn: number
-  maxTurn: number
-  onPrev: () => void
-  onNext: () => void
-}) {
-  return (
-    <div className="flex items-center justify-center gap-2 py-1">
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={turn <= 1}
-        aria-label="Turno precedente"
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-(--color-border) bg-surface text-primary-900 shadow-sm transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-      </button>
-      <span className="min-w-16 text-center text-sm font-semibold text-primary-900 tabular-nums">
-        Turno {turn} / {maxTurn}
-      </span>
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={turn >= maxTurn}
-        aria-label="Turno successivo"
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-(--color-border) bg-surface text-primary-900 shadow-sm transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <ChevronRight className="h-4 w-4" aria-hidden />
-      </button>
-    </div>
-  )
-}
 
 interface BookingCalendarProps {
   bookings: BookingRequest[]
@@ -421,33 +338,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   const { data: serviceSlots = [] } = useServiceSlots()
   const hasTurnsFeature = features.servizio && serviceSlots.length > 0
 
-  const splitDigestBySlotConfigs = useCallback((digestBookings: BookingRequest[]): Record<string, BookingRequest[]> => {
-    const bySlot: Record<string, BookingRequest[]> = {}
-    for (const s of digestSlots) bySlot[s.id] = []
-    for (const booking of digestBookings) {
-      const startTime = getAccurateStartTime(booking)
-      const startMin = parseHmToMinutes(startTime)
-      let matched = false
-      for (const s of digestSlots) {
-        const sStart = parseHmToMinutes(s.start_time)
-        const sEnd = parseHmToMinutes(s.end_time)
-        const crossesMidnight = sEnd < sStart
-        const inSlot = crossesMidnight
-          ? startMin >= sStart || startMin < sEnd
-          : startMin >= sStart && startMin < sEnd
-        if (inSlot) {
-          bySlot[s.id].push(booking)
-          matched = true
-          break
-        }
-      }
-      if (!matched) {
-        if (!bySlot['__unassigned__']) bySlot['__unassigned__'] = []
-        bySlot['__unassigned__'].push(booking)
-      }
-    }
-    return bySlot
-  }, [digestSlots])
+
 
   const calendarRef = useRef<FullCalendar>(null)
   const [selectedBooking, setSelectedBooking] = useState<BookingRequest | null>(null)
@@ -456,8 +347,6 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return initialDate || new Date().toISOString().split('T')[0]
   })
-  // Pro: navigazione turni nel digest — si resetta a 1 quando cambia data
-  const [activeTurn, setActiveTurn] = useState(1)
   const { data: tableAssignments = [] } = useTableAssignments(selectedDate)
   const [currentView, setCurrentView] = useState<FullCalendarViewId>(getDefaultCalendarViewForViewport)
   const [isCalendarNarrowViewport, setIsCalendarNarrowViewport] =
@@ -480,11 +369,6 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
       mql500.removeEventListener('change', sync)
     }
   }, [])
-
-  // Resetta il turno attivo quando cambia la data selezionata
-  useEffect(() => {
-    setActiveTurn(1)
-  }, [selectedDate])
 
   // Aggiorna il selectedBooking quando i bookings cambiano (dopo modifica)
   useEffect(() => {
@@ -522,6 +406,12 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   const slotLimitEnabledQuery = useRestaurantSetting('slot_limit_enabled', {
     authenticated: true,
   })
+  const { data: bookingFormConfig } = useRestaurantSetting('booking_public_form_config', {
+    authenticated: true,
+  })
+  const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets', {
+    authenticated: true,
+  })
   const slotGuestCapacitiesQuery = useRestaurantSetting('slot_guest_capacities', {
     authenticated: true,
   })
@@ -535,21 +425,32 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
 
   // Cap per-fascia risolto come nel client (useCapacityCheck): override(data) → service_slots.max_guests
   // → slot_guest_capacities[slotId]. Considera SOLO fasce esistenti (no chiavi orfane "appese").
+  const resolveSlotCapacityForDate = useCallback(
+    (slotId: string | null, cellDateStr: string): number | null => {
+      if (!slotId || !slotLimitEnabled || !timeSlotsEnabled) return null
+      const slot = serviceSlots.find((item) => item.id === slotId)
+      if (!slot) return null
+      const ov = resolveSlotOverride(slotOverrides, slot.id, cellDateStr)
+      const cap = ov ? ov.max_guests : (slot.max_guests ?? slotGuestCapacities[slot.id] ?? null)
+      return typeof cap === 'number' && cap > 0 ? cap : null
+    },
+    [slotLimitEnabled, timeSlotsEnabled, serviceSlots, slotOverrides, slotGuestCapacities],
+  )
+
   const resolveDayDenominator = useCallback(
     (cellDateStr: string): number | null => {
       if (!slotLimitEnabled || !timeSlotsEnabled) return null
       if (serviceSlots.length === 0) return null
       let sum = 0
       for (const slot of serviceSlots) {
-        const ov = resolveSlotOverride(slotOverrides, slot.id, cellDateStr)
-        const cap = ov ? ov.max_guests : (slot.max_guests ?? slotGuestCapacities[slot.id] ?? null)
+        const cap = resolveSlotCapacityForDate(slot.id, cellDateStr)
         // Se anche una sola fascia del giorno è senza limite → niente %, solo conteggio.
         if (cap == null) return null
         sum += cap
       }
       return sum > 0 ? sum : null
     },
-    [slotLimitEnabled, timeSlotsEnabled, serviceSlots, slotOverrides, slotGuestCapacities],
+    [slotLimitEnabled, timeSlotsEnabled, serviceSlots, resolveSlotCapacityForDate],
   )
 
 
@@ -758,8 +659,8 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     return { days, total }
   }, [bookings, selectedDate])
 
-  const { selectedDayDigestBookings, digestWithMenu, digestTableOnly } = useMemo(() => {
-    const sorted = bookings
+  const selectedDayDigestBookings = useMemo(() => {
+    return bookings
       .filter((b) => b.status === 'accepted' && !b.no_show && b.confirmed_start && b.confirmed_end)
       .filter((b) => extractDateFromISO(b.confirmed_start!) === selectedDate)
       .sort((a, b) => {
@@ -767,29 +668,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
         const mb = startTimeToMinutesSinceMidnight(getAccurateStartTime(b)) ?? 24 * 60
         return ma - mb
       })
-    return {
-      selectedDayDigestBookings: sorted,
-      digestWithMenu: sorted.filter(digestBookingHasMenuContext),
-      digestTableOnly: sorted.filter((b) => !digestBookingHasMenuContext(b)),
-    }
   }, [bookings, selectedDate])
-  const digestWithMenuBySlot = useMemo(
-    () => splitDigestBySlotConfigs(digestWithMenu),
-    [digestWithMenu, digestSlots]
-  )
-  const digestTableOnlyBySlot = useMemo(
-    () => splitDigestBySlotConfigs(digestTableOnly),
-    [digestTableOnly, digestSlots]
-  )
-  const digestUnassignedWithMenu = useMemo(
-    () => digestWithMenuBySlot['__unassigned__'] ?? [],
-    [digestWithMenuBySlot]
-  )
-  const digestUnassignedTableOnly = useMemo(
-    () => digestTableOnlyBySlot['__unassigned__'] ?? [],
-    [digestTableOnlyBySlot]
-  )
-
   // Pro: set di booking_id con almeno un assignment attivo per la data selezionata
   const assignedBookingIds = useMemo<Set<string>>(() => {
     if (!hasTurnsFeature) return new Set()
@@ -800,26 +679,15 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     return s
   }, [hasTurnsFeature, tableAssignments])
 
-  // Pro: mappa booking_id → turn_number per la data selezionata
-  const turnByBookingId = useMemo<Record<string, number>>(() => {
-    if (!hasTurnsFeature) return {}
-    const map: Record<string, number> = {}
-    for (const a of tableAssignments as BookingTableAssignment[]) {
-      // Usa il turn_number più basso (turno attivo) per ogni prenotazione
-      if (map[a.booking_id] === undefined || a.turn_number < map[a.booking_id]) {
-        map[a.booking_id] = a.turn_number
-      }
-    }
-    return map
-  }, [hasTurnsFeature, tableAssignments])
-
-  // Turno massimo rilevato dagli assignments della data selezionata
-  const maxTurnFromAssignments = useMemo(() => {
-    if (!hasTurnsFeature || tableAssignments.length === 0) return 1
-    return Math.max(...(tableAssignments as BookingTableAssignment[]).map((a) => a.turn_number))
-  }, [hasTurnsFeature, tableAssignments])
-
-  const maxTurn = Math.max(activeTurn, maxTurnFromAssignments)
+  // View model giornaliero — usato per i gruppi orari nella vista-giorno
+  const dayModel = useMemo(
+    () =>
+      buildDayDigestModel(selectedDayDigestBookings, digestSlots, {
+        isPro: hasTurnsFeature,
+        assignedBookingIds,
+      }),
+    [selectedDayDigestBookings, digestSlots, hasTurnsFeature, assignedBookingIds],
+  )
 
   // Pro: booking selezionato per assegnazione/riassegnazione rapida tavolo dal pallino
   const [quickAssignBooking, setQuickAssignBooking] = useState<BookingRequest | null>(null)
@@ -830,20 +698,10 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     }
   }, [hasTurnsFeature])
 
-  /** Filtra prenotazioni per turno attivo.
-   *  - Con feature pro: mostra solo quelle assegnate al turno corrente.
-   *    Le prenotazioni senza assignment (non ancora assegnate) appaiono al turno 1.
-   *  - Senza feature pro: restituisce tutto invariato. */
+  /** Navigazione turni spostata in pagina Servizio — restituisce la lista invariata. */
   const filterByTurn = useCallback(
-    (list: BookingRequest[]): BookingRequest[] => {
-      if (!hasTurnsFeature) return list
-      return list.filter((b) => {
-        const t = turnByBookingId[b.id]
-        // Prenotazione senza assignment → sempre turno 1
-        return (t ?? 1) === activeTurn
-      })
-    },
-    [hasTurnsFeature, turnByBookingId, activeTurn],
+    (list: BookingRequest[]): BookingRequest[] => list,
+    [],
   )
 
   const openDigestBooking = (booking: BookingRequest) => {
@@ -998,7 +856,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
       if (!frame) return
       mountDayFillBadge(frame, cellDateStr)
     },
-    dayCellDidUnmount: (arg: any) => {
+    dayCellWillUnmount: (arg: any) => {
       const frame = (arg.el as HTMLElement).querySelector('.fc-daygrid-day-frame')
       frame?.querySelector('.booking-day-fill-holder')?.remove()
     },
@@ -1203,14 +1061,14 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
         {/* Giornata selezionata: elenco prenotazioni e fasce */}
         <div>
           {/* Toggle Giorno / Settimana */}
-          <div className="mb-4 flex items-center justify-center gap-1 rounded-xl border border-(--color-border) bg-surface/80 p-1 w-fit mx-auto shadow-sm">
+          <div className="mx-auto mb-5 flex w-fit items-center justify-center gap-1.5 rounded-xl border border-(--color-border) bg-surface/80 p-1.5 shadow-sm">
             {(['day', 'week'] as const).map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => setDigestRange(r)}
                 className={cn(
-                  'rounded-lg px-4 py-1.5 text-sm font-medium transition-colors',
+                  'rounded-lg px-5 py-2 text-body font-medium transition-colors',
                   digestRange === r
                     ? 'bg-primary-600 text-white shadow-sm'
                     : 'text-primary-900 hover:bg-primary-50'
@@ -1222,20 +1080,20 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
           </div>
 
           {/* Pulsante crea-da-giorno: sempre visibile sul giorno selezionato (niente toggle mostra/nascondi) */}
-          <div className="mb-4 flex justify-center">
+          <div className="mb-5 flex justify-center">
               <button
                 type="button"
                 onClick={() => setNewBookingDate(selectedDate)}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-body font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:ring-offset-2"
               >
-                <span className="text-base leading-none">+</span>
+                <span className="text-title-subtitle leading-none">+</span>
                 Nuova prenotazione il {format(new Date(selectedDate), 'dd/MM', { locale: it })}
               </button>
             </div>
 
           {digestRange === 'week' ? (
             <div className="mb-8 w-full">
-              <h4 className="text-center text-base font-semibold text-primary-900 mb-3 leading-snug">
+              <h4 className="mb-4 text-center text-title-section font-semibold leading-snug text-primary-900">
                 Settimana{' '}
                 {weekDigest.days.length > 0 && (
                   <span className="font-normal">
@@ -1244,12 +1102,12 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                   </span>
                 )}{' '}
                 ={' '}
-                <span className="font-normal text-(--color-text-muted)">
+                <span className="text-value font-normal text-(--color-text-muted)">
                   {weekDigest.total} {weekDigest.total === 1 ? 'Prenotazione' : 'Prenotazioni'}
                 </span>
               </h4>
               {weekDigest.total > DIGEST_WEEK_BUSY_THRESHOLD && (
-                <p className="mb-3 text-center text-xs text-amber-700">
+                <p className="mb-4 text-center text-body text-amber-700">
                   Tante prenotazioni questa settimana: per i dettagli completi passa alla vista Giorno.
                 </p>
               )}
@@ -1262,7 +1120,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                       day.date === selectedDate ? 'border-primary-400' : 'border-(--color-border)'
                     )}
                   >
-                    <h6 className="mb-2 flex items-center justify-between rounded-lg bg-primary-50 px-2 py-1 text-sm font-semibold capitalize text-primary-900">
+                    <h6 className="mb-2 flex items-center justify-between rounded-lg bg-primary-50 px-3 py-2 text-value font-semibold capitalize text-primary-900">
                       <span>{day.label}</span>
                       <span className="font-normal text-(--color-text-muted)">{day.bookings.length}</span>
                     </h6>
@@ -1279,7 +1137,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                         ))}
                       </div>
                     ) : (
-                      <p className="px-1 py-2 text-xs italic text-(--color-text-muted)">—</p>
+                      <p className="px-1 py-2 text-body italic text-(--color-text-muted)">—</p>
                     )}
                   </div>
                 ))}
@@ -1287,180 +1145,65 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
             </div>
           ) : (
           <div className="mb-8 w-full">
-            <h4 className="text-center text-base font-semibold text-primary-900 mb-3 leading-snug">
-              Prenotazioni del giorno:{' '}
-              <span className="font-normal text-[var(--color-text-muted)]">
-                {format(new Date(selectedDateData.date), 'EEEE, dd MMMM yyyy', { locale: it })} ={' '}
-                {selectedDayDigestBookings.length}{' '}
-                {selectedDayDigestBookings.length === 1 ? 'Prenotazione' : 'Prenotazioni'}
-              </span>
-            </h4>
+            <DayDigestSummaryPanel
+              summary={dayModel.summary}
+              date={selectedDateData.date}
+              isPro={hasTurnsFeature}
+            />
             {selectedDayDigestBookings.length > 0 ? (
               <div className="space-y-8">
-                {/* Navigazione turni — visibile solo in versione pro con service_slots configurati */}
-                {hasTurnsFeature && (
-                  <DigestTurnNav
-                    turn={activeTurn}
-                    maxTurn={maxTurn}
-                    onPrev={() => setActiveTurn((t) => Math.max(1, t - 1))}
-                    onNext={() => setActiveTurn((t) => Math.min(maxTurn, t + 1))}
-                  />
-                )}
-                <section aria-labelledby="digest-with-menu-heading">
-                  <div
-                    id="digest-with-menu-heading"
-                    className="admin-warm-surface mb-3 flex items-center justify-center rounded-xl border px-3 py-2 text-center shadow-sm"
-                  >
-                    <h5 className="!text-[19px] font-semibold tracking-wide text-primary-900">
-                      Prenotazioni con menu
-                    </h5>
+                {timeSlotsEnabled && digestSlots.length > 0 ? (
+                  <div className="space-y-3">
+                    {dayModel.groups.map((group) => (
+                      <DayServiceGroupCard
+                        key={group.slotId!}
+                        group={group}
+                        isPro={hasTurnsFeature}
+                        assignedBookingIds={assignedBookingIds}
+                        filterByTurn={filterByTurn}
+                        occupancyCapacity={resolveSlotCapacityForDate(group.slotId, selectedDate)}
+                        bookingModes={bookingFormConfig?.booking_modes ?? []}
+                        customStaffPresets={customStaffPresets}
+                        onOpenBooking={openDigestBooking}
+                        onDotClick={handleDotClick}
+                      />
+                    ))}
+                    {dayModel.outOfSlot && (
+                      <DayServiceGroupCard
+                        key="__out-of-slot__"
+                        group={dayModel.outOfSlot}
+                        isPro={hasTurnsFeature}
+                        assignedBookingIds={assignedBookingIds}
+                        filterByTurn={filterByTurn}
+                        occupancyCapacity={null}
+                        bookingModes={bookingFormConfig?.booking_modes ?? []}
+                        customStaffPresets={customStaffPresets}
+                        onOpenBooking={openDigestBooking}
+                        onDotClick={handleDotClick}
+                      />
+                    )}
                   </div>
-                  {digestWithMenu.length > 0 ? (
-                    <div className="rounded-xl border border-(--color-border) bg-surface/90 p-2 shadow-inner">
-                      {!timeSlotsEnabled || digestSlots.length === 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {filterByTurn(digestWithMenu).map((booking) => (
-                            <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                              <DigestBookingListRow
-                                booking={booking}
-                                onOpen={openDigestBooking}
-                                showMenuPricing
-                                compactGrid
-                                unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                hasTurns={hasTurnsFeature}
-                                onDotClick={handleDotClick}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {digestSlots.map((s: SlotConfig) => (
-                            <div key={s.id} className="space-y-2">
-                              <DigestSlotHeader label={getSlotLabel(s)} />
-                              {filterByTurn(digestWithMenuBySlot[s.id] ?? []).map((booking) => (
-                                <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                                  <DigestBookingListRow
-                                    booking={booking}
-                                    onOpen={openDigestBooking}
-                                    showMenuPricing
-                                    compactGrid
-                                    unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                    assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                    hasTurns={hasTurnsFeature}
-                                    onDotClick={handleDotClick}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-center text-sm text-(--color-text-muted) italic py-6 rounded-xl border border-dashed border-(--color-border) bg-(--color-surface-2)/80">
-                      Nessuna prenotazione con menu per questa data.
-                    </p>
-                  )}
-                </section>
-
-                <div className="border-t-2 border-[var(--color-border)] pt-8 mt-2" aria-hidden />
-
-                <section aria-labelledby="digest-table-only-heading">
-                  <div
-                    id="digest-table-only-heading"
-                    className="admin-warm-surface mb-3 flex items-center justify-center rounded-xl border px-3 py-2 text-center shadow-sm"
-                  >
-                    <h5 className="!text-[19px] font-semibold tracking-wide text-primary-900">
-                      Solo tavolo
-                    </h5>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 xl:grid-cols-3 2xl:grid-cols-4">
+                    {filterByTurn(selectedDayDigestBookings).map((booking) => (
+                      <BookingDigestCard
+                        key={booking.id}
+                        booking={booking}
+                        onOpen={openDigestBooking}
+                        showMenuPricing={digestBookingHasMenuContext(booking)}
+                        unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
+                        assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
+                        hasTurns={hasTurnsFeature}
+                        bookingModes={bookingFormConfig?.booking_modes ?? []}
+                        customStaffPresets={customStaffPresets}
+                        onDotClick={handleDotClick}
+                      />
+                    ))}
                   </div>
-                  {digestTableOnly.length > 0 ? (
-                    <div className="rounded-xl border border-(--color-border) bg-surface/90 p-2 shadow-inner">
-                      {!timeSlotsEnabled || digestSlots.length === 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {filterByTurn(digestTableOnly).map((booking) => (
-                            <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                              <DigestBookingListRow
-                                booking={booking}
-                                onOpen={openDigestBooking}
-                                compactGrid
-                                unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                hasTurns={hasTurnsFeature}
-                                onDotClick={handleDotClick}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {digestSlots.map((s: SlotConfig) => (
-                            <div key={s.id} className="space-y-2">
-                              <DigestSlotHeader label={getSlotLabel(s)} />
-                              {filterByTurn(digestTableOnlyBySlot[s.id] ?? []).map((booking) => (
-                                <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                                  <DigestBookingListRow
-                                    booking={booking}
-                                    onOpen={openDigestBooking}
-                                    compactGrid
-                                    unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                    assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                    hasTurns={hasTurnsFeature}
-                                    onDotClick={handleDotClick}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-center text-sm text-(--color-text-muted) italic py-6 rounded-xl border border-dashed border-(--color-border) bg-(--color-surface-2)/80">
-                      Nessuna prenotazione solo tavolo per questa data.
-                    </p>
-                  )}
-                </section>
-
-                {/* Sezione orfani: booking fuori da ogni fascia oraria configurata */}
-                {timeSlotsEnabled && digestSlots.length > 0 && (digestUnassignedWithMenu.length > 0 || digestUnassignedTableOnly.length > 0) && (
-                  <>
-                    <div className="border-t-2 border-(--color-border) pt-8 mt-2" aria-hidden />
-                    <section aria-labelledby="digest-unassigned-heading">
-                      <div
-                        id="digest-unassigned-heading"
-                        className="admin-warm-surface mb-3 flex items-center justify-center rounded-xl border px-3 py-2 text-center shadow-sm"
-                      >
-                        <h5 className="text-[19px]! font-semibold tracking-wide text-primary-900">
-                          Fuori fascia
-                        </h5>
-                      </div>
-                      <div className="rounded-xl border border-(--color-border) bg-surface/90 p-2 shadow-inner">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {filterByTurn([...digestUnassignedWithMenu, ...digestUnassignedTableOnly]).map((booking) => (
-                            <div key={booking.id} className="flex min-w-0 w-full flex-col">
-                              <DigestBookingListRow
-                                booking={booking}
-                                onOpen={openDigestBooking}
-                                showMenuPricing={digestBookingHasMenuContext(booking)}
-                                compactGrid
-                                unassigned={hasTurnsFeature && !assignedBookingIds.has(booking.id)}
-                                assigned={hasTurnsFeature && assignedBookingIds.has(booking.id)}
-                                hasTurns={hasTurnsFeature}
-                                onDotClick={handleDotClick}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </section>
-                  </>
                 )}
               </div>
             ) : (
-              <p className="text-center text-sm text-(--color-text-muted) italic py-4 rounded-xl border border-dashed border-(--color-border) bg-(--color-surface-2)/80">
+              <p className="rounded-xl border border-dashed border-(--color-border) bg-(--color-surface-2)/80 py-5 text-center text-body italic text-(--color-text-muted)">
                 Nessuna prenotazione accettata per questa data.
               </p>
             )}
@@ -1520,4 +1263,3 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     </>
   )
 }
-

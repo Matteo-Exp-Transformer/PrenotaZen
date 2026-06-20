@@ -1289,6 +1289,75 @@ export const BookingFormConfigPanel = forwardRef<
               placeholder="Nome card scorrevole"
               singleLine
             />
+            <div className="w-full min-w-0 space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-sm">Badge prenotazione</Label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="Mostra badge nella card prenotazione"
+                  aria-checked={tab.booking_badge_enabled !== false}
+                  onClick={() =>
+                    patchTab({
+                      booking_badge_enabled:
+                        tab.booking_badge_enabled === false ? undefined : false,
+                    })
+                  }
+                  className={cn(
+                    'relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400',
+                    tab.booking_badge_enabled !== false
+                      ? 'border-primary-600 bg-primary-600'
+                      : 'border-slate-300 bg-slate-200',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform',
+                      tab.booking_badge_enabled !== false ? 'translate-x-5' : 'translate-x-1',
+                    )}
+                  />
+                </button>
+              </div>
+              <div
+                className={cn(
+                  tab.booking_badge_enabled === false && 'pointer-events-none opacity-50',
+                )}
+              >
+                <Input
+                  value={tab.booking_badge_label ?? ''}
+                  maxLength={L.bookingBadgeLabel}
+                  onChange={(e) =>
+                    patchTab({
+                      booking_badge_label:
+                        e.target.value.trim() === ''
+                          ? undefined
+                          : e.target.value.slice(0, L.bookingBadgeLabel),
+                    })
+                  }
+                  onBlur={(e) => {
+                    const trimmed = e.target.value.trim()
+                    patchTab({
+                      booking_badge_label: trimmed === '' ? undefined : trimmed,
+                    })
+                  }}
+                  placeholder={tab.label?.trim() || 'Badge admin'}
+                  className="w-full"
+                />
+                <p
+                  className={cn(
+                    'text-right text-[11px] tabular-nums',
+                    (tab.booking_badge_label ?? '').length >= L.bookingBadgeLabel
+                      ? 'text-red-500'
+                      : 'text-slate-400',
+                  )}
+                >
+                  {(tab.booking_badge_label ?? '').length}/{L.bookingBadgeLabel}
+                </p>
+              </div>
+              <p className="-mt-2 text-xs text-slate-500">
+                Testo mostrato nella card prenotazione admin
+              </p>
+            </div>
           </>
         )}
 
@@ -1736,6 +1805,81 @@ export const BookingFormConfigPanel = forwardRef<
                       onChange={(value) => updateMode(mode.id, { label: value })}
                       placeholder="Nome della modalità"
                     />
+
+                    <div className="w-full min-w-0 space-y-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor={`mode-booking-badge-${mode.id}`} className="text-sm">
+                          Badge prenotazione
+                        </Label>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label="Mostra badge nella card prenotazione"
+                          aria-checked={mode.booking_badge_enabled !== false}
+                          onClick={() =>
+                            updateMode(mode.id, {
+                              booking_badge_enabled:
+                                mode.booking_badge_enabled === false ? undefined : false,
+                            })
+                          }
+                          className={cn(
+                            'relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400',
+                            mode.booking_badge_enabled !== false
+                              ? 'border-primary-600 bg-primary-600'
+                              : 'border-slate-300 bg-slate-200',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform',
+                              mode.booking_badge_enabled !== false
+                                ? 'translate-x-5'
+                                : 'translate-x-1',
+                            )}
+                          />
+                        </button>
+                      </div>
+                      <div
+                        className={cn(
+                          mode.booking_badge_enabled === false && 'pointer-events-none opacity-50',
+                        )}
+                      >
+                        <Input
+                          id={`mode-booking-badge-${mode.id}`}
+                          value={mode.booking_badge_label ?? ''}
+                          maxLength={L.bookingBadgeLabel}
+                          onChange={(e) =>
+                            updateMode(mode.id, {
+                              booking_badge_label:
+                                e.target.value.trim() === ''
+                                  ? undefined
+                                  : e.target.value.slice(0, L.bookingBadgeLabel),
+                            })
+                          }
+                          onBlur={(e) => {
+                            const trimmed = e.target.value.trim()
+                            updateMode(mode.id, {
+                              booking_badge_label: trimmed === '' ? undefined : trimmed,
+                            })
+                          }}
+                          placeholder={mode.label?.trim() || 'Badge admin'}
+                          className="w-full"
+                        />
+                        <p
+                          className={cn(
+                            'text-right text-[11px] tabular-nums',
+                            (mode.booking_badge_label ?? '').length >= L.bookingBadgeLabel
+                              ? 'text-red-500'
+                              : 'text-slate-400',
+                          )}
+                        >
+                          {(mode.booking_badge_label ?? '').length}/{L.bookingBadgeLabel}
+                        </p>
+                      </div>
+                      <p className="-mt-2 text-xs text-slate-500">
+                        Testo mostrato nella card prenotazione admin
+                      </p>
+                    </div>
 
                     <div>
                       <Label htmlFor={`mode-desc-${mode.id}`} className="block mb-1 text-sm">Descrizione breve</Label>

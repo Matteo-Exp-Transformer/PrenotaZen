@@ -17,6 +17,8 @@ export interface ResolvedSubTab {
   id: string
   display: SubTab['display']
   label: string
+  booking_badge_label?: string
+  booking_badge_enabled?: boolean
   description?: string
   courses_label?: string
   price_per_person?: number
@@ -96,6 +98,8 @@ export function resolveSubTabView(
     id: subTab.id,
     display: subTab.display,
     label,
+    booking_badge_label: subTab.booking_badge_label,
+    booking_badge_enabled: subTab.booking_badge_enabled,
     description,
     courses_label: subTab.courses_label,
     price_per_person,

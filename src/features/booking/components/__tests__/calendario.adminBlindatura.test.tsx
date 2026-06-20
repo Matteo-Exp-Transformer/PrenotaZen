@@ -8,6 +8,7 @@ import { render, screen, within, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { UserEvent } from '@testing-library/user-event'
 import type { BookingRequest } from '@/types/booking'
+import type { BookingPublicFormConfig } from '@/features/booking/constants/bookingPublicFormConfig'
 
 const confirmSpy = vi.spyOn(window, 'confirm')
 
@@ -25,6 +26,13 @@ const {
     slot_limit_enabled: false as boolean,
     booking_time_slots_enabled: true,
     slot_guest_capacities: {} as Record<string, number | null>,
+    booking_public_form_config: null as BookingPublicFormConfig | null,
+    booking_custom_staff_presets: [] as Array<{
+      id: string
+      name: string
+      item_ids: string[]
+      booking_types: ['menu_prezzo_fisso']
+    }>,
   },
   serviceSlotsState: { slots: [] as Array<{ id: string; name: string; start_time: string; end_time: string; max_guests?: number | null }> },
   tableAssignmentsState: { data: [] as Array<{ booking_id: string; turn_number: number; checked_out_at: string | null }> },
@@ -198,6 +206,8 @@ describe('@admin-blindatura calendario — solo accettate in vista', () => {
     featuresState.servizio = false
     restaurantSettings.slot_limit_enabled = false
     restaurantSettings.slot_guest_capacities = {}
+    restaurantSettings.booking_public_form_config = null
+    restaurantSettings.booking_custom_staff_presets = []
     serviceSlotsState.slots = []
     tableAssignmentsState.data = []
     mockAcceptedBookingsState.data = []
@@ -412,6 +422,108 @@ describe('@admin-blindatura calendario — gate tavolo Classic vs Pro', () => {
     expect(screen.queryByLabelText(/assegna tavolo/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/tavolo assegnato/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/turno 1/i)).not.toBeInTheDocument()
+  })
+
+  it('digest giorno mostra massimo tre badge configurati: da assegnare, tipologia, card scorrevole', () => {
+    featuresState.servizio = true
+    serviceSlotsState.slots = [
+      { id: 'slot-1', name: 'Cena', start_time: '19:00', end_time: '23:00' },
+    ]
+    const presetId = '11111111-1111-4111-8111-111111111111'
+    restaurantSettings.booking_custom_staff_presets = [
+      {
+        id: presetId,
+        name: 'Preset degustazione',
+        item_ids: [],
+        booking_types: ['menu_prezzo_fisso'],
+      },
+    ]
+    restaurantSettings.booking_public_form_config = {
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      header_styles: {},
+      booking_modes: [
+        {
+          id: 'mode-menu',
+          booking_type: 'menu_prezzo_fisso',
+          enabled: true,
+          label: 'Menu degustazione lungo',
+          booking_badge_label: 'Menu',
+          description: 'D',
+          icon: 'bowl_food',
+          sub_tabs_enabled: true,
+          sub_tabs_presentation: 'cards',
+          sub_tabs: [
+            {
+              id: 'sub-menu',
+              display: 'cards',
+              label: 'Cena lunga',
+              booking_badge_label: 'Degustazione',
+              preset_id: presetId,
+            },
+          ],
+        },
+      ],
+    } as BookingPublicFormConfig
+    const booking = acceptedBooking({
+      client_name: 'Cliente Badge',
+      booking_type: 'menu_prezzo_fisso',
+      preset_menu: `custom:${presetId}`,
+      special_requests: 'Nota cliente',
+    })
+
+    renderCalendar(<BookingCalendar bookings={[booking]} initialDate="2026-06-12" />)
+
+    expect(screen.getByText('DA ASSEGNARE')).toBeInTheDocument()
+    expect(screen.getByText('Menu')).toBeInTheDocument()
+    expect(screen.getByText('Degustazione')).toBeInTheDocument()
+    expect(screen.queryByText('NOTE')).not.toBeInTheDocument()
+    expect(screen.queryByText('ASSEGNATO')).not.toBeInTheDocument()
+  })
+
+  it('digest giorno non mostra il badge del carosello quando la prenotazione arriva da carosello', () => {
+    featuresState.servizio = true
+    serviceSlotsState.slots = [
+      { id: 'slot-1', name: 'Cena', start_time: '19:00', end_time: '23:00' },
+    ]
+    restaurantSettings.booking_public_form_config = {
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      header_styles: {},
+      booking_modes: [
+        {
+          id: 'mode-menu',
+          booking_type: 'menu_prezzo_fisso',
+          enabled: true,
+          label: 'Menu degustazione lungo',
+          booking_badge_label: 'Menu',
+          description: 'D',
+          icon: 'bowl_food',
+          sub_tabs_enabled: true,
+          sub_tabs_presentation: 'carousel',
+          sub_tabs: [
+            {
+              id: 'sub-carousel',
+              display: 'carousel',
+              label: 'Carosello admin',
+              booking_badge_label: 'CaroselloBadge',
+              carousel_items: [{ image_url: 'https://example.com/offerta.jpg' }],
+            },
+          ],
+        },
+      ],
+    } as BookingPublicFormConfig
+    const booking = acceptedBooking({
+      client_name: 'Cliente Carosello',
+      booking_type: 'menu_prezzo_fisso',
+    })
+
+    renderCalendar(<BookingCalendar bookings={[booking]} initialDate="2026-06-12" />)
+
+    expect(screen.getByText('DA ASSEGNARE')).toBeInTheDocument()
+    expect(screen.getByText('Menu')).toBeInTheDocument()
+    expect(screen.queryByText('CaroselloBadge')).not.toBeInTheDocument()
+    expect(screen.queryByText('Carosello admin')).not.toBeInTheDocument()
   })
 })
 

@@ -336,6 +336,10 @@ export interface SubTab {
   id: string
   display: 'cards' | 'carousel'
   label: string
+  /** Testo badge mostrato solo nella card prenotazione admin. Assente = fallback a `label`. */
+  booking_badge_label?: string
+  /** Se `false`, il badge non appare nella card prenotazione admin. Omesso o `true` = mostrato. */
+  booking_badge_enabled?: boolean
   icon?: SubTabIcon
   preset_id?: string
   price_per_person?: number
@@ -457,6 +461,10 @@ export interface BookingMode {
   booking_type: BookingType
   enabled: boolean
   label: string
+  /** Testo badge mostrato solo nella card prenotazione admin. Assente = fallback a `label`. */
+  booking_badge_label?: string
+  /** Se `false`, il badge non appare nella card prenotazione admin. Omesso o `true` = mostrato. */
+  booking_badge_enabled?: boolean
   description: string
   icon: BookingModeIcon
   sub_tabs_enabled: boolean
@@ -553,6 +561,12 @@ export function parseSubTabFromUnknown(raw: unknown): SubTab | null {
   }
 
   const description = typeof o.description === 'string' ? o.description.trim() : undefined
+  const booking_badge_label =
+    typeof o.booking_badge_label === 'string' && o.booking_badge_label.trim()
+      ? clampBookingText(o.booking_badge_label.trim(), BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.bookingBadgeLabel)
+      : undefined
+  const booking_badge_enabled =
+    typeof o.booking_badge_enabled === 'boolean' ? o.booking_badge_enabled : undefined
   const courses_label = typeof o.courses_label === 'string' ? o.courses_label.trim() : undefined
   const hidden_category_keys = Array.isArray(o.hidden_category_keys)
     ? o.hidden_category_keys.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim())
@@ -621,6 +635,8 @@ export function parseSubTabFromUnknown(raw: unknown): SubTab | null {
     label,
     icon,
     preset_id,
+    booking_badge_label,
+    booking_badge_enabled,
     price_per_person,
     is_fixed_menu,
     description: display === 'carousel' ? undefined : description,
@@ -767,6 +783,9 @@ export function normalizeBookingPublicFormConfig(
           display,
           icon: tab.icon ? parseBookingIconOptional(tab.icon) : undefined,
           label: clampBookingText(tab.label.trim(), L.subTabLabel),
+          booking_badge_label: tab.booking_badge_label?.trim()
+            ? clampBookingText(tab.booking_badge_label.trim(), L.bookingBadgeLabel)
+            : undefined,
           is_fixed_menu: isPersonalizzabileCard ? false : undefined,
           price_per_person: isPersonalizzabileCard ? undefined : tab.price_per_person,
           hidden_category_keys: tab.hidden_category_keys?.filter((v) => v.trim()) ?? undefined,
@@ -824,6 +843,9 @@ export function normalizeBookingPublicFormConfig(
       return {
         ...modeRest,
         label: clampBookingText(mode.label.trim(), L.modeLabel),
+        booking_badge_label: mode.booking_badge_label?.trim()
+          ? clampBookingText(mode.booking_badge_label.trim(), L.bookingBadgeLabel)
+          : undefined,
         description: clampBookingText(mode.description.trim(), L.modeDescription),
         icon: parseBookingIconRequired(mode.icon, MENU_QR_DEFAULT_CATEGORY_ICON_KEY),
         sub_tabs_presentation: normalizeSubTabsPresentation(mode.sub_tabs_presentation, subTabs),
