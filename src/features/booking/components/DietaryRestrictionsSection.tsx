@@ -36,6 +36,12 @@ interface DietaryRestrictionsSectionProps {
   dietaryConsentError?: string
   showDietaryConsentAttention?: boolean
   onDietaryConsentAttentionInteract?: () => void
+  dietaryError?: string
+  showDietaryAttention?: boolean
+  onDietaryAttentionInteract?: () => void
+  specialRequestsError?: string
+  showSpecialRequestsAttention?: boolean
+  onSpecialRequestsAttentionInteract?: () => void
   /** Nasconde il blocco "Altre Richieste" (es. renderizzato sotto la griglia in AdminBookingForm) */
   omitSpecialRequestsSection?: boolean
   /** Layout /prenota: campi al 75% larghezza, stessa altezza e font delle card sottotab */
@@ -68,6 +74,12 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
   dietaryConsentError,
   showDietaryConsentAttention = false,
   onDietaryConsentAttentionInteract,
+  dietaryError,
+  showDietaryAttention = false,
+  onDietaryAttentionInteract,
+  specialRequestsError,
+  showSpecialRequestsAttention = false,
+  onSpecialRequestsAttentionInteract,
   omitSpecialRequestsSection = false,
   publicFormFields = false,
   lightTextOnDarkBackground = false,
@@ -76,7 +88,7 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
 
   return (
     <div className={publicFormFields ? 'w-full space-y-5' : 'space-y-5'}>
-      <div className="space-y-1">
+      <div className={cn('space-y-1', BOOKING_PUBLIC_FIELD_SCROLL_MARGIN)}>
         {publicFormFields ? (
           <BookingPublicInsetField
             id="dietary-notes"
@@ -85,6 +97,9 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
             value={dietaryText}
             maxLength={C.dietaryText}
             autoComplete="off"
+            hasError={Boolean(dietaryError)}
+            showAttention={showDietaryAttention}
+            onAttentionInteract={onDietaryAttentionInteract}
             onChange={(e) => onDietaryTextChange(e.target.value.slice(0, C.dietaryText))}
           />
         ) : (
@@ -101,15 +116,27 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
             />
           </>
         )}
+        {dietaryError && (
+          <p className={cn('text-sm font-semibold', lightTextOnDarkBackground ? 'text-white' : 'text-red-500')}>
+            {dietaryError}
+          </p>
+        )}
       </div>
 
       {dietaryText.trim().length > 0 && dietaryConsentAccepted !== undefined && onDietaryConsentChange && (
         <div
+          id="dietary-consent-section"
           className={cn(
             'flex min-w-0 flex-1 items-start gap-3',
+            BOOKING_PUBLIC_FIELD_SCROLL_MARGIN,
             showDietaryConsentAttention && BOOKING_PUBLIC_FIELD_ATTENTION_CLASS,
             'rounded-lg',
           )}
+          onPointerDown={(event) => {
+            if (showDietaryConsentAttention && shouldDismissBookingPublicAttention(event)) {
+              onDietaryConsentAttentionInteract?.()
+            }
+          }}
         >
           <div className="group relative size-5 shrink-0">
             <input
@@ -165,7 +192,7 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
       )}
 
       {!omitSpecialRequestsSection && (
-        <div className="space-y-1">
+        <div className={cn('space-y-1', BOOKING_PUBLIC_FIELD_SCROLL_MARGIN)}>
           {publicFormFields ? (
             <BookingPublicInsetField
               id="special_requests"
@@ -174,6 +201,9 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
               value={specialRequests}
               maxLength={C.specialRequests}
               autoComplete="off"
+              hasError={Boolean(specialRequestsError)}
+              showAttention={showSpecialRequestsAttention}
+              onAttentionInteract={onSpecialRequestsAttentionInteract}
               onChange={(e) => onSpecialRequestsChange(e.target.value.slice(0, C.specialRequests))}
             />
           ) : (
@@ -189,6 +219,11 @@ export const DietaryRestrictionsSection: React.FC<DietaryRestrictionsSectionProp
                 className={CONTROL_CLASS}
               />
             </>
+          )}
+          {specialRequestsError && (
+            <p className={cn('text-sm font-semibold', lightTextOnDarkBackground ? 'text-white' : 'text-red-500')}>
+              {specialRequestsError}
+            </p>
           )}
         </div>
       )}

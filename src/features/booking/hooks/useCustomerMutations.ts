@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { supabase } from '@/lib/supabase'
-import { normalizeCustomerEmail } from '@/lib/customerEmail'
+import { normalizeClientName, normalizeCustomerEmail } from '@/lib/customerEmail'
 import { logger } from '@/lib/logger'
 import { toast } from 'react-toastify'
 import { CRM_QUERY_KEY } from './useCustomers'
@@ -17,24 +17,61 @@ export interface UpdateCustomerInput {
   /** Riga `customers`; null se profilo solo da booking (crea/aggiorna synced). */
   customerRowId: string | null
   previousEmail: string
+  /** Nome identità rubrica al momento dell'apertura form (raggruppa patch booking). */
+  previousName: string
   name: string
   email: string
   phone?: string | null
   notes?: string | null
 }
 
-async function bookingIdsMatchingEmail(tenantId: string, emailKey: string): Promise<string[]> {
+type BookingEmailNameRow = { id: string; client_email: string; client_name: string }
+
+export function matchesCustomerIdentity(
+  clientEmail: string,
+  clientName: string,
+  emailKey: string,
+  nameKey: string,
+): boolean {
+  return (
+    normalizeCustomerEmail(clientEmail) === emailKey &&
+    normalizeClientName(clientName) === nameKey
+  )
+}
+
+export function filterBookingIdsByIdentity(
+  rows: BookingEmailNameRow[],
+  emailKey: string,
+  nameKey: string,
+): string[] {
+  return rows
+    .filter((r) => matchesCustomerIdentity(r.client_email, r.client_name, emailKey, nameKey))
+    .map((r) => r.id)
+}
+
+async function fetchActiveBookingEmailNameRows(tenantId: string): Promise<BookingEmailNameRow[]> {
   const { data, error } = await supabase
     .from('booking_requests')
-    .select('id,client_email')
+    .select('id,client_email,client_name')
     .eq('tenant_id', tenantId)
     .neq('status', 'deleted')
 
   if (error) throw new Error(error.message)
-  const rows = data ?? []
-  return rows
-    .filter((r) => normalizeCustomerEmail(r.client_email) === emailKey)
-    .map((r) => r.id)
+  return data ?? []
+}
+
+async function bookingIdsMatchingIdentity(
+  tenantId: string,
+  emailKey: string,
+  nameKey: string,
+): Promise<string[]> {
+  const rows = await fetchActiveBookingEmailNameRows(tenantId)
+  return filterBookingIdsByIdentity(rows, emailKey, nameKey)
+}
+
+async function hasActiveBookingsForEmail(tenantId: string, emailKey: string): Promise<boolean> {
+  const rows = await fetchActiveBookingEmailNameRows(tenantId)
+  return rows.some((r) => normalizeCustomerEmail(r.client_email) === emailKey)
 }
 
 export function useCreateCustomer() {
@@ -85,6 +122,7 @@ export function useUpdateCustomer() {
       if (!nextEmail) throw new Error('Email non valida')
       const prevKey = normalizeCustomerEmail(input.previousEmail)
       if (!prevKey) throw new Error('Email precedente non valida')
+      const prevNameKey = normalizeClientName(input.previousName)
 
       let rowId = input.customerRowId
 
@@ -137,33 +175,24 @@ export function useUpdateCustomer() {
         throw new Error(msg)
       }
 
-      if (nextEmail !== prevKey) {
-        const ids = await bookingIdsMatchingEmail(tenantId, prevKey)
-        if (ids.length > 0) {
-          const { error: patchErr } = await supabase
-            .from('booking_requests')
-            .update({
-              client_email: nextEmail,
-              client_name: input.name.trim(),
-              client_phone: input.phone?.trim() || null,
-            })
-            .in('id', ids)
-
-          if (patchErr) throw new Error(patchErr.message)
+      const identityIds = await bookingIdsMatchingIdentity(tenantId, prevKey, prevNameKey)
+      if (identityIds.length > 0) {
+        const patch: {
+          client_email: string
+          client_name: string
+          client_phone: string | null
+        } = {
+          client_email: nextEmail,
+          client_name: input.name.trim(),
+          client_phone: input.phone?.trim() || null,
         }
-      } else {
-        const ids = await bookingIdsMatchingEmail(tenantId, prevKey)
-        if (ids.length > 0) {
-          const { error: patchErr } = await supabase
-            .from('booking_requests')
-            .update({
-              client_name: input.name.trim(),
-              client_phone: input.phone?.trim() || null,
-            })
-            .in('id', ids)
 
-          if (patchErr) throw new Error(patchErr.message)
-        }
+        const { error: patchErr } = await supabase
+          .from('booking_requests')
+          .update(patch)
+          .in('id', identityIds)
+
+        if (patchErr) throw new Error(patchErr.message)
       }
 
       return { id: rowId }
@@ -188,6 +217,8 @@ export interface DeleteCustomerInput {
   customerRowId: string | null
   /** Email del cliente (qualsiasi casing — verrà normalizzata). */
   email: string
+  /** Nome identità rubrica da eliminare (raggruppa soft-delete booking). */
+  clientName: string
   /** UUID dell'admin che effettua l'azione (per audit `cancelled_by` — campo UUID nel DB). */
   adminId?: string | null
 }
@@ -198,12 +229,9 @@ export interface DeleteCustomerResult {
 }
 
 /**
- * Eliminazione cliente "completa":
- *  - tutte le prenotazioni attive con quell'email vengono soft-deleted
- *    (`status='deleted'`, `cancellation_reason='customer_deleted'`, `cancelled_at`, `cancelled_by`)
- *  - se esiste la riga `customers` viene rimossa fisicamente
- * Risultato: il cliente sparisce dalla CRM (filtra `status != 'deleted'`) e i dati
- * restano archiviati su DB come storico.
+ * Eliminazione identità rubrica (email + nome):
+ *  - soft-delete solo le prenotazioni attive con quella coppia email+nome
+ *  - la riga `customers` si elimina solo se non restano prenotazioni attive per quell'email
  */
 export function useDeleteCustomer() {
   const { tenantId } = useTenantContext()
@@ -214,8 +242,9 @@ export function useDeleteCustomer() {
       if (!tenantId) throw new Error('Tenant mancante')
       const emailKey = normalizeCustomerEmail(input.email)
       if (!emailKey) throw new Error('Email non valida')
+      const nameKey = normalizeClientName(input.clientName)
 
-      const bookingIds = await bookingIdsMatchingEmail(tenantId, emailKey)
+      const bookingIds = await bookingIdsMatchingIdentity(tenantId, emailKey, nameKey)
 
       if (bookingIds.length > 0) {
         const nowIso = new Date().toISOString()
@@ -233,7 +262,8 @@ export function useDeleteCustomer() {
       }
 
       let customerRowDeleted = false
-      if (input.customerRowId) {
+      const emailStillHasBookings = await hasActiveBookingsForEmail(tenantId, emailKey)
+      if (input.customerRowId && !emailStillHasBookings) {
         const { error: delErr } = await supabase
           .from('customers')
           .delete()

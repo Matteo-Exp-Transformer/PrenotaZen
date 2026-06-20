@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { supabase } from '@/lib/supabase'
-import { normalizeCustomerEmail } from '@/lib/customerEmail'
+import { customerProfileKey, normalizeCustomerEmail, resolveContactKey } from '@/lib/customerEmail'
 import type { BookingRequest } from '@/types/booking'
 import type { CustomerProfile, CustomerDbSource } from '@/types/customer'
 import { logger } from '@/lib/logger'
+import { sortBookingsByCreatedAtDesc } from '@/features/booking/utils/customerBookingHistoryDisplay'
 
 export type CustomerDateFilter = 'all' | 'week' | 'month' | 'year'
 
@@ -13,6 +14,78 @@ export const CRM_QUERY_KEY = 'crm-customer-profiles'
 
 function rowToBookingRequest(row: Record<string, unknown>): BookingRequest {
   return row as unknown as BookingRequest
+}
+
+function buildProfileFromBookings(
+  contact: string,  // email normalizzata OR "tel:<telefono>" — usata per profileKey
+  name: string,
+  bookings: BookingRequest[],
+  cust:
+    | {
+        id: string
+        name: string
+        email: string
+        phone: string | null
+        notes: string | null
+        source: CustomerDbSource
+        marketing_consent: boolean
+      }
+    | undefined,
+): CustomerProfile {
+  const sorted = sortBookingsByCreatedAtDesc(bookings)
+
+  const latest = sorted[0]
+  const displayName = bookings.length > 0 ? latest?.client_name ?? name : name
+  const phoneFromBookings =
+    latest?.client_phone !== undefined && latest?.client_phone !== null && latest.client_phone !== ''
+      ? latest.client_phone
+      : undefined
+  const phone = bookings.length > 0 ? phoneFromBookings : cust?.phone ?? undefined
+
+  const dates = bookings.map((b) => b.desired_date).filter(Boolean)
+  const first_booking_date = dates.length ? dates.reduce((a, b) => (a < b ? a : b)) : undefined
+  const last_booking_date = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : undefined
+
+  let total_guests = 0
+  let accepted_count = 0
+  let pending_count = 0
+  let cancelled_count = 0
+  for (const b of bookings) {
+    total_guests += b.num_guests ?? 0
+    if (b.status === 'accepted') accepted_count += 1
+    else if (b.status === 'pending') pending_count += 1
+    if (b.cancelled_at) cancelled_count += 1
+  }
+
+  const source: CustomerProfile['source'] = bookings.length > 0 ? 'booking' : 'manual'
+
+  const marketing_consent =
+    cust !== undefined
+      ? cust.marketing_consent === true
+      : bookings.some((b) => b.marketing_consent === true)
+
+  // I profili solo-telefono hanno email vuota; la chiave usa il prefisso "tel:"
+  const actualEmail = contact.startsWith('tel:') ? '' : contact
+
+  return {
+    profileKey: customerProfileKey(contact, displayName),
+    email: actualEmail,
+    name: displayName,
+    phone,
+    source,
+    manual_id: cust?.id,
+    customer_db_source: cust?.source,
+    notes: cust?.notes ?? undefined,
+    booking_count: bookings.length,
+    total_guests,
+    first_booking_date,
+    last_booking_date,
+    bookings: sorted,
+    accepted_count,
+    pending_count,
+    cancelled_count,
+    marketing_consent,
+  }
 }
 
 export function mergeProfiles(
@@ -27,23 +100,16 @@ export function mergeProfiles(
     marketing_consent: boolean
   }[],
 ): CustomerProfile[] {
-  const byEmail = new Map<string, BookingRequest[]>()
+  const byIdentity = new Map<string, BookingRequest[]>()
 
   for (const raw of bookingRows) {
     const b = rowToBookingRequest(raw)
-    const key = normalizeCustomerEmail(b.client_email)
-    if (!key) continue
-    const arr = byEmail.get(key) ?? []
+    const contactKey = resolveContactKey(b.client_email, b.client_phone)
+    if (!contactKey) continue
+    const identityKey = customerProfileKey(contactKey, b.client_name ?? '')
+    const arr = byIdentity.get(identityKey) ?? []
     arr.push(b)
-    byEmail.set(key, arr)
-  }
-
-  for (const [, list] of byEmail) {
-    list.sort((a, b) => {
-      const cmp = b.desired_date.localeCompare(a.desired_date)
-      if (cmp !== 0) return cmp
-      return b.updated_at.localeCompare(a.updated_at)
-    })
+    byIdentity.set(identityKey, arr)
   }
 
   const customerByEmail = new Map<
@@ -72,61 +138,37 @@ export function mergeProfiles(
     })
   }
 
-  const emails = new Set([...byEmail.keys(), ...customerByEmail.keys()])
+  const emailsWithBookings = new Set<string>()
+  for (const raw of bookingRows) {
+    const b = rowToBookingRequest(raw)
+    const emailKey = normalizeCustomerEmail(b.client_email)
+    if (emailKey) emailsWithBookings.add(emailKey)
+  }
+
+  for (const c of customerRows) {
+    const emailKey = normalizeCustomerEmail(c.email)
+    if (!emailKey) continue
+    const identityKey = customerProfileKey(c.email, c.name)
+    if (byIdentity.has(identityKey)) continue
+    const isManual = c.source !== 'synced'
+    if (isManual || !emailsWithBookings.has(emailKey)) {
+      byIdentity.set(identityKey, [])
+    }
+  }
+
   const out: CustomerProfile[] = []
 
-  for (const email of emails) {
-    const bookings = byEmail.get(email) ?? []
-    const cust = customerByEmail.get(email)
-
-    const latest = bookings[0]
-    const nameFromBookings = latest?.client_name ?? cust?.name ?? ''
-    const phoneFromBookings =
-      latest?.client_phone !== undefined && latest?.client_phone !== null && latest.client_phone !== ''
-        ? latest.client_phone
-        : undefined
-    const phone = bookings.length > 0 ? phoneFromBookings : cust?.phone ?? undefined
-
-    const dates = bookings.map((b) => b.desired_date).filter(Boolean)
-    const first_booking_date = dates.length ? dates.reduce((a, b) => (a < b ? a : b)) : undefined
-    const last_booking_date = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : undefined
-
-    let total_guests = 0
-    let accepted_count = 0
-    let pending_count = 0
-    let cancelled_count = 0
-    for (const b of bookings) {
-      total_guests += b.num_guests ?? 0
-      if (b.status === 'accepted') accepted_count += 1
-      else if (b.status === 'pending') pending_count += 1
-      if (b.cancelled_at) cancelled_count += 1
-    }
-
-    const source: CustomerProfile['source'] = bookings.length > 0 ? 'booking' : 'manual'
-
-    const marketing_consent =
-      cust !== undefined
-        ? cust.marketing_consent === true
-        : bookings.some((b) => b.marketing_consent === true)
-
-    out.push({
-      email,
-      name: bookings.length > 0 ? nameFromBookings : cust?.name ?? '',
-      phone,
-      source,
-      manual_id: cust?.id,
-      customer_db_source: cust?.source,
-      notes: cust?.notes ?? undefined,
-      booking_count: bookings.length,
-      total_guests,
-      first_booking_date,
-      last_booking_date,
-      bookings,
-      accepted_count,
-      pending_count,
-      cancelled_count,
-      marketing_consent,
-    })
+  for (const [identityKey, bookings] of byIdentity) {
+    const sep = identityKey.indexOf('\0')
+    const contact = sep >= 0 ? identityKey.slice(0, sep) : identityKey
+    const namePart = sep >= 0 ? identityKey.slice(sep + 1) : ''
+    const actualEmail = contact.startsWith('tel:') ? '' : contact
+    const cust = customerByEmail.get(actualEmail)
+    const displayName =
+      bookings.length > 0
+        ? bookings[0].client_name ?? (namePart ? namePart : cust?.name ?? '')
+        : cust?.name ?? namePart
+    out.push(buildProfileFromBookings(contact, displayName, bookings, cust))
   }
 
   out.sort((a, b) => (b.last_booking_date ?? '').localeCompare(a.last_booking_date ?? ''))
@@ -160,7 +202,9 @@ export function useCustomers() {
       const [bookingsRes, customersRes] = await Promise.all([
         supabase
           .from('booking_requests')
-          .select('id, client_email, client_name, client_phone, desired_date, updated_at, status, num_guests, cancelled_at, booking_type, event_type, marketing_consent')
+          .select(
+            'id, client_email, client_name, client_phone, desired_date, created_at, updated_at, status, num_guests, cancelled_at, booking_type, event_type, marketing_consent, dietary_restrictions, dietary_data_consent, dietary_off_platform_notice, menu_total_booking, preset_menu, special_requests, menu_selection',
+          )
           .eq('tenant_id', tenantId)
           .neq('status', 'deleted'),
         supabase.from('customers').select('id,name,email,phone,notes,source,marketing_consent').eq('tenant_id', tenantId),

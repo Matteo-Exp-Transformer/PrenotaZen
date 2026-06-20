@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BookingRequestInput } from '@/types/booking'
 import { activeSubTabShowsMenu, modeUsesDietary } from '../utils/bookingCapabilities'
 import { useCreateBookingRequest } from '../hooks/useBookingRequests'
@@ -64,6 +64,11 @@ import {
   resolveBookingPublicErrorElementId,
   shouldDismissBookingPublicAttention,
 } from '../utils/bookingPublicFormAttention'
+import {
+  applyBookingPublicFormError,
+  isCreateBookingRequestError,
+  mapCreateBookingError,
+} from '../utils/bookingPublicFormErrorFeedback'
 import { useFormValidationAttention } from '../hooks/useFormValidationAttention'
 
 interface BookingRequestFormProps {
@@ -313,6 +318,41 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     onCollapsePanels: dispatchBookingMenuComposeCollapse,
     resolveElementId: resolveBookingPublicErrorElementId,
   })
+
+  const handleCreateBookingError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Errore nell\'invio della richiesta'
+      const code = isCreateBookingRequestError(error) ? error.code : undefined
+      const mapping = mapCreateBookingError(message, code, {
+        client_name: formData.client_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        num_guests: formData.num_guests,
+        dietary_restrictions: formData.dietary_restrictions,
+        special_requests: formData.special_requests,
+      })
+
+      if (mapping.reopenDietaryModal) {
+        setShowDietaryConsentModal(true)
+      }
+
+      applyBookingPublicFormError({
+        errorKey: mapping.errorKey,
+        message: mapping.inlineMessage,
+        toastMessage: mapping.toastMessage,
+        setErrors,
+        focusFirstValidationIssue,
+      })
+    },
+    [formData, focusFirstValidationIssue],
+  )
+
+  const clearMenuValidationFeedback = useCallback(() => {
+    setErrors((prev) => ({ ...prev, menu: '' }))
+    if (attentionFieldKey === 'menu') {
+      clearAttentionField()
+    }
+  }, [attentionFieldKey, clearAttentionField])
 
   const enabledBookingModes = useMemo(
     () => formConfig.booking_modes.filter((m) => m.enabled),
@@ -631,6 +671,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
           submitLockIdRef.current = null
           setIsSubmitting(false)
           if (savedLockId) releaseGlobalLock(savedLockId)
+          handleCreateBookingError(error)
         },
       },
     )
@@ -1029,19 +1070,14 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
 
     setErrors(newErrors)
 
-    // If validation failed, show toast and scroll to first error
-    if (!isValid) {
-      const errorCount = Object.keys(newErrors).length
-      toast.error(`Compilazione non valida: ${errorCount} ${errorCount === 1 ? 'campo da correggere' : 'campi da correggere'}`, {
-        position: 'top-center',
-        autoClose: 4000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true
+    if (!isValid && firstErrorKey) {
+      applyBookingPublicFormError({
+        errorKey: firstErrorKey,
+        message: newErrors[firstErrorKey],
+        toastMessage: newErrors[firstErrorKey],
+        setErrors,
+        focusFirstValidationIssue,
       })
-
-      focusFirstValidationIssue(firstErrorKey)
     }
 
     return isValid
@@ -1201,6 +1237,9 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
             activeSubTabId={activeSubTabId}
             onChange={(tab) => {
               setActiveSubTabId(tab?.id ?? null)
+              if (tab) {
+                clearMenuValidationFeedback()
+              }
               if (!tab) {
                 handlePresetMenuChange(null)
                 return
@@ -1310,7 +1349,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
                     ? effectiveTotalPerPerson * numGuests
                     : undefined,
               })
-              setErrors({ ...errors, menu: '' })
+              clearMenuValidationFeedback()
             }}
           />
           {errors.menu && (
@@ -1361,18 +1400,23 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
                 ...formData,
                 dietary_restrictions: dietaryTextToRestrictions(text),
               })
-              // Se l'utente cancella il testo dietary, azzera il consenso già dato
               if (!text.trim()) setDietaryConsent(false)
+              if (errors.dietary) {
+                setErrors((prev) => ({ ...prev, dietary: '' }))
+              }
             }}
             specialRequests={formData.special_requests || ''}
             onSpecialRequestsChange={(value) => {
               setFormData({ ...formData, special_requests: value })
+              if (errors.special_requests) {
+                setErrors((prev) => ({ ...prev, special_requests: '' }))
+              }
             }}
             privacyAccepted={privacyAccepted}
             onPrivacyChange={(newValue) => {
               setPrivacyAccepted(newValue)
               if (newValue && errors.privacyAccepted) {
-                setErrors({ ...errors, privacyAccepted: '' })
+                setErrors((prev) => ({ ...prev, privacyAccepted: '' }))
               }
             }}
             privacyError={errors.privacyAccepted}
@@ -1381,7 +1425,21 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
             marketingConsent={marketingConsent}
             onMarketingConsentChange={setMarketingConsent}
             dietaryConsentAccepted={dietaryConsent}
-            onDietaryConsentChange={setDietaryConsent}
+            onDietaryConsentChange={(accepted) => {
+              setDietaryConsent(accepted)
+              if (accepted && errors.dietaryConsent) {
+                setErrors((prev) => ({ ...prev, dietaryConsent: '' }))
+              }
+            }}
+            dietaryConsentError={errors.dietaryConsent}
+            showDietaryConsentAttention={attentionFieldKey === 'dietaryConsent'}
+            onDietaryConsentAttentionInteract={clearAttentionField}
+            dietaryError={errors.dietary}
+            showDietaryAttention={attentionFieldKey === 'dietary'}
+            onDietaryAttentionInteract={clearAttentionField}
+            specialRequestsError={errors.special_requests}
+            showSpecialRequestsAttention={attentionFieldKey === 'special_requests'}
+            onSpecialRequestsAttentionInteract={clearAttentionField}
             publicFormFields
             lightTextOnDarkBackground={publicFormLightTextOnDarkBackground}
           />

@@ -7,6 +7,8 @@ export type CustomerDbSource = 'manual' | 'synced'
 export type CustomerProfileSource = 'booking' | 'manual'
 
 export interface CustomerProfile {
+  /** Chiave logica rubrica: email normalizzata + nome normalizzato. */
+  profileKey: string
   email: string
   name: string
   phone?: string

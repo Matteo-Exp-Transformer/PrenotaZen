@@ -14,6 +14,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const mutateSpy = vi.fn()
+const toastErrorSpy = vi.fn()
+
+vi.mock('react-toastify', () => ({
+  toast: {
+    error: (...args: unknown[]) => toastErrorSpy(...args),
+    success: vi.fn(),
+  },
+}))
 
 // --- Mock degli hook dati (nessuna rete, valori deterministici) ---
 vi.mock('@/features/booking/hooks/useBookingRequests', () => ({
@@ -37,6 +45,7 @@ vi.mock('@/features/booking/hooks/useMenuCategories', () => ({
 }))
 
 import { BookingRequestForm } from '../BookingRequestForm'
+import { CreateBookingRequestError } from '../../utils/bookingPublicFormErrorFeedback'
 import type { BookingPublicFormConfig, BookingMode } from '../../constants/bookingPublicFormConfig'
 import { BOOKING_PUBLIC_CLIENT_TEXT_LIMITS } from '../../constants/bookingPrenotaTextLimits'
 
@@ -74,6 +83,7 @@ function renderForm(config: BookingPublicFormConfig, onFormDataChange?: (d: unkn
 
 beforeEach(() => {
   mutateSpy.mockClear()
+  toastErrorSpy.mockClear()
   try {
     window.sessionStorage.clear()
   } catch {
@@ -99,6 +109,48 @@ describe('BookingRequestForm — submit a form vuoto (§2-bis: invalido → nien
 
     // Messaggio errore nome obbligatorio visibile.
     expect(screen.getByText('Nome obbligatorio')).toBeInTheDocument()
+
+    // Toast con copy del primo errore (non conteggio generico campi).
+    expect(toastErrorSpy).toHaveBeenCalledWith(
+      'Nome obbligatorio',
+      expect.objectContaining({ position: 'top-center' }),
+    )
+  })
+})
+
+describe('BookingRequestForm — errore server create-booking (triplo feedback)', () => {
+  it('SLOT_LIMIT → inline sotto ora + pulse + toast', async () => {
+    mutateSpy.mockImplementation((_data, options) => {
+      options?.onError?.(
+        new CreateBookingRequestError(
+          'Spiacenti, la fascia "Pranzo" è al completo per questa data.',
+          'SLOT_LIMIT',
+        ),
+      )
+    })
+
+    const config = makeConfig([makeMode({ booking_type: 'tavolo' })])
+    const { container } = renderForm(config)
+
+    fireEvent.change(screen.getByLabelText(/Nome Completo/i), { target: { value: 'Anna' } })
+    fireEvent.change(screen.getByLabelText(/Telefono/i), { target: { value: '3331234567' } })
+    fireEvent.change(screen.getByLabelText(/Ospiti/i), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /Privacy Policy/i }))
+
+    fireEvent.submit(container.querySelector('#booking-request-form') as HTMLFormElement)
+
+    await waitFor(() => {
+      expect(mutateSpy).toHaveBeenCalled()
+    })
+
+    expect(
+      screen.getByText(/Questa fascia oraria è al completo/i),
+    ).toBeInTheDocument()
+    expect(container.querySelector('.booking-public-field-attention')).toBeTruthy()
+    expect(toastErrorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/Fascia piena/i),
+      expect.objectContaining({ position: 'top-center' }),
+    )
   })
 })
 

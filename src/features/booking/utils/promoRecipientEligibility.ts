@@ -3,6 +3,24 @@ import { supabase } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import type { CustomerProfile } from '@/types/customer'
 
+/** Una riga per email — per picker campagne (rubrica può avere più nomi stessa email). */
+export function dedupeProfilesByEmail(profiles: CustomerProfile[]): CustomerProfile[] {
+  const byEmail = new Map<string, CustomerProfile>()
+  for (const p of profiles) {
+    const existing = byEmail.get(p.email)
+    if (!existing) {
+      byEmail.set(p.email, p)
+      continue
+    }
+    const existingDate = existing.last_booking_date ?? ''
+    const nextDate = p.last_booking_date ?? ''
+    if (nextDate.localeCompare(existingDate) > 0) {
+      byEmail.set(p.email, p)
+    }
+  }
+  return Array.from(byEmail.values())
+}
+
 /** Intersezione sincrona: solo email ancora eleggibili (consenso marketing + picker). */
 export function filterRecipientsToEligible(
   emails: readonly string[],

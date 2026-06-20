@@ -4,6 +4,7 @@ import { Button, Modal, Input } from '@/components/ui'
 import { useCustomers } from '@/features/booking/hooks/useCustomers'
 import {
   countEligibleRecipients,
+  dedupeProfilesByEmail,
   filterRecipientsToEligible,
   isEligiblePromoRecipient,
 } from '@/features/booking/utils/promoRecipientEligibility'
@@ -24,7 +25,10 @@ export const PromoRecipientPicker: FC<Props> = ({
   initialRecipients = [],
 }) => {
   const { customers } = useCustomers()
-  const eligible = useMemo(() => customers.filter(isEligiblePromoRecipient), [customers])
+  const eligible = useMemo(
+    () => dedupeProfilesByEmail(customers.filter(isEligiblePromoRecipient)),
+    [customers],
+  )
   const eligibleEmails = useMemo(() => new Set(eligible.map((c) => c.email)), [eligible])
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialRecipients))
   const [search, setSearch] = useState('')

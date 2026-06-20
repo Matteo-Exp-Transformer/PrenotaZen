@@ -4,6 +4,7 @@ import type { BookingRequest, BookingRequestInput } from '@/types/booking'
 import { toast } from 'react-toastify'
 import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
+import { CreateBookingRequestError } from '../utils/bookingPublicFormErrorFeedback'
 import type { TablesUpdate } from '@/types/database'
 
 // Lock globale per prevenire chiamate multiple simultanee alla mutation
@@ -123,8 +124,11 @@ export const useCreateBookingRequest = () => {
         }
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Errore nell\'invio della richiesta')
+          const errorData = await response.json().catch(() => ({} as { error?: string; code?: string }))
+          throw new CreateBookingRequestError(
+            errorData.error || 'Errore nell\'invio della richiesta',
+            errorData.code,
+          )
         }
 
         const result = await response.json()
@@ -148,9 +152,7 @@ export const useCreateBookingRequest = () => {
         // Non critico se fallisce (ad esempio se admin non è loggato)
       }
     },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Errore nell\'invio della richiesta')
-    }
+    // Feedback visivo (inline + pulse + toast) gestito dal form parent — BookingRequestForm.
   })
 }
 

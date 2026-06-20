@@ -90,6 +90,7 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       {
         customerRowId: initialProfile.manual_id ?? null,
         previousEmail: emailSnapshot,
+        previousName: initialProfile.name,
         name,
         email,
         phone: phone.trim() || null,

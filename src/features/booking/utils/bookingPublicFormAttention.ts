@@ -37,6 +37,9 @@ export const BOOKING_PUBLIC_ERROR_FIELD_IDS: Record<string, string> = {
   booking_type: 'booking-sub-tabs-section',
   menu: 'menu-section',
   privacyAccepted: 'privacy-consent-dietary',
+  dietaryConsent: 'dietary-consent-section',
+  dietary: 'dietary-notes',
+  special_requests: 'special_requests',
 }
 
 /** Riserva spazio sopra/sotto per sticky bar mobile (~140px) e header. */

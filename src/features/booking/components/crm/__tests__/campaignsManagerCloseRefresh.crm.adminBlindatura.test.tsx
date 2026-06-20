@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EmailCampaign } from '@/features/booking/hooks/useEmailCampaigns'
 import type { CustomerProfile } from '@/types/customer'
+import { customerProfileKey } from '@/lib/customerEmail'
 import { CampaignsManager } from '../CampaignsManager'
 
 const baseCampaign = (overrides: Partial<EmailCampaign> = {}): EmailCampaign => ({
@@ -33,6 +34,7 @@ const bookingCustomer = (
   name: string,
   marketing_consent = true,
 ): CustomerProfile => ({
+  profileKey: customerProfileKey(email, name),
   email,
   name,
   source: 'booking',

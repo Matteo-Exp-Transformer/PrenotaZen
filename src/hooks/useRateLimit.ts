@@ -49,7 +49,7 @@ export const useRateLimit = (options: RateLimitOptions = { maxAttempts: 7, timeW
         const remainingTime = Math.ceil((state.resetTime - Date.now()) / 1000)
         setIsBlocked(true)
         toast.error(
-          `Hai raggiunto il limite di ${options.maxAttempts} richieste. Riprova tra ${remainingTime} secondi.`
+          `Hai inviato troppe richieste. Attendi ${remainingTime} secondi e riprova.`
         )
         return false
       }

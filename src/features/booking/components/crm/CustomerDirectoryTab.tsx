@@ -1,21 +1,20 @@
 import type { FC } from 'react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useCustomers } from '@/features/booking/hooks/useCustomers'
 import { useDeleteCustomer } from '@/features/booking/hooks/useCustomerMutations'
 import { useAdminAuth } from '@/features/booking/hooks/useAdminAuth'
 import type { CustomerProfile } from '@/types/customer'
 import { CustomerSearchBar } from './CustomerSearchBar'
-import { CustomerListTable } from './CustomerListTable'
-import { CustomerDetailPanel } from './CustomerDetailPanel'
+import { CustomerCardList } from './CustomerCardList'
 import { CustomerFormModal } from './CustomerFormModal'
 import { CustomerDeleteConfirm } from './CustomerDeleteConfirm'
 
 export const CustomerDirectoryTab: FC = () => {
-  const { customers, isLoading, error, searchQuery, setSearchQuery, dateFilter, setDateFilter } = useCustomers()
+  const { customers, isLoading, error, searchQuery, setSearchQuery, dateFilter, setDateFilter } =
+    useCustomers()
   const { user } = useAdminAuth()
   const deleteCustomer = useDeleteCustomer()
-  const [selected, setSelected] = useState<CustomerProfile | null>(null)
-  const [panelOpen, setPanelOpen] = useState(false)
+  const [expandedProfileKey, setExpandedProfileKey] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [formProfile, setFormProfile] = useState<CustomerProfile | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CustomerProfile | null>(null)
@@ -25,14 +24,9 @@ export const CustomerDirectoryTab: FC = () => {
     setFormOpen(true)
   }
 
-  const openDetail = (p: CustomerProfile) => {
-    setSelected(p)
-    setPanelOpen(true)
-  }
-
-  const handleRowSelect = (p: CustomerProfile) => {
-    setSelected(p)
-  }
+  const toggleExpand = useCallback((p: CustomerProfile) => {
+    setExpandedProfileKey((prev) => (prev === p.profileKey ? null : p.profileKey))
+  }, [])
 
   const openDelete = (p: CustomerProfile) => {
     setDeleteTarget(p)
@@ -44,13 +38,13 @@ export const CustomerDirectoryTab: FC = () => {
       {
         customerRowId: deleteTarget.manual_id ?? null,
         email: deleteTarget.email,
+        clientName: deleteTarget.name,
         adminId: user?.id ?? null,
       },
       {
         onSuccess: () => {
-          if (selected?.email === deleteTarget.email) {
-            setPanelOpen(false)
-            setSelected(null)
+          if (expandedProfileKey === deleteTarget.profileKey) {
+            setExpandedProfileKey(null)
           }
           setDeleteTarget(null)
         },
@@ -59,23 +53,10 @@ export const CustomerDirectoryTab: FC = () => {
   }
 
   useEffect(() => {
-    setSelected((prev) => {
-      if (!prev?.email) return prev
-      const next = customers.find((c) => c.email === prev.email)
-      if (!next) return prev
-      if (
-        next.name === prev.name &&
-        next.notes === prev.notes &&
-        next.phone === prev.phone &&
-        next.manual_id === prev.manual_id &&
-        next.booking_count === prev.booking_count &&
-        next.last_booking_date === prev.last_booking_date
-      ) {
-        return prev
-      }
-      return next
-    })
-  }, [customers])
+    if (!expandedProfileKey) return
+    const stillExists = customers.some((c) => c.profileKey === expandedProfileKey)
+    if (!stillExists) setExpandedProfileKey(null)
+  }, [customers, expandedProfileKey])
 
   return (
     <div className="space-y-6">
@@ -95,22 +76,14 @@ export const CustomerDirectoryTab: FC = () => {
       {isLoading ? (
         <p className="text-body text-(--color-text-muted)">Caricamento…</p>
       ) : (
-        <CustomerListTable
+        <CustomerCardList
           rows={customers}
-          selectedEmail={selected?.email ?? null}
-          onSelect={handleRowSelect}
-          onOpenDetail={openDetail}
+          expandedProfileKey={expandedProfileKey}
+          onToggleExpand={toggleExpand}
           onEdit={openEdit}
           onDelete={openDelete}
         />
       )}
-
-      <CustomerDetailPanel
-        profile={selected}
-        open={panelOpen}
-        onClose={() => setPanelOpen(false)}
-        onEditContacts={() => selected && openEdit(selected)}
-      />
 
       <CustomerFormModal
         isOpen={formOpen}

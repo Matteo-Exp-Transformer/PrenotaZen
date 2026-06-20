@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import type { CustomerProfile } from '@/types/customer'
+import { customerProfileKey } from '@/lib/customerEmail'
 import { PromoRecipientPicker } from '../PromoRecipientPicker'
 
 const bookingCustomer = (
@@ -14,6 +15,7 @@ const bookingCustomer = (
   name: string,
   marketing_consent = true,
 ): CustomerProfile => ({
+  profileKey: customerProfileKey(email, name),
   email,
   name,
   source: 'booking',

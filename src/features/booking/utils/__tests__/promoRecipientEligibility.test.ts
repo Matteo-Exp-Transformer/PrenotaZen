@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { customerProfileKey } from '@/lib/customerEmail'
 import type { CustomerProfile } from '@/types/customer'
 
 const { mockFrom } = vi.hoisted(() => ({
@@ -18,12 +19,16 @@ import {
   filterEmailsWithMarketingConsent,
   filterRecipientsToEligible,
   countEligibleRecipients,
+  dedupeProfilesByEmail,
 } from '../promoRecipientEligibility'
 
 function profile(overrides: Partial<CustomerProfile> = {}): CustomerProfile {
+  const email = overrides.email ?? 'a@example.com'
+  const name = overrides.name ?? 'Alice'
   return {
-    email: 'a@example.com',
-    name: 'Alice',
+    profileKey: customerProfileKey(email, name),
+    email,
+    name,
     source: 'booking',
     booking_count: 1,
     total_guests: 2,
@@ -43,6 +48,26 @@ describe('promoRecipientEligibility', () => {
       expect(isEligiblePromoRecipient(profile({ marketing_consent: false }))).toBe(false)
       expect(isEligiblePromoRecipient(profile({ source: 'manual' }))).toBe(false)
       expect(isEligiblePromoRecipient(profile({ email: '' }))).toBe(false)
+    })
+
+    it('profilo solo-telefono (email vuota) è escluso dal picker campagne', () => {
+      // I profili solo-telefono compaiono in rubrica ma non nel picker promo (le campagne email richiedono un'email)
+      expect(
+        isEligiblePromoRecipient(
+          profile({ email: '', phone: '3456789012', marketing_consent: true }),
+        ),
+      ).toBe(false)
+    })
+  })
+
+  describe('dedupeProfilesByEmail', () => {
+    it('mantiene una sola riga per email (ultima prenotazione più recente)', () => {
+      const result = dedupeProfilesByEmail([
+        profile({ email: 'x@y.com', name: 'cava', last_booking_date: '2026-06-10' }),
+        profile({ email: 'x@y.com', name: 'Mario Rossi', last_booking_date: '2026-06-20' }),
+      ])
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('Mario Rossi')
     })
   })
 
