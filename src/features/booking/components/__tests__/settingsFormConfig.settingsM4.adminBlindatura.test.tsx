@@ -4,7 +4,7 @@
 
 import '@testing-library/jest-dom/vitest'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -30,6 +30,10 @@ const restaurantSettingsData = vi.hoisted(() => ({
   restaurant_name: 'Locale Test',
   booking_custom_staff_presets: [] as unknown[],
   booking_menu_promos: [] as unknown[],
+}))
+
+const scrollIntoCenterMock = vi.hoisted(() => ({
+  scheduleScrollIntoCenter: vi.fn(() => vi.fn()),
 }))
 
 vi.mock('react-toastify', () => ({
@@ -75,6 +79,10 @@ vi.mock('@/features/booking/hooks/useDebouncedSettingsAutosave', () => ({
     cancelPending: vi.fn(),
     fieldStatus: {},
   }),
+}))
+
+vi.mock('@/features/booking/lib/scrollIntoCenter', () => ({
+  scheduleScrollIntoCenter: scrollIntoCenterMock.scheduleScrollIntoCenter,
 }))
 
 vi.mock('@/features/booking/components/settings/BookingFormCarouselEditor', () => ({
@@ -155,6 +163,56 @@ async function expandMode(user: ReturnType<typeof userEvent.setup>, modeId = MOD
 function deleteButtonLabel(summary: string): RegExp {
   return new RegExp(`elimina ${summary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
 }
+
+function latestCenterTarget(): Element | null {
+  const calls = scrollIntoCenterMock.scheduleScrollIntoCenter.mock.calls as unknown as Array<
+    [() => Element | null]
+  >
+  const resolveTarget = calls[calls.length - 1]?.[0] as (() => Element | null) | undefined
+  return resolveTarget?.() ?? null
+}
+
+beforeEach(() => {
+  scrollIntoCenterMock.scheduleScrollIntoCenter.mockClear()
+})
+
+describe('settings-form-config centratura elemento aperto', () => {
+  it('apertura modalità, card scorrevole e carosello passano dal helper riusabile', async () => {
+    const user = userEvent.setup()
+    const card = makeCard(CARD_ID_1, 'Pranzo domenicale')
+    restaurantSettingsData.booking_public_form_config = makeConfig('cards', [card])
+    renderPanel()
+
+    await expandMode(user)
+    await waitFor(() => {
+      expect(scrollIntoCenterMock.scheduleScrollIntoCenter).toHaveBeenCalled()
+    })
+    expect(latestCenterTarget()).toHaveAttribute('data-booking-center-target', `mode-${MODE_ID}`)
+
+    scrollIntoCenterMock.scheduleScrollIntoCenter.mockClear()
+    await user.click(screen.getByText(/pranzo domenicale · card 1/i))
+    await waitFor(() => {
+      expect(scrollIntoCenterMock.scheduleScrollIntoCenter).toHaveBeenCalled()
+    })
+    expect(latestCenterTarget()).toHaveAttribute(
+      'data-booking-center-target',
+      `subtab-${MODE_ID}-${CARD_ID_1}`,
+    )
+
+    scrollIntoCenterMock.scheduleScrollIntoCenter.mockClear()
+    cleanup()
+    restaurantSettingsData.booking_public_form_config = makeConfig('carousel', [])
+    renderPanel()
+
+    await expandMode(user)
+    scrollIntoCenterMock.scheduleScrollIntoCenter.mockClear()
+    await user.click(screen.getByRole('button', { name: /\+ carosello/i }))
+    await waitFor(() => {
+      expect(scrollIntoCenterMock.scheduleScrollIntoCenter).toHaveBeenCalled()
+    })
+    expect(latestCenterTarget()).toHaveAttribute('data-booking-center-target', `draft-${MODE_ID}`)
+  })
+})
 
 describe('settings-form-config delete card/carosello', () => {
   const card1 = makeCard(CARD_ID_1, 'Pranzo domenicale')

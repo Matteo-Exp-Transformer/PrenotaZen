@@ -153,6 +153,24 @@ export const BookingMenuCategoryCard: React.FC<BookingMenuCategoryCardProps> = (
     setExpanded(false)
   }, [])
 
+  useEffect(() => {
+    if (!expanded) return
+
+    const onDocumentPointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+
+      const shell = shellRef.current
+      const portal = portalArticleRef.current
+      if (shell?.contains(target) || portal?.contains(target)) return
+
+      collapseExpanded()
+    }
+
+    document.addEventListener('pointerdown', onDocumentPointerDown, { capture: true })
+    return () => document.removeEventListener('pointerdown', onDocumentPointerDown, { capture: true })
+  }, [expanded, collapseExpanded])
+
   const collapseIfClipOutsideScrollContainer = useCallback(() => {
     if (!expanded || layout !== 'scroll') return
     if (Date.now() < suppressVisibilityCollapseUntilRef.current) return

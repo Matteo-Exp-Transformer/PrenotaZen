@@ -68,6 +68,7 @@ import {
   BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS,
   getBookingHeaderFontSizeMax,
 } from '@/features/booking/constants/bookingPrenotaTextLimits'
+import { scheduleScrollIntoCenter } from '@/features/booking/lib/scrollIntoCenter'
 
 const L = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS
 
@@ -427,6 +428,8 @@ export const BookingFormConfigPanel = forwardRef<
   const [expandedMode, setExpandedMode] = useState<string | null>(null)
   const [draftSubTabsByMode, setDraftSubTabsByMode] = useState<Record<string, SubTab | null>>({})
   const [expandedSubTabByMode, setExpandedSubTabByMode] = useState<Record<string, string | null>>({})
+  const panelRootRef = useRef<HTMLDivElement>(null)
+  const pendingCenterTargetRef = useRef<string | null>(null)
   const [deleteConfirmSubTab, setDeleteConfirmSubTab] = useState<{
     modeId: string
     subTabId: string
@@ -487,6 +490,20 @@ export const BookingFormConfigPanel = forwardRef<
   const markHeaderStylesDirty = () => setHeaderStylesDirty(true)
   const markModesDirty = () => setModesDirty(true)
 
+  const requestCenterOnOpen = (targetId: string) => {
+    pendingCenterTargetRef.current = targetId
+  }
+
+  useEffect(() => {
+    const targetId = pendingCenterTargetRef.current
+    if (!targetId) return undefined
+
+    pendingCenterTargetRef.current = null
+    return scheduleScrollIntoCenter(() =>
+      panelRootRef.current?.querySelector(`[data-booking-center-target="${targetId}"]`) ?? null,
+    )
+  }, [expandedMode, draftSubTabsByMode, expandedSubTabByMode])
+
   const getSavedBaseline = () => savedConfig ?? DEFAULT_BOOKING_FORM_CONFIG
 
   const updateMode = (modeId: string, patch: Partial<BookingMode>) => {
@@ -531,6 +548,7 @@ export const BookingFormConfigPanel = forwardRef<
       }),
     }))
     setDraftSubTabsByMode((prev) => ({ ...prev, [modeId]: newSubTab(display) }))
+    requestCenterOnOpen(`draft-${modeId}`)
     markModesDirty()
   }
 
@@ -1569,7 +1587,7 @@ export const BookingFormConfigPanel = forwardRef<
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
+    <div ref={panelRootRef} className="w-full max-w-2xl mx-auto space-y-4">
       {/* Blocco 1 — Intestazione pagina */}
       <section className="admin-warm-surface rounded-xl border p-5 space-y-4 shadow-sm">
           <h3 className="text-base font-semibold text-slate-800">Intestazione pagina Prenota</h3>
@@ -1668,7 +1686,10 @@ export const BookingFormConfigPanel = forwardRef<
                 <button
                   type="button"
                   data-mode-id={mode.id}
-                  onClick={() => setExpandedMode(isOpen ? null : mode.id)}
+                  onClick={() => {
+                    if (!isOpen) requestCenterOnOpen(`mode-${mode.id}`)
+                    setExpandedMode(isOpen ? null : mode.id)
+                  }}
                   className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -1689,7 +1710,10 @@ export const BookingFormConfigPanel = forwardRef<
                 </button>
 
                 {isOpen && (
-                  <div className="px-4 py-4 space-y-4 border-t border-slate-200 bg-white">
+                  <div
+                    data-booking-center-target={`mode-${mode.id}`}
+                    className="px-4 py-4 space-y-4 border-t border-slate-200 bg-white"
+                  >
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
@@ -1796,7 +1820,10 @@ export const BookingFormConfigPanel = forwardRef<
                         )}
 
                         {draftSubTab && (
-                          <div className="w-full min-w-0">
+                          <div
+                            data-booking-center-target={`draft-${mode.id}`}
+                            className="w-full min-w-0"
+                          >
                             {renderSubTabEditor({
                               mode,
                               tab: draftSubTab,
@@ -1816,11 +1843,13 @@ export const BookingFormConfigPanel = forwardRef<
                             {subTabs.map((tab, tabIdx) => {
                               const savedOpen = expandedSubTabId === tab.id
                               const rowSummary = getSubTabCollapsedRowTitle(tab, tabIdx + 1)
-                              const toggleSavedSubTab = () =>
+                              const toggleSavedSubTab = () => {
+                                if (!savedOpen) requestCenterOnOpen(`subtab-${mode.id}-${tab.id}`)
                                 setExpandedSubTabByMode((prev) => ({
                                   ...prev,
                                   [mode.id]: savedOpen ? null : tab.id,
                                 }))
+                              }
                               const deleteButton = (
                                 <SubTabDeleteButton
                                   summary={rowSummary}
@@ -1832,6 +1861,7 @@ export const BookingFormConfigPanel = forwardRef<
                               return (
                                 <div
                                   key={tab.id}
+                                  data-booking-center-target={`subtab-${mode.id}-${tab.id}`}
                                   className="w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
                                 >
                                   <div className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50/80">

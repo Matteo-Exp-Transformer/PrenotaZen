@@ -253,4 +253,57 @@ describe('FIX 8 — BookingMenuCategoryCard scrollIntoView prima di espandere', 
 
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1)
   })
+
+  it('card aperta: click fuori chiude il pannello categoria', () => {
+    render(
+      <div>
+        <button type="button">Fuori card</button>
+        <BookingMenuCategoryCard
+          categoryKey="pizze"
+          categoryLabel="Pizze"
+          items={items}
+          selectedItems={[]}
+          locked={false}
+          formatPrice={() => '€6.50'}
+          onToggleItem={vi.fn()}
+          layout="grid"
+        />
+      </div>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Pizze/i }))
+    expect(screen.getByRole('region', { name: /Pizze/i })).toBeInTheDocument()
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /fuori card/i }))
+    expect(screen.queryByRole('region', { name: /Pizze/i })).not.toBeInTheDocument()
+  })
+
+  it('card aperta: selezionare un ingrediente non chiude il pannello categoria', () => {
+    const onToggleItem = vi.fn()
+
+    render(
+      <BookingMenuCategoryCard
+        categoryKey="pizze"
+        categoryLabel="Pizze"
+        items={items}
+        selectedItems={[]}
+        locked={false}
+        formatPrice={() => '€6.50'}
+        onToggleItem={onToggleItem}
+        layout="grid"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Pizze/i }))
+    const checkbox = screen.getByRole('checkbox')
+
+    fireEvent.pointerDown(checkbox)
+    fireEvent.click(checkbox)
+
+    expect(onToggleItem).toHaveBeenCalledWith(items[0])
+    expect(screen.getByRole('region', { name: /Pizze/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Pizze/i }))
+    expect(screen.queryByRole('region', { name: /Pizze/i })).not.toBeInTheDocument()
+  })
 })

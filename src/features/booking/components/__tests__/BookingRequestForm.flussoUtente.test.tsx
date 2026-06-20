@@ -15,6 +15,11 @@ import { MemoryRouter } from 'react-router-dom'
 
 const mutateSpy = vi.fn()
 const toastErrorSpy = vi.fn()
+const mockBookingData = vi.hoisted(() => ({
+  menuItems: [] as unknown[],
+  menuCategories: [] as unknown[],
+  customStaffPresets: [] as unknown[],
+}))
 
 vi.mock('react-toastify', () => ({
   toast: {
@@ -35,13 +40,24 @@ vi.mock('@/hooks/useBusinessHours', () => ({
   useBusinessHours: () => ({ data: null, isLoading: false, error: null }),
 }))
 vi.mock('@/features/booking/hooks/useMenuItems', () => ({
-  useMenuItems: () => ({ data: [], isLoading: false, isFetching: false }),
+  useMenuItems: () => ({ data: mockBookingData.menuItems, isLoading: false, isFetching: false }),
 }))
 vi.mock('@/features/booking/hooks/useRestaurantSetting', () => ({
-  useRestaurantSetting: () => ({ data: undefined, isLoading: false, isFetching: false }),
+  useRestaurantSetting: (key: string) => {
+    if (key === 'booking_custom_staff_presets') {
+      return { data: mockBookingData.customStaffPresets, isLoading: false, isFetching: false }
+    }
+    if (key === 'booking_staff_presets_visible') {
+      return { data: true, isLoading: false, isFetching: false }
+    }
+    if (key === 'booking_menu_promos') {
+      return { data: [], isLoading: false, isFetching: false }
+    }
+    return { data: undefined, isLoading: false, isFetching: false }
+  },
 }))
 vi.mock('@/features/booking/hooks/useMenuCategories', () => ({
-  useMenuCategories: () => ({ data: [] }),
+  useMenuCategories: () => ({ data: mockBookingData.menuCategories }),
 }))
 
 import { BookingRequestForm } from '../BookingRequestForm'
@@ -84,11 +100,108 @@ function renderForm(config: BookingPublicFormConfig, onFormDataChange?: (d: unkn
 beforeEach(() => {
   mutateSpy.mockClear()
   toastErrorSpy.mockClear()
+  mockBookingData.menuItems = []
+  mockBookingData.menuCategories = []
+  mockBookingData.customStaffPresets = []
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as typeof ResizeObserver
   try {
     window.sessionStorage.clear()
   } catch {
     /* jsdom: ignora */
   }
+})
+
+describe('BookingRequestForm — card categoria ingredienti (§5 card categoria ingredienti)', () => {
+  it('resta aperta dopo la prima selezione ingrediente su una card preset personalizzabile', async () => {
+    mockBookingData.menuCategories = [
+      {
+        id: 'cat-antipasti',
+        tenant_id: 'tenant',
+        key: 'antipasti',
+        label: 'Antipasti',
+        description: null,
+        image_url: null,
+        is_available: true,
+        sort_order: 1,
+        created_at: '',
+        updated_at: '',
+      },
+    ]
+    mockBookingData.menuItems = [
+      {
+        id: 'item-bruschetta',
+        created_at: '',
+        updated_at: '',
+        name: 'Bruschetta',
+        category: 'antipasti',
+        price: 5,
+        description: '',
+        sort_order: 1,
+        is_available: true,
+        booking_types: ['rinfresco_laurea'],
+        image_url: null,
+      },
+      {
+        id: 'item-crostino',
+        created_at: '',
+        updated_at: '',
+        name: 'Crostino',
+        category: 'antipasti',
+        price: 4,
+        description: '',
+        sort_order: 2,
+        is_available: true,
+        booking_types: ['rinfresco_laurea'],
+        image_url: null,
+      },
+    ]
+    mockBookingData.customStaffPresets = [
+      {
+        id: 'preset-festa',
+        name: 'Menu festa',
+        item_ids: ['item-bruschetta', 'item-crostino'],
+        booking_types: ['rinfresco_laurea'],
+        is_fixed_menu: false,
+        visible_on_booking: true,
+      },
+    ]
+
+    const config = makeConfig([
+      makeMode({
+        id: 'rinf',
+        booking_type: 'rinfresco_laurea',
+        label: 'Rinfresco',
+        sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [
+          {
+            id: 'card-menu-festa',
+            display: 'cards',
+            label: 'Menu festa',
+            preset_id: 'preset-festa',
+            is_fixed_menu: false,
+          },
+        ],
+      }),
+    ])
+    renderForm(config)
+
+    fireEvent.click(screen.getByTestId('booking-sub-tab-card-card-menu-festa'))
+    const categoryButtons = await screen.findAllByRole('button', { name: /Antipasti/i })
+    fireEvent.click(categoryButtons[0])
+
+    const firstIngredient = await screen.findByRole('checkbox', { name: /Bruschetta/i })
+    fireEvent.click(firstIngredient)
+
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /Bruschetta/i })).toBeChecked()
+    })
+    expect(screen.getByRole('region', { name: /Antipasti/i })).toBeInTheDocument()
+  })
 })
 
 describe('BookingRequestForm — submit a form vuoto (§2-bis: invalido → niente POST)', () => {

@@ -1333,6 +1333,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
 
               if (
                 currentPreset &&
+                !activeSubTab?.preset_id &&
                 !presetSelectionStillMatchesStoredPreset(currentPreset, items, customStaffPresets)
               ) {
                 updatedPreset = null
