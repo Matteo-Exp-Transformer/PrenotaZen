@@ -46,6 +46,8 @@ import { cn } from '@/lib/utils'
 
 /** Sotto questa larghezza (inclusa), la vista FullCalendar predefinita è lista invece del mese */
 const CALENDAR_DEFAULT_LIST_MAX_WIDTH_PX = 630
+/** Da Tailwind `lg` in su sono disponibili tutte le viste; sotto restano Mese e Lista. */
+const CALENDAR_DESKTOP_MIN_WIDTH_PX = 1024
 /** Nei blocchi evento: sotto questa larghezza mostra solo l’icona tipologia (il nome resta in title per hover/tooltip). */
 const CALENDAR_EVENT_ICON_ONLY_MAX_WIDTH_PX = 500
 /**
@@ -81,6 +83,11 @@ function getInitialCalendarNarrowViewport(): boolean {
 function getInitialCalendarEventIconOnly(): boolean {
   if (typeof window === 'undefined') return false
   return window.matchMedia(`(max-width: ${CALENDAR_EVENT_ICON_ONLY_MAX_WIDTH_PX}px)`).matches
+}
+
+function getInitialCalendarDesktopViewport(): boolean {
+  if (typeof window === 'undefined') return true
+  return window.matchMedia(`(min-width: ${CALENDAR_DESKTOP_MIN_WIDTH_PX}px)`).matches
 }
 
 
@@ -364,22 +371,41 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     useState(getInitialCalendarNarrowViewport)
   const [isCalendarEventIconOnly, setIsCalendarEventIconOnly] =
     useState(getInitialCalendarEventIconOnly)
+  const [isCalendarDesktopViewport, setIsCalendarDesktopViewport] =
+    useState(getInitialCalendarDesktopViewport)
 
   useEffect(() => {
     const mql630 = window.matchMedia(`(max-width: ${CALENDAR_DEFAULT_LIST_MAX_WIDTH_PX}px)`)
     const mql500 = window.matchMedia(`(max-width: ${CALENDAR_EVENT_ICON_ONLY_MAX_WIDTH_PX}px)`)
+    const mqlDesktop = window.matchMedia(`(min-width: ${CALENDAR_DESKTOP_MIN_WIDTH_PX}px)`)
     const sync = () => {
       setIsCalendarNarrowViewport(mql630.matches)
       setIsCalendarEventIconOnly(mql500.matches)
+      setIsCalendarDesktopViewport(mqlDesktop.matches)
     }
     sync()
     mql630.addEventListener('change', sync)
     mql500.addEventListener('change', sync)
+    mqlDesktop.addEventListener('change', sync)
     return () => {
       mql630.removeEventListener('change', sync)
       mql500.removeEventListener('change', sync)
+      mqlDesktop.removeEventListener('change', sync)
     }
   }, [])
+
+  useEffect(() => {
+    if (
+      isCalendarDesktopViewport ||
+      currentView === 'dayGridMonth' ||
+      currentView === 'listWeek'
+    ) {
+      return
+    }
+
+    setCurrentView('dayGridMonth')
+    calendarRef.current?.getApi()?.changeView('dayGridMonth')
+  }, [currentView, isCalendarDesktopViewport])
 
   // Aggiorna il selectedBooking quando i bookings cambiano (dopo modifica)
   useEffect(() => {
@@ -1021,17 +1047,25 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
             </div>
           </div>
 
-          {/* Pulsanti vista — sotto la barra titolo, stessi stili su tutte le larghezze */}
-          <div className="flex w-full max-w-full flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-0.5">
+          {/* Tablet/mobile: solo Mese e Lista. Settimana/Giorno sono disponibili da `lg`. */}
+          <div
+            role="group"
+            aria-label="Viste calendario"
+            className="flex w-full max-w-full flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-0.5"
+          >
             <button type="button" onClick={() => handleViewChange('dayGridMonth')} className={viewButtonClass('dayGridMonth')}>
               Mese
             </button>
-            <button type="button" onClick={() => handleViewChange('timeGridWeek')} className={viewButtonClass('timeGridWeek')}>
-              Settimana
-            </button>
-            <button type="button" onClick={() => handleViewChange('timeGridDay')} className={viewButtonClass('timeGridDay')}>
-              Giorno
-            </button>
+            {isCalendarDesktopViewport && (
+              <>
+                <button type="button" onClick={() => handleViewChange('timeGridWeek')} className={viewButtonClass('timeGridWeek')}>
+                  Settimana
+                </button>
+                <button type="button" onClick={() => handleViewChange('timeGridDay')} className={viewButtonClass('timeGridDay')}>
+                  Giorno
+                </button>
+              </>
+            )}
             <button type="button" onClick={() => handleViewChange('listWeek')} className={viewButtonClass('listWeek')}>
               Lista
             </button>

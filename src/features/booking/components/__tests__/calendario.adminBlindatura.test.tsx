@@ -14,12 +14,18 @@ const confirmSpy = vi.spyOn(window, 'confirm')
 
 const {
   fcPropsCapture,
+  calendarApiState,
   featuresState,
   restaurantSettings,
   serviceSlotsState,
   tableAssignmentsState,
 } = vi.hoisted(() => ({
   fcPropsCapture: { current: null as Record<string, unknown> | null },
+  calendarApiState: {
+    changeView: vi.fn(),
+    gotoDate: vi.fn(),
+    view: { type: 'dayGridMonth' },
+  },
   featuresState: { servizio: false },
   restaurantSettings: {
     // Nuovo modello (18-06): badge % su SOMMA cap per-fascia, gated dall'interruttore globale.
@@ -42,11 +48,7 @@ vi.mock('@fullcalendar/react', () => ({
   default: React.forwardRef(function MockFullCalendar(props: Record<string, unknown>, ref: React.Ref<unknown>) {
     fcPropsCapture.current = props
     React.useImperativeHandle(ref, () => ({
-      getApi: () => ({
-        changeView: vi.fn(),
-        gotoDate: vi.fn(),
-        view: { type: 'dayGridMonth' },
-      }),
+      getApi: () => calendarApiState,
     }))
     return <div data-testid="mock-fullcalendar" />
   }),
@@ -185,18 +187,59 @@ async function clickAndFlush(user: UserEvent, target: HTMLElement) {
   })
 }
 
-function setupMatchMedia(desktop = true) {
+type MatchMediaChangeListener = (event: { matches: boolean; media: string }) => void
+
+function setupMatchMedia(desktopOrWidth: boolean | number = true) {
+  let viewportWidth =
+    typeof desktopOrWidth === 'number' ? desktopOrWidth : desktopOrWidth ? 1280 : 375
+  const mediaQueries: Array<{
+    media: string
+    mql: MediaQueryList
+    listeners: Set<MatchMediaChangeListener>
+  }> = []
+
+  const evaluate = (query: string) => {
+    const minWidth = query.match(/min-width:\s*(\d+)px/)
+    const maxWidth = query.match(/max-width:\s*(\d+)px/)
+    if (minWidth && viewportWidth < Number(minWidth[1])) return false
+    if (maxWidth && viewportWidth > Number(maxWidth[1])) return false
+    return true
+  }
+
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     configurable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: !desktop,
-      media: query,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+    value: vi.fn().mockImplementation((query: string) => {
+      const listeners = new Set<MatchMediaChangeListener>()
+      const mql = {
+        matches: evaluate(query),
+        media: query,
+        onchange: null,
+        addListener: (listener: MatchMediaChangeListener) => listeners.add(listener),
+        removeListener: (listener: MatchMediaChangeListener) => listeners.delete(listener),
+        addEventListener: (_type: string, listener: MatchMediaChangeListener) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: MatchMediaChangeListener) => listeners.delete(listener),
+        dispatchEvent: () => true,
+      } as unknown as MediaQueryList
+      mediaQueries.push({ media: query, mql, listeners })
+      return mql
+    }),
   })
+
+  return {
+    setWidth(width: number) {
+      viewportWidth = width
+      mediaQueries.forEach(({ media, mql, listeners }) => {
+        const nextMatches = evaluate(media)
+        if (nextMatches === mql.matches) return
+        Object.defineProperty(mql, 'matches', {
+          configurable: true,
+          value: nextMatches,
+        })
+        listeners.forEach((listener) => listener({ matches: nextMatches, media }))
+      })
+    },
+  }
 }
 
 describe('@admin-blindatura calendario — solo accettate in vista', () => {
@@ -614,6 +657,92 @@ describe('@admin-blindatura calendario — navigazione mese FC (datesSet)', () =
 
     expect(screen.getByRole('button', { name: /nuova prenotazione il 12\/06/i })).toBeInTheDocument()
   })
+})
+
+describe('@admin-blindatura calendario — selettore viste responsive', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fcPropsCapture.current = null
+    featuresState.servizio = false
+    restaurantSettings.slot_limit_enabled = false
+    restaurantSettings.slot_guest_capacities = {}
+    serviceSlotsState.slots = []
+    tableAssignmentsState.data = []
+  })
+
+  it.each([375, 834])('a %ipx mostra esclusivamente Mese e Lista', (width) => {
+    setupMatchMedia(width)
+
+    renderCalendar(<BookingCalendar bookings={[]} initialDate="2026-06-12" />)
+    const viewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+
+    expect(viewSelector.getByRole('button', { name: 'Mese' })).toBeInTheDocument()
+    expect(viewSelector.getByRole('button', { name: 'Lista' })).toBeInTheDocument()
+    expect(viewSelector.queryByRole('button', { name: 'Settimana' })).not.toBeInTheDocument()
+    expect(viewSelector.queryByRole('button', { name: 'Giorno' })).not.toBeInTheDocument()
+  })
+
+  it('a 1280px mostra tutte le viste esistenti', () => {
+    setupMatchMedia(1280)
+
+    renderCalendar(<BookingCalendar bookings={[]} initialDate="2026-06-12" />)
+    const viewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+
+    expect(viewSelector.getByRole('button', { name: 'Mese' })).toBeInTheDocument()
+    expect(viewSelector.getByRole('button', { name: 'Settimana' })).toBeInTheDocument()
+    expect(viewSelector.getByRole('button', { name: 'Giorno' })).toBeInTheDocument()
+    expect(viewSelector.getByRole('button', { name: 'Lista' })).toBeInTheDocument()
+  })
+
+  it.each([375, 834])(
+    'passando da desktop a %ipx porta automaticamente Settimana a Mese',
+    async (width) => {
+      const user = userEvent.setup()
+      const viewport = setupMatchMedia(1280)
+      renderCalendar(<BookingCalendar bookings={[]} initialDate="2026-06-12" />)
+      const desktopViewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+
+      await clickAndFlush(user, desktopViewSelector.getByRole('button', { name: 'Settimana' }))
+      expect(calendarApiState.changeView).toHaveBeenLastCalledWith('timeGridWeek')
+
+      act(() => viewport.setWidth(width))
+
+      await waitFor(() => {
+        expect(calendarApiState.changeView).toHaveBeenLastCalledWith('dayGridMonth')
+      })
+      const narrowViewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+      expect(narrowViewSelector.getByRole('button', { name: 'Mese' })).toHaveClass('bg-primary-50')
+      expect(narrowViewSelector.queryByRole('button', { name: 'Settimana' })).not.toBeInTheDocument()
+      expect(narrowViewSelector.queryByRole('button', { name: 'Giorno' })).not.toBeInTheDocument()
+    },
+  )
+
+  it.each([375, 834])(
+    'a %ipx permette Mese ↔ Lista e tornando desktop mantiene la vista corrente',
+    async (width) => {
+      const user = userEvent.setup()
+      const viewport = setupMatchMedia(width)
+      renderCalendar(<BookingCalendar bookings={[]} initialDate="2026-06-12" />)
+      const narrowViewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+
+      await clickAndFlush(user, narrowViewSelector.getByRole('button', { name: 'Mese' }))
+      expect(calendarApiState.changeView).toHaveBeenLastCalledWith('dayGridMonth')
+      await clickAndFlush(user, narrowViewSelector.getByRole('button', { name: 'Lista' }))
+      expect(calendarApiState.changeView).toHaveBeenLastCalledWith('listWeek')
+
+      const callsBeforeDesktop = calendarApiState.changeView.mock.calls.length
+      act(() => viewport.setWidth(1280))
+
+      await waitFor(() => {
+        const desktopViewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+        expect(desktopViewSelector.getByRole('button', { name: 'Settimana' })).toBeInTheDocument()
+      })
+      const desktopViewSelector = within(screen.getByRole('group', { name: 'Viste calendario' }))
+      expect(desktopViewSelector.getByRole('button', { name: 'Giorno' })).toBeInTheDocument()
+      expect(desktopViewSelector.getByRole('button', { name: 'Lista' })).toHaveClass('bg-primary-50')
+      expect(calendarApiState.changeView).toHaveBeenCalledTimes(callsBeforeDesktop)
+    },
+  )
 })
 
 describe('@admin-blindatura calendario — no drag&drop', () => {

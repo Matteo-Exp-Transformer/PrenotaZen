@@ -108,6 +108,50 @@ async function expectBookingInSlotByIndex(
   await expect(slotBlock).toContainText(bookingName)
 }
 
+test.describe('Admin Calendario - responsive', () => {
+  test.skip(ADMIN_CREDENTIALS.length === 0, 'richiede credenziali staging in .env.local.test')
+
+  test.beforeEach(async ({ page }) => {
+    await loginClassicAdmin(page)
+  })
+
+  // @admin-blindatura: calendario-e2e
+  // Copre: viste FullCalendar disponibili e fallback responsive sui tre viewport QA.
+  test('selettore viste responsive a 375, 834 e 1280 px', async ({ page }) => {
+    await goToCalendar(page)
+    const viewSelector = page.getByRole('group', { name: 'Viste calendario' })
+    const monthButton = viewSelector.getByRole('button', { name: 'Mese' })
+    const listButton = viewSelector.getByRole('button', { name: 'Lista' })
+
+    await expect(viewSelector.getByRole('button', { name: 'Settimana' })).toBeVisible()
+    await expect(viewSelector.getByRole('button', { name: 'Giorno' })).toBeVisible()
+    await viewSelector.getByRole('button', { name: 'Settimana' }).click()
+
+    await page.setViewportSize({ width: 375, height: 812 })
+    await expect(viewSelector.getByRole('button', { name: 'Settimana' })).toHaveCount(0)
+    await expect(viewSelector.getByRole('button', { name: 'Giorno' })).toHaveCount(0)
+    await expect(monthButton).toHaveClass(/bg-primary-50/)
+    await listButton.click()
+    await expect(listButton).toHaveClass(/bg-primary-50/)
+    await monthButton.click()
+    await expect(monthButton).toHaveClass(/bg-primary-50/)
+
+    await page.setViewportSize({ width: 834, height: 1194 })
+    await expect(viewSelector.getByRole('button', { name: 'Settimana' })).toHaveCount(0)
+    await expect(viewSelector.getByRole('button', { name: 'Giorno' })).toHaveCount(0)
+    await listButton.click()
+    await expect(listButton).toHaveClass(/bg-primary-50/)
+    await monthButton.click()
+    await expect(monthButton).toHaveClass(/bg-primary-50/)
+    await listButton.click()
+
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await expect(viewSelector.getByRole('button', { name: 'Settimana' })).toBeVisible()
+    await expect(viewSelector.getByRole('button', { name: 'Giorno' })).toBeVisible()
+    await expect(listButton).toHaveClass(/bg-primary-50/)
+  })
+})
+
 test.describe('Admin Calendario - smoke', () => {
   test.describe.configure({ mode: 'serial' })
   test.skip(!hasE2eCreds, 'richiede credenziali staging in .env.local.test')
