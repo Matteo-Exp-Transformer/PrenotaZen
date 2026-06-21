@@ -122,9 +122,70 @@ export const DetailsTab: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
+      {/*
+        Ordine mobile (grid-cols-1) garantito dall'ORDINE DEL DOM, non solo dalle classi CSS
+        `order-*` (su alcuni browser mobile risultavano ignorate): Informazioni Cliente è il
+        primo figlio, quindi su mobile appare per prima → Informazioni Cliente → Dati
+        Prenotazione → Note Speciali.
+        Desktop (md:grid-cols-2): le classi `md:order-*` riportano il layout a 2 colonne
+        (md:order-1 = colonna sinistra = Dati Prenotazione; md:order-2 = colonna destra = Cliente).
+      */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 md:items-start">
-        {/* LEFT column: Dati Prenotazione + Note/Intolleranze */}
-        <div className="flex min-w-0 flex-col gap-4">
+        {/* RIGHT column (desktop): Informazioni Cliente — primo nel DOM per ordine mobile corretto */}
+        <div className="flex min-w-0 flex-col gap-4 md:order-2">
+          <div className={SECTION_CARD}>
+            <h3 className="text-title-subtitle font-bold uppercase tracking-wide text-gray-900">
+              Informazioni Cliente
+            </h3>
+            {isEditMode ? (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-base font-medium text-gray-700">Nome</label>
+                  <input
+                    type="text"
+                    value={formData.client_name}
+                    onChange={(e) => onFormDataChange('client_name', e.target.value)}
+                    className={ADMIN_INPUT_CLASS}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-base font-medium text-gray-700">
+                    Email <span className="text-sm font-normal text-gray-500">(opzionale)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.client_email}
+                    onChange={(e) => onFormDataChange('client_email', e.target.value)}
+                    className={ADMIN_INPUT_CLASS}
+                    placeholder="opzionale"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-base font-medium text-gray-700">Telefono</label>
+                  <input
+                    type="tel"
+                    value={formData.client_phone}
+                    onChange={(e) => onFormDataChange('client_phone', e.target.value)}
+                    className={ADMIN_INPUT_CLASS}
+                    placeholder="Opzionale"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid min-w-0 grid-cols-1 gap-3">
+                <InfoRow label="Nome" value={formData.client_name} />
+                <InfoRow label="Email" value={formData.client_email ?? ''} />
+                <InfoRow label="Telefono" value={formData.client_phone ?? ''} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* LEFT column (desktop): Dati Prenotazione + Note/Intolleranze */}
+        <div className="flex min-w-0 flex-col gap-4 md:order-1">
           {/* Dati Prenotazione (ex Dettagli Evento) */}
           <div className={SECTION_CARD}>
             <h3 className="text-title-subtitle font-bold uppercase tracking-wide text-gray-900">
@@ -282,59 +343,6 @@ export const DetailsTab: React.FC<Props> = ({
               )}
             </div>
           )}
-        </div>
-
-        {/* RIGHT column: Informazioni Cliente */}
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className={SECTION_CARD}>
-            <h3 className="text-title-subtitle font-bold uppercase tracking-wide text-gray-900">
-              Informazioni Cliente
-            </h3>
-            {isEditMode ? (
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="block text-base font-medium text-gray-700">Nome</label>
-                  <input
-                    type="text"
-                    value={formData.client_name}
-                    onChange={(e) => onFormDataChange('client_name', e.target.value)}
-                    className={ADMIN_INPUT_CLASS}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-base font-medium text-gray-700">
-                    Email <span className="text-sm font-normal text-gray-500">(opzionale)</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.client_email}
-                    onChange={(e) => onFormDataChange('client_email', e.target.value)}
-                    className={ADMIN_INPUT_CLASS}
-                    placeholder="opzionale"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-base font-medium text-gray-700">Telefono</label>
-                  <input
-                    type="tel"
-                    value={formData.client_phone}
-                    onChange={(e) => onFormDataChange('client_phone', e.target.value)}
-                    className={ADMIN_INPUT_CLASS}
-                    placeholder="Opzionale"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="grid min-w-0 grid-cols-1 gap-3">
-                <InfoRow label="Nome" value={formData.client_name} />
-                <InfoRow label="Email" value={formData.client_email ?? ''} />
-                <InfoRow label="Telefono" value={formData.client_phone ?? ''} />
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

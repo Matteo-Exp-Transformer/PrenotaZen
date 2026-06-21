@@ -176,10 +176,10 @@ export const DietaryTab: React.FC<Props> = ({
                       key={index}
                       className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white"
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 wrap-break-word">
                         <span className="text-base font-medium text-gray-900">{restriction.restriction}</span>
                         {restriction.restriction === 'Altro' && restriction.notes && (
-                          <span className="text-sm text-gray-600 italic ml-2">({restriction.notes})</span>
+                          <span className="text-sm text-gray-600 italic ml-2 wrap-break-word">({restriction.notes})</span>
                         )}
                         {shouldShowDietaryGuestCount(restriction) && (
                           <span className="text-base text-gray-600 ml-2">
@@ -234,7 +234,7 @@ export const DietaryTab: React.FC<Props> = ({
                 {dietaryRestrictions.length > 0 ? (
                   <ul className="space-y-2">
                     {dietaryRestrictions.map((restriction, index) => (
-                      <li key={index} className="text-base text-gray-900">
+                      <li key={index} className="text-base text-gray-900 wrap-break-word">
                         <span className="font-medium">• {restriction.restriction}</span>
                         {shouldShowDietaryGuestCount(restriction) && (
                           <span className="text-gray-600">
@@ -243,7 +243,7 @@ export const DietaryTab: React.FC<Props> = ({
                           </span>
                         )}
                         {restriction.notes && restriction.restriction === 'Altro' && (
-                          <span className="text-gray-500 italic block ml-4">Note: {restriction.notes}</span>
+                          <span className="text-gray-500 italic block ml-4 wrap-break-word">Note: {restriction.notes}</span>
                         )}
                       </li>
                     ))}

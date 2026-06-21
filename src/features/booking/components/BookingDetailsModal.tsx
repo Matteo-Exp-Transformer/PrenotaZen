@@ -901,10 +901,14 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           // Oscurare ulteriormente quando cancel confirmation è aperto
           backgroundColor: dangerOverlayOpen ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
           width: '100vw',
-          height: '100vh',
+          // Mobile: altezza dinamica del viewport (dvh), non 100vh. Con lo scroll del body
+          // bloccato la barra del browser resta visibile: 100vh è più alto dell'area realmente
+          // visibile, quindi il footer sticky (Modifica/Elimina/No-show) finiva sotto la barra
+          // e su mobile non era raggiungibile. 100dvh = altezza effettivamente visibile.
+          height: '100dvh',
           pointerEvents: dangerOverlayOpen ? 'none' : 'auto',
           // Transizione smooth per il cambio di opacità
-          transition: 'background-color 0.2s ease-in-out'
+          transition: 'background-color 0.2s ease-in-out',
         }}
         onMouseDown={(e) => setMouseDownTarget(e.target)}
         onClick={(e) => {
@@ -998,7 +1002,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
           {/* Content Area - Scrollable */}
           <div
-            className="flex-1 bg-[var(--color-bg)]"
+            className="min-h-0 flex-1 bg-[var(--color-bg)]"
             style={{
               paddingLeft: '12px',
               paddingRight: '12px',

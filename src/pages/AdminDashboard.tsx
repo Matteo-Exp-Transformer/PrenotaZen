@@ -327,39 +327,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Nav tab sempre visibile; sotto-righe tab (statistiche, filtri, …) nascoste con form nuova prenotazione aperto */}
           <div className="space-y-4 pb-4">
-            <nav className="grid grid-cols-3 items-start gap-2 sm:grid-cols-5">
-              <NavItem
-                icon={Calendar}
-                label="Calendario"
-                active={activeTab === 'calendar'}
-                onClick={() => handleTabClick('calendar')}
-              />
-              <NavItem
-                icon={Clock}
-                label="Prenotazioni"
-                active={activeTab === 'pending'}
-                badge={stats?.pending}
-                notifyHighlight
-                onClick={() => handleTabClick('pending')}
-              />
-              <NavItem
-                icon={Archive}
-                label="Archivio"
-                active={activeTab === 'archive'}
-                onClick={() => handleTabClick('archive')}
-              />
-              <NavItem
-                icon={UtensilsCrossed}
-                label="Menu"
-                active={activeTab === 'menu'}
-                onClick={() => handleTabClick('menu')}
-              />
-              <NavItem
-                icon={Store}
-                label="Impostazioni"
-                active={activeTab === 'settings-restaurant'}
-                onClick={() => handleTabClick('settings-restaurant')}
-              />
+            {/*
+              Mobile: 6 colonne per centrare gli ultimi 2 pulsanti.
+              I primi 3 occupano col-span-2 ciascuno (6/6 = riga piena).
+              Il 4° (Menu) ha col-start-2 → cols 2-3; il 5° (Impostazioni) auto-piazza in cols 4-5.
+              Risultato: [ vuoto ][ Menu ][ Impostazioni ][ vuoto ] = centrato.
+              Desktop (sm+): grid-cols-5 con col-span-1 e col-start-auto = 5 pulsanti in riga.
+            */}
+            <nav className="grid grid-cols-6 items-start gap-2 sm:grid-cols-5">
+              <div className="col-span-2 sm:col-span-1">
+                <NavItem
+                  icon={Calendar}
+                  label="Calendario"
+                  active={activeTab === 'calendar'}
+                  onClick={() => handleTabClick('calendar')}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <NavItem
+                  icon={Clock}
+                  label="Prenotazioni"
+                  active={activeTab === 'pending'}
+                  badge={stats?.pending}
+                  notifyHighlight
+                  onClick={() => handleTabClick('pending')}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <NavItem
+                  icon={Archive}
+                  label="Archivio"
+                  active={activeTab === 'archive'}
+                  onClick={() => handleTabClick('archive')}
+                />
+              </div>
+              <div className="col-start-2 col-span-2 sm:col-start-auto sm:col-span-1">
+                <NavItem
+                  icon={UtensilsCrossed}
+                  label="Menu"
+                  active={activeTab === 'menu'}
+                  onClick={() => handleTabClick('menu')}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <NavItem
+                  icon={Store}
+                  label="Impostazioni"
+                  active={activeTab === 'settings-restaurant'}
+                  onClick={() => handleTabClick('settings-restaurant')}
+                />
+              </div>
             </nav>
 
             {!showNewBookingPanel && (
