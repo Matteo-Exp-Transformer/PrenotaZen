@@ -50,6 +50,7 @@ const baseFormData = {
   numGuests: 4,
   specialRequests: '',
   placement: 'Sala A',
+  adminNotes: '',
 }
 
 describe('DetailsTab — Posizionamento edition gate', () => {

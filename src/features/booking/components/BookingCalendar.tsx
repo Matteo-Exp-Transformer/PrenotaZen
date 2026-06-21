@@ -9,7 +9,7 @@ import {
   PenLine,
   Tag,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import type { BookingRequest } from '@/types/booking'
 import { transformBookingsToCalendarEvents } from '../utils/bookingEventTransform'
@@ -28,6 +28,7 @@ import {
   getAccurateStartTime,
   startTimeToMinutesSinceMidnight,
 } from '../utils/dateUtils'
+import { dateToIso, getTodayIso } from '../utils/bookingPublicDateHelpers'
 import { getResolvedMenuPriceDisplay } from '../utils/menuPricing'
 import { sumGuestsByDate } from '../utils/capacityCalculator'
 import { useRestaurantSetting } from '../hooks/useRestaurantSetting'
@@ -59,6 +60,11 @@ const CALENDAR_MODAL_UNSAVED_SOURCE_ID = 'calendar-modal'
 const CALENDAR_TITLE_SECTION_INSET_CLASS = 'mx-auto w-full max-w-7xl px-3 md:px-[1.125rem]'
 
 type FullCalendarViewId = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek'
+
+function parseLocalIsoDate(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
 
 function getDefaultCalendarViewForViewport(): FullCalendarViewId {
   if (typeof window === 'undefined') return 'dayGridMonth'
@@ -334,7 +340,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   // In Pro le fasce sono sempre attive; in Classic rispetta il flag
   const timeSlotsEnabled = features.servizio ? true : (timeSlotsEnabledQuery.data ?? true)
 
-  // Pro: service_slots e assignments per navigazione turni
+  // Pro: service_slots attivano digest per fascia e badge assegnazione tavoli.
   const { data: serviceSlots = [] } = useServiceSlots()
   const hasTurnsFeature = features.servizio && serviceSlots.length > 0
 
@@ -345,8 +351,13 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
   const [isModalOpen, setIsModalOpen] = useState(false)
   const currentDateLabel = format(new Date(), 'dd/MM/yy')
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    return initialDate || new Date().toISOString().split('T')[0]
+    return initialDate || getTodayIso()
   })
+  const selectedDateRef = useRef(selectedDate)
+  const setSelectedCalendarDate = useCallback((date: string) => {
+    selectedDateRef.current = date
+    setSelectedDate(date)
+  }, [])
   const { data: tableAssignments = [] } = useTableAssignments(selectedDate)
   const [currentView, setCurrentView] = useState<FullCalendarViewId>(getDefaultCalendarViewForViewport)
   const [isCalendarNarrowViewport, setIsCalendarNarrowViewport] =
@@ -387,15 +398,14 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     if (initialDate && calendarRef.current) {
       try {
         const calendarApi = calendarRef.current.getApi()
-        const [year, month, day] = initialDate.split('-').map(Number)
-        const targetDate = new Date(year, month - 1, day)
+        const targetDate = parseLocalIsoDate(initialDate)
         calendarApi.gotoDate(targetDate)
-        setSelectedDate(initialDate)
+        setSelectedCalendarDate(initialDate)
       } catch (error) {
         logger.error('Error navigating to calendar date:', error)
       }
     }
-  }, [initialDate])
+  }, [initialDate, setSelectedCalendarDate])
 
   // I no-show restano nel DB per gli analytics ma non vengono mostrati nel calendario
   const visibleBookings = bookings.filter((b) => !b.no_show)
@@ -595,14 +605,26 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     }
   }, [clearUnsavedSource, registerUnsavedHandlers])
 
+  const selectCalendarDate = useCallback((date: string) => {
+    setSelectedCalendarDate(date)
+    calendarRef.current?.getApi()?.gotoDate(parseLocalIsoDate(date))
+  }, [setSelectedCalendarDate])
+
   const handleDateClick = useCallback((clickInfo: any) => {
-    const d = new Date(clickInfo.date)
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const date = `${year}-${month}-${day}`
-    setSelectedDate(date)
-  }, [])
+    selectCalendarDate(dateToIso(new Date(clickInfo.date)))
+  }, [selectCalendarDate])
+
+  const shiftSelectedDigestDay = useCallback((days: number) => {
+    selectCalendarDate(dateToIso(addDays(parseLocalIsoDate(selectedDate), days)))
+  }, [selectCalendarDate, selectedDate])
+
+  const handlePreviousDigestDay = useCallback(() => {
+    shiftSelectedDigestDay(-1)
+  }, [shiftSelectedDigestDay])
+
+  const handleNextDigestDay = useCallback(() => {
+    shiftSelectedDigestDay(1)
+  }, [shiftSelectedDigestDay])
 
   /** Navigazione mese FC (prev/next): se il giorno selezionato non è nel mese visibile,
    *  riallinea al giorno del mese corrispondente (es. 12/06 → 12/07), clampato all'ultimo del mese. */
@@ -613,15 +635,15 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
 
     const visibleYear = anchor.getFullYear()
     const visibleMonth = anchor.getMonth()
-    const [selY, selM, selD] = selectedDate.split('-').map(Number)
+    const [selY, selM, selD] = selectedDateRef.current.split('-').map(Number)
 
     if (selY === visibleYear && selM - 1 === visibleMonth) return
 
     const daysInMonth = new Date(visibleYear, visibleMonth + 1, 0).getDate()
     const day = Math.min(selD, daysInMonth)
     const synced = `${visibleYear}-${String(visibleMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    setSelectedDate(synced)
-  }, [selectedDate])
+    setSelectedCalendarDate(synced)
+  }, [setSelectedCalendarDate])
 
   const selectedDateData = useMemo(() => {
     return { date: selectedDate }
@@ -644,7 +666,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
     for (let i = 0; i < 7; i++) {
       const day = new Date(monday)
       day.setDate(monday.getDate() + i)
-      const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+      const dateStr = dateToIso(day)
       const dayBookings = bookings
         .filter((b) => b.status === 'accepted' && !b.no_show && b.confirmed_start && b.confirmed_end)
         .filter((b) => extractDateFromISO(b.confirmed_start!) === dateStr)
@@ -961,17 +983,8 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
 
   const handleGoToToday = () => {
     const today = new Date()
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0')
-    const day = String(today.getDate()).padStart(2, '0')
-    const todayStr = `${year}-${month}-${day}`
-
-    setSelectedDate(todayStr)
-
-    const calendarApi = calendarRef.current?.getApi()
-    if (calendarApi) {
-      calendarApi.gotoDate(today)
-    }
+    setSelectedCalendarDate(getTodayIso())
+    calendarRef.current?.getApi()?.gotoDate(today)
   }
 
   const viewButtonClass = (view: FullCalendarViewId) =>
@@ -1087,7 +1100,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                 className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-body font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:ring-offset-2"
               >
                 <span className="text-title-subtitle leading-none">+</span>
-                Nuova prenotazione il {format(new Date(selectedDate), 'dd/MM', { locale: it })}
+                Nuova prenotazione il {format(parseLocalIsoDate(selectedDate), 'dd/MM', { locale: it })}
               </button>
             </div>
 
@@ -1097,8 +1110,8 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
                 Settimana{' '}
                 {weekDigest.days.length > 0 && (
                   <span className="font-normal">
-                    {format(new Date(weekDigest.days[0].date), 'dd MMM', { locale: it })} –{' '}
-                    {format(new Date(weekDigest.days[6].date), 'dd MMM', { locale: it })}
+                    {format(parseLocalIsoDate(weekDigest.days[0].date), 'dd MMM', { locale: it })} –{' '}
+                    {format(parseLocalIsoDate(weekDigest.days[6].date), 'dd MMM', { locale: it })}
                   </span>
                 )}{' '}
                 ={' '}
@@ -1149,6 +1162,8 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, init
               summary={dayModel.summary}
               date={selectedDateData.date}
               isPro={hasTurnsFeature}
+              onPreviousDay={handlePreviousDigestDay}
+              onNextDay={handleNextDigestDay}
             />
             {selectedDayDigestBookings.length > 0 ? (
               <div className="space-y-8">

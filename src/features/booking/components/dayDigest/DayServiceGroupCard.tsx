@@ -61,7 +61,12 @@ export function DayServiceGroupCard({
     >
       <button
         type="button"
-        className="grid w-full grid-cols-1 items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:ring-offset-2 sm:grid-cols-[minmax(9rem,0.8fr)_minmax(13rem,1fr)_auto_auto] sm:px-6 sm:py-5"
+        className={cn(
+          'grid w-full grid-cols-1 items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-400/50 focus:ring-offset-2 md:px-6 md:py-5',
+          isPro
+            ? 'md:grid-cols-[minmax(9rem,0.7fr)_minmax(12rem,0.9fr)_minmax(17rem,0.9fr)_2rem]'
+            : 'md:grid-cols-[minmax(9rem,0.75fr)_minmax(13rem,1fr)_minmax(13rem,0.75fr)_2rem]',
+        )}
         aria-expanded={expanded}
         aria-controls={contentId}
         onClick={() => setExpanded((value) => !value)}
@@ -76,7 +81,7 @@ export function DayServiceGroupCard({
         </span>
 
         {!group.isOutOfSlot && (
-          <span className="min-w-0 border-(--color-border) sm:border-l sm:pl-6">
+          <span className="min-w-0 border-(--color-border) md:border-l md:pl-6">
             <span className="mb-2 block text-label font-semibold leading-tight text-(--color-text-muted)">
               % occupazione
             </span>
@@ -99,8 +104,8 @@ export function DayServiceGroupCard({
 
         <span
           className={cn(
-            'grid min-w-0 grid-cols-2 gap-0 overflow-hidden rounded-lg border border-(--color-border) bg-white/70 sm:flex sm:rounded-none sm:border-0 sm:bg-transparent',
-            isPro ? 'max-sm:grid-cols-3' : 'max-sm:grid-cols-2',
+            'grid min-w-0 grid-cols-2 gap-0 overflow-hidden rounded-lg border border-(--color-border) bg-white/70 md:flex md:justify-center md:justify-self-center md:rounded-none md:border-0 md:bg-transparent',
+            isPro ? 'max-md:grid-cols-3' : 'max-md:grid-cols-2',
           )}
         >
           <GroupMetric label="Coperti" value={group.totalGuests} max={occupancyCapacity} />
@@ -108,7 +113,7 @@ export function DayServiceGroupCard({
           {isPro && <GroupMetric label="Da assegnare" value={group.pendingAssignments} />}
         </span>
 
-        <span className="flex justify-end sm:justify-center" aria-hidden>
+        <span className="flex justify-end md:justify-center" aria-hidden>
           <ChevronDown
             className={cn(
               'h-5 w-5 text-primary-900 transition-transform',

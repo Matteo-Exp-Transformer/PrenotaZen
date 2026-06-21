@@ -14,6 +14,10 @@ import {
   type BookingPublicFormConfig,
   type SubTab,
 } from '@/features/booking/constants/bookingPublicFormConfig'
+import {
+  BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS,
+  clampBookingText,
+} from '@/features/booking/constants/bookingPrenotaTextLimits'
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext'
 import {
   BookingFormConfigPanel,
@@ -205,5 +209,92 @@ describe('settings-form-config header', () => {
     for (const payload of payloads) {
       expect(payload.page_description).toBe('Testo descrizione nuovo')
     }
+  })
+
+  it('badge prenotazione mostra il fallback dal titolo già cappato al limite reale', async () => {
+    const user = userEvent.setup()
+    const config = makeConfig(
+      [makeCard(CARD_ID, 'Degustazione lunga speciale')],
+      DEFAULT_BOOKING_FORM_CONFIG.page_description,
+    )
+    restaurantSettingsData.booking_public_form_config = config
+    renderPanelWithRef()
+
+    const modeButton = document.querySelector(`[data-mode-id="${MODE_ID}"]`)
+    expect(modeButton).toBeTruthy()
+    await user.click(modeButton as HTMLElement)
+
+    expect(
+      await screen.findByPlaceholderText(
+        clampBookingText(
+          config.booking_modes.find((mode) => mode.id === MODE_ID)!.label,
+          BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.bookingBadgeLabel,
+        ),
+      ),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByText(/degustazione lunga/i))
+    expect(
+      await screen.findByPlaceholderText(
+        clampBookingText(
+          'Degustazione lunga speciale',
+          BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.bookingBadgeLabel,
+        ),
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('saveAll riuscito chiude pannello modalità e card aperta', async () => {
+    const user = userEvent.setup()
+    const panelRef = renderPanelWithRef()
+
+    const modeButton = document.querySelector(`[data-mode-id="${MODE_ID}"]`)
+    expect(modeButton).toBeTruthy()
+    await user.click(modeButton as HTMLElement)
+
+    await user.click(screen.getByText(/pranzo domenicale · card 1/i))
+    expect(await screen.findByDisplayValue('Pranzo domenicale')).toBeInTheDocument()
+
+    const modeLabelInput = await screen.findByPlaceholderText(/nome della modalità/i)
+    await user.clear(modeLabelInput)
+    await user.type(modeLabelInput, 'Tavolo rinominato')
+
+    await panelRef.current?.saveAll()
+
+    await waitFor(() => {
+      expect(screen.queryByText(/abilita card o carosello/i)).not.toBeInTheDocument()
+    })
+    expect(screen.queryByDisplayValue('Pranzo domenicale')).not.toBeInTheDocument()
+  })
+
+  it('saveAll non chiude pannello modalità e card se una save successiva fallisce', async () => {
+    const user = userEvent.setup()
+    const panelRef = renderPanelWithRef()
+
+    const modeButton = document.querySelector(`[data-mode-id="${MODE_ID}"]`)
+    expect(modeButton).toBeTruthy()
+    await user.click(modeButton as HTMLElement)
+
+    await user.click(screen.getByText(/pranzo domenicale · card 1/i))
+    expect(await screen.findByDisplayValue('Pranzo domenicale')).toBeInTheDocument()
+
+    const modeLabelInput = await screen.findByPlaceholderText(/nome della modalità/i)
+    await user.clear(modeLabelInput)
+    await user.type(modeLabelInput, 'Tavolo rinominato')
+
+    await user.click(screen.getByRole('button', { name: /nuova promo/i }))
+    await user.type(await screen.findByLabelText(/nome promo/i), 'Promo test')
+    await user.type(screen.getByLabelText(/testo promo/i), 'Messaggio promo test')
+    await user.click(screen.getByRole('button', { name: /aggiungi alla lista/i }))
+
+    mutateAsyncSpy.mockReset()
+    mutateAsyncSpy
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('promo fail'))
+
+    await expect(panelRef.current!.saveAll()).rejects.toThrow('promo fail')
+
+    expect(screen.getByText(/abilita card o carosello/i)).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Pranzo domenicale')).toBeInTheDocument()
   })
 })

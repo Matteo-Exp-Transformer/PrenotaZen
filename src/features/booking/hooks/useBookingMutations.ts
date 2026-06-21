@@ -67,6 +67,7 @@ interface UpdateBookingInput {
   preset_menu?: string
   menu?: string
   placement?: string | null
+  adminNotes?: string | null
 }
 
 // Mutation per accettare una prenotazione
@@ -268,6 +269,10 @@ export const useUpdateBooking = () => {
         updateData.placement = input.placement || null
       }
 
+      // Update admin notes if provided
+      if (input.adminNotes !== undefined) {
+        updateData.admin_notes = input.adminNotes || null
+      }
 
       // D6: guard di stato — non aggiornare silenziosamente una prenotazione
       // già eliminata (cambio stato sotto i piedi in un'altra scheda/sessione).

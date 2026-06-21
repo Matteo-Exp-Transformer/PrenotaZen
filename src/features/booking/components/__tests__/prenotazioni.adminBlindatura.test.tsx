@@ -94,8 +94,12 @@ async function expandArchiveCard(user: UserEvent, clientName: string) {
   await act(async () => {
     await user.click(cardHeader!)
   })
+  // Il dettaglio espanso non ripete più i campi base (Nome/Email/Data…): sono già a card chiusa.
+  // Segnale stabile di espansione = il bottone azione (Reinserisci / Riporta in attesa / Calendario).
   await waitFor(() => {
-    expect(screen.getByText(/^Nome:$/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /reinserisci|riporta in attesa|visualizza nel calendario/i }),
+    ).toBeInTheDocument()
   })
 }
 
@@ -261,9 +265,10 @@ describe('@admin-blindatura prenotazioni — LIMIT UI archivio', () => {
 
     expect(screen.getByText(LONG_TEXT)).toBeInTheDocument()
     await expandArchiveCard(user, LONG_TEXT)
+    // Dedup: il nome non è più ripetuto nel dettaglio → compare una sola volta (header), senza crash.
     await waitFor(() => {
       const detailLabels = screen.getAllByText(LONG_TEXT)
-      expect(detailLabels.length).toBeGreaterThanOrEqual(2)
+      expect(detailLabels.length).toBeGreaterThanOrEqual(1)
     })
   })
 

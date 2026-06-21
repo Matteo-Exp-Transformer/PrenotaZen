@@ -63,6 +63,9 @@ export interface BookingRequest {
   // No-show tracking (migrazione 009)
   no_show?: boolean
 
+  // Note interne admin (migrazione 056) — visibili solo dal modal dettaglio admin
+  admin_notes?: string | null
+
   // Multi-tenant
   tenant_id: string
 

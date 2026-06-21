@@ -83,6 +83,7 @@ export type Database = {
       }
       booking_requests: {
         Row: {
+          admin_notes: string | null
           booking_source: string
           booking_type: string | null
           cancellation_reason: string | null
@@ -120,6 +121,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_notes?: string | null
           booking_source?: string
           booking_type?: string | null
           cancellation_reason?: string | null
@@ -157,6 +159,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_notes?: string | null
           booking_source?: string
           booking_type?: string | null
           cancellation_reason?: string | null

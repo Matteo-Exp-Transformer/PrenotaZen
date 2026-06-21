@@ -80,6 +80,7 @@ type DetailsFormData = {
   dietary_restrictions: NonNullable<BookingRequest['dietary_restrictions']>
   preset_menu: BookingRequest['preset_menu']
   placement: string
+  adminNotes: string
 }
 
 // Punto unico di verità per derivare i campi del form dalla prenotazione.
@@ -99,6 +100,7 @@ const buildFormDataFromBooking = (booking: BookingRequest): DetailsFormData => (
   dietary_restrictions: booking.dietary_restrictions || [],
   preset_menu: booking.preset_menu,
   placement: booking.placement || '',
+  adminNotes: booking.admin_notes || '',
 })
 
 export const isDetailsFormDirty = (
@@ -270,7 +272,8 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         menu_selection: booking.menu_selection,
         dietary_restrictions: booking.dietary_restrictions || [],
         preset_menu: booking.preset_menu,
-        placement: booking.placement || ''
+        placement: booking.placement || '',
+        adminNotes: booking.admin_notes || '',
       }
     }
   })
@@ -610,7 +613,8 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         preset_menu: bookingTypeUsesMenuSelections(formData.booking_type)
           ? (formData.preset_menu || undefined)
           : undefined,
-        placement: formData.placement?.trim() === '' ? null : (formData.placement || null)
+        placement: formData.placement?.trim() === '' ? null : (formData.placement || null),
+        adminNotes: formData.adminNotes?.trim() === '' ? null : (formData.adminNotes || null),
       },
       {
         onSuccess: () => {
@@ -1021,6 +1025,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                 onBookingTypeChange={handleBookingTypeChange}
               />
             )}
+
 
             {activeTab === 'menu' && bookingTypeUsesMenuSelections(formData.booking_type) && (
               <MenuTab

@@ -13,7 +13,6 @@ import {
   Users,
   Mail,
   Phone,
-  MessageSquare,
   ChevronDown,
   ChevronUp,
   User,
@@ -258,19 +257,7 @@ const ArchiveBookingCard: React.FC<ArchiveBookingCardProps> = ({
                               {booking.client_email}
                             </span>
                           </div>
-                          {booking.special_requests && (
-                            <div className="flex min-w-0 w-full items-start gap-2">
-                              <MessageSquare className={cn('mt-0.5 h-4 w-4 shrink-0', digestBodyIcon)} />
-                              <span
-                                className={cn(
-                                  'line-clamp-2 max-[599px]:line-clamp-none min-w-0 flex-1 text-sm italic',
-                                  digestSecondaryText
-                                )}
-                              >
-                                {booking.special_requests}
-                              </span>
-                            </div>
-                          )}
+                          {/* special_requests rimosso dall'header: mostrato una sola volta nel dettaglio espanso (no duplicati). */}
                         </div>
                       </div>
                     </div>
@@ -294,62 +281,26 @@ const ArchiveBookingCard: React.FC<ArchiveBookingCardProps> = ({
       {/* Contenuto Espandibile */}
       {isExpanded && (
         <div className="animate-slideDown rounded-b-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
-          {/* Dati Organizzati - Responsive: 1 colonna su mobile, 2 su desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 md:gap-y-3">
-            {/* Nome */}
-            <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">
-              <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Nome:</span>
-              <span className="text-sm md:text-base font-semibold text-primary-900 break-words">{booking.client_name}</span>
-            </div>
+          {/* Dettaglio espanso: niente campi base (Nome/Email/Telefono/Data/Orario/Pax/Tipo):
+              sono già visibili a card chiusa. Qui solo ciò che NON è ripetuto:
+              Richieste Speciali (note cliente), Appunti (admin), motivi rifiuto/eliminazione, azioni. */}
 
-            {/* Email */}
-            <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">
-              <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Email:</span>
-              <span className="text-sm md:text-base font-semibold text-primary-900 break-all">{booking.client_email}</span>
-            </div>
-
-            {/* Telefono */}
-            {booking.client_phone && (
-              <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">
-                <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Telefono:</span>
-                <span className="text-sm md:text-base font-semibold text-primary-900">{booking.client_phone}</span>
-              </div>
-            )}
-
-            {/* Data */}
-            <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">
-              <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Data:</span>
-              <span className="text-sm md:text-base font-semibold text-primary-900">{formatDate(displayDate)}</span>
-            </div>
-
-            {/* Orario */}
-            <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">
-              <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Orario:</span>
-              <span className="text-sm md:text-base font-semibold text-primary-900">{formatTime(displayTime)}</span>
-            </div>
-
-            {/* Pax */}
-            <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">
-              <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Pax:</span>
-              <span className="text-sm md:text-base font-semibold text-primary-900">{booking.num_guests}</span>
-            </div>
-
-                        {/* Tipo - Mostra solo se esiste un valore valido */}
-            {eventTypeLabel && (
-              <div className="flex flex-row items-start gap-3 py-1.5 md:py-2">  
-                <span className="text-xs text-gray-500 w-24 md:w-28 font-medium uppercase tracking-wide flex-shrink-0">Tipo:</span>
-                <span className="text-sm md:text-base font-semibold text-primary-900">{eventTypeLabel}</span>
-              </div>
-            )}
-
-          </div>
-
-          {/* Note Richieste Speciali - Fuori dalla griglia */}
+          {/* Note Richieste Speciali (note inserite dal cliente alla prenotazione) */}
           {booking.special_requests && (
-            <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-[var(--color-border)]">
+            <div className="border-t border-[var(--color-border)] pt-4 md:pt-6 first:border-t-0 first:pt-0">{/* first: evita linea doppia sotto il bordo del pannello */}
               <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2 md:mb-3">Richieste Speciali</p>
               <p className="text-sm md:text-base text-gray-700 leading-relaxed break-words">
                 {booking.special_requests}
+              </p>
+            </div>
+          )}
+
+          {/* Appunti admin (interni) — mostrati anche in archivio, sola lettura */}
+          {booking.admin_notes && (
+            <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-[var(--color-border)]">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2 md:mb-3">Appunti</p>
+              <p className="text-sm md:text-base text-gray-700 leading-relaxed break-words whitespace-pre-wrap">
+                {booking.admin_notes}
               </p>
             </div>
           )}

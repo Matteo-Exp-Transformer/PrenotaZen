@@ -66,6 +66,7 @@ import {
 import { AdminFieldWithCharCount } from '@/features/booking/components/settings/AdminFieldWithCharCount'
 import {
   BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS,
+  clampBookingText,
   getBookingHeaderFontSizeMax,
 } from '@/features/booking/constants/bookingPrenotaTextLimits'
 import { scheduleScrollIntoCenter } from '@/features/booking/lib/scrollIntoCenter'
@@ -805,6 +806,11 @@ export const BookingFormConfigPanel = forwardRef<
     }
   }
 
+  const closeOpenPanelsAfterSuccessfulSave = () => {
+    closeSubTabEditors()
+    setExpandedMode(null)
+  }
+
   const persistModesSection = async (bookingModes: BookingPublicFormConfig['booking_modes']) => {
     const saved = getSavedBaseline()
     const modesForDb = bookingModes.map((m) => ({
@@ -823,7 +829,6 @@ export const BookingFormConfigPanel = forwardRef<
     await upsert.mutateAsync([{ key: 'booking_public_form_config', value: normalized }])
     mergeConfigAfterPartialSave(normalized, 'modes')
     setModesDirty(false)
-    closeSubTabEditors()
   }
 
   const saveModesSection = async () => {
@@ -875,6 +880,7 @@ export const BookingFormConfigPanel = forwardRef<
     if (modesDirty) await saveModesSection()
     if (promoDirty && promoSectionRef.current) await promoSectionRef.current.save()
     if (bookingBgDirty && onSaveBookingBackground) await onSaveBookingBackground()
+    closeOpenPanelsAfterSuccessfulSave()
   }
 
   const handleCancelAllPage = () => {
@@ -1340,7 +1346,11 @@ export const BookingFormConfigPanel = forwardRef<
                       booking_badge_label: trimmed === '' ? undefined : trimmed,
                     })
                   }}
-                  placeholder={tab.label?.trim() || 'Badge admin'}
+                  placeholder={
+                    tab.label?.trim()
+                      ? clampBookingText(tab.label.trim(), L.bookingBadgeLabel)
+                      : 'Badge admin'
+                  }
                   className="w-full"
                 />
                 <p
@@ -1862,7 +1872,11 @@ export const BookingFormConfigPanel = forwardRef<
                               booking_badge_label: trimmed === '' ? undefined : trimmed,
                             })
                           }}
-                          placeholder={mode.label?.trim() || 'Badge admin'}
+                          placeholder={
+                            mode.label?.trim()
+                              ? clampBookingText(mode.label.trim(), L.bookingBadgeLabel)
+                              : 'Badge admin'
+                          }
                           className="w-full"
                         />
                         <p

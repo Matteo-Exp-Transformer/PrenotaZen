@@ -308,19 +308,21 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
           {/* Menu Info - Solo per Rinfresco di Laurea */}
           {bookingTypeUsesMenuSelections(booking.booking_type) && booking.menu_selection && (
             <div className="pt-6 mt-6 border-t border-[var(--color-border)]">
-              <p className="mb-3 text-[0.82em] font-semibold tracking-wide text-gray-500 uppercase">Menu Selezionato</p>
-              
-              {/* Mostra Menu Predefinito se presente */}
-              {booking.preset_menu && (
-                <div className="mb-3 rounded-lg border border-primary-200 bg-primary-50 p-2">
-                  <p className="font-semibold text-primary-800">
-                    📋 Menu Predefinito:{AFTER_COLON}
-                    {getPresetMenuLabel(booking.preset_menu as PresetMenuType, customStaffPresets)}
-                  </p>
-                </div>
-              )}
-              
-              <div className="space-y-2">
+              <div className="mb-3">
+                <p className="mb-3 text-[0.82em] font-semibold tracking-wide text-gray-500 uppercase">Menu Selezionato</p>
+
+                {/* Mostra Menu Predefinito se presente */}
+                {booking.preset_menu && (
+                  <div className="rounded-lg border border-primary-200 bg-primary-50 p-2">
+                    <p className="font-semibold text-primary-800">
+                      📋 Menu Predefinito:{AFTER_COLON}
+                      {getPresetMenuLabel(booking.preset_menu as PresetMenuType, customStaffPresets)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/40 p-3">
                 {menuPriceDisplay && (
                   <>
                     <p className="font-bold text-primary-900">
@@ -460,7 +462,6 @@ export const BookingRequestCard: React.FC<BookingRequestCardProps> = ({
     </div>
   )
 }
-
 
 
 
