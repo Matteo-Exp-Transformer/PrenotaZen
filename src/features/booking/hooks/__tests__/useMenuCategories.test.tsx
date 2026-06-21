@@ -50,6 +50,7 @@ import {
   useCreateMenuCategory,
   useUpdateMenuCategory,
   useDeleteMenuCategory,
+  useReorderMenuCategories,
 } from '../useMenuCategories'
 
 const CAT_LIST = [
@@ -204,6 +205,64 @@ describe('useUpdateMenuCategory', () => {
     })
 
     expect(mockSyncRename).toHaveBeenCalledWith('tenant-1', 'antipasti', 'antipasti_freddi')
+  })
+})
+
+describe('useReorderMenuCategories', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTenantId.value = 'tenant-1'
+  })
+
+  it('riscrive sort_order sequenziale (0,10,20…) seguendo l\'ordine degli id', async () => {
+    const chain: Record<string, unknown> = {}
+    chain['update'] = vi.fn(() => chain)
+    let eqCalls = 0
+    chain['eq'] = vi.fn(() => {
+      eqCalls++
+      // .eq('id').eq('tenant_id') → la seconda eq di ogni update risolve la Promise
+      return eqCalls % 2 === 0 ? Promise.resolve({ error: null }) : chain
+    })
+    mockFrom.mockReturnValue(chain)
+
+    const { result } = renderHook(() => useReorderMenuCategories(), { wrapper: makeWrapper() })
+
+    await act(async () => {
+      await result.current.mutateAsync(['cat-2', 'cat-1'])
+    })
+
+    expect(mockFrom).toHaveBeenCalledWith('menu_categories')
+    const updateCalls = (chain['update'] as ReturnType<typeof vi.fn>).mock.calls
+    expect(updateCalls[0][0].sort_order).toBe(0)
+    expect(updateCalls[1][0].sort_order).toBe(10)
+
+    // Primo id aggiornato = cat-2 (nuovo ordine)
+    const eqIdCalls = (chain['eq'] as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0] === 'id',
+    )
+    expect(eqIdCalls[0][1]).toBe('cat-2')
+    expect(eqIdCalls[1][1]).toBe('cat-1')
+  })
+
+  it('propaga errore se un update fallisce', async () => {
+    const chain: Record<string, unknown> = {}
+    chain['update'] = vi.fn(() => chain)
+    let eqCalls = 0
+    chain['eq'] = vi.fn(() => {
+      eqCalls++
+      return eqCalls % 2 === 0
+        ? Promise.resolve({ error: { message: 'boom' } })
+        : chain
+    })
+    mockFrom.mockReturnValue(chain)
+
+    const { result } = renderHook(() => useReorderMenuCategories(), { wrapper: makeWrapper() })
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync(['cat-1'])
+      }),
+    ).rejects.toThrow('boom')
   })
 })
 

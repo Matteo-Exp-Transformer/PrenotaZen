@@ -232,6 +232,46 @@ export type DeleteMenuCategoryInput = {
   categoryKey: string
 }
 
+/**
+ * Riscrive `sort_order` sequenziale (0,10,20…) seguendo l'ordine degli id passati.
+ * Ordine canonico unico del magazzino: lo stesso usato da panoramica Menu, menù
+ * preselezionati e dettaglio prenotazione (Prenota/QR mantengono i loro override).
+ * Riscrive tutte le categorie (max 7) per normalizzare anche i legacy a sort_order=999.
+ */
+export const useReorderMenuCategories = () => {
+  const queryClient = useQueryClient()
+  const { tenantId } = useTenantContext()
+
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const now = new Date().toISOString()
+      await Promise.all(
+        orderedIds.map((id, index) => {
+          const patch: TablesUpdate<'menu_categories'> = {
+            sort_order: index * 10,
+            updated_at: now,
+          }
+          return supabase
+            .from('menu_categories')
+            .update(patch)
+            .eq('id', id)
+            .eq('tenant_id', tenantId!)
+            .then(({ error }) => {
+              if (error) throw new Error(handleSupabaseError(error))
+            })
+        }),
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
+    },
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
+      toast.error(error.message || 'Errore nel riordino delle categorie')
+    },
+  })
+}
+
 export const useUpdateCategoryDescription = () => {
   const queryClient = useQueryClient()
   const { tenantId } = useTenantContext()

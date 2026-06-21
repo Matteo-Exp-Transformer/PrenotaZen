@@ -12,6 +12,15 @@ import type { CustomStaffPreset } from '../../constants/presetMenus'
 import { customPresetStorageId } from '../../constants/presetMenus'
 import { MenuTab } from '../MenuTab'
 
+vi.mock('@/features/booking/hooks/useMenuCategories', () => ({
+  useMenuCategories: () => ({
+    data: [
+      { key: 'bevande', sort_order: 0 },
+      { key: 'antipasti', sort_order: 10 },
+    ],
+  }),
+}))
+
 const ITEMS: SelectedMenuItem[] = [
   { id: 'i1', name: 'Bruschetta', price: 4, category: 'antipasti' },
   { id: 'i2', name: 'Tagliere', price: 6, category: 'antipasti' },
@@ -66,12 +75,37 @@ describe('MenuTab — vista admin edit (fix 7)', () => {
     const user = userEvent.setup()
     const { onMenuChange } = renderEdit()
 
-    // Prima categoria renderizzata = antipasti (2 voci) → bottone «Rimuovi categoria».
+    // Prima categoria canonica = bevande, anche se arriva dopo nello snapshot.
     const removeCategoryButtons = screen.getAllByRole('button', { name: /rimuovi categoria/i })
     await user.click(removeCategoryButtons[0])
 
     const payload = onMenuChange.mock.calls[0][0]
-    expect(payload.items.map((i: SelectedMenuItem) => i.id)).toEqual(['i3'])
+    expect(payload.items.map((i: SelectedMenuItem) => i.id)).toEqual(['i1', 'i2'])
+  })
+
+  it.each([
+    { label: 'edit', renderMenu: () => renderEdit() },
+    {
+      label: 'view',
+      renderMenu: () =>
+        render(
+          <MenuTab
+            booking={{ booking_type: 'rinfresco_laurea' }}
+            isEditMode={false}
+            menuSelection={{ items: ITEMS }}
+            numGuests={10}
+            presetMenu={null}
+            customStaffPresets={PRESETS}
+            onMenuChange={vi.fn()}
+          />,
+        ),
+    },
+  ])('segue l\'ordine canonico categorie nella vista $label', ({ renderMenu }) => {
+    renderMenu()
+
+    const beverages = screen.getByText('BEVANDE')
+    const starters = screen.getByText('ANTIPASTI')
+    expect(beverages.compareDocumentPosition(starters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('cambia il menù preselezionato usando la pipeline preset del parent', async () => {

@@ -27,7 +27,7 @@ import {
   filterMenuCategoriesForPublic,
   filterMenuItemsForPublic,
 } from '../constants/menuMagazzinoLimits'
-import { validateMenuQrSettings, isMenuQrSettingsValid } from '../utils/menuQrValidation'
+import { validateMenuQrSettings } from '../utils/menuQrValidation'
 import { buildCatalogPrefillForKeys } from '../utils/menuQrStorage'
 import type {
   CarouselItem,
@@ -396,14 +396,11 @@ export function MenuQrModal({
     [carouselItems, categoryFilter, itemsByCategory, hiddenItemIds],
   )
 
-  const canSaveSettings = useMemo(
-    () => isMenuQrSettingsValid(validationInput),
-    [validationInput],
-  )
-
-  const canSave = !!name.trim() && canSaveSettings && !isPending
-
   const validateBeforeSave = (): boolean => {
+    if (!name.trim()) {
+      toast.warn('Dai un nome al menù QR per salvarlo.')
+      return false
+    }
     const validation = validateMenuQrSettings(validationInput)
     if (!validation.ok) {
       toast.warn(validation.message)
@@ -501,7 +498,7 @@ export function MenuQrModal({
       <Button variant="ghost" onClick={requestClose} disabled={isPending}>
         Annulla
       </Button>
-      <Button variant="primary" onClick={handleSave} disabled={!canSave}>
+      <Button variant="primary" onClick={handleSave} disabled={isPending}>
         {isPending ? 'Salvataggio…' : 'Salva'}
       </Button>
     </div>
@@ -525,7 +522,7 @@ export function MenuQrModal({
         <div>
           <div className="mb-1 flex items-center justify-between gap-2">
             <label className="text-sm font-semibold text-gray-800">Nome QR *</label>
-            <Button variant="primary" size="sm" onClick={handleSave} disabled={!canSave}>
+            <Button variant="primary" size="sm" onClick={handleSave} disabled={isPending}>
               {isPending ? 'Salvataggio…' : 'Salva'}
             </Button>
           </div>

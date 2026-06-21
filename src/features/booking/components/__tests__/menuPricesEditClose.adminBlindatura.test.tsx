@@ -84,6 +84,7 @@ vi.mock('@/features/booking/hooks/useMenuCategories', () => ({
   useUpdateMenuCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteMenuCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSetMenuCategoryAvailability: () => ({ mutate: vi.fn() }),
+  useReorderMenuCategories: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/features/booking/hooks/useRestaurantSetting', () => ({

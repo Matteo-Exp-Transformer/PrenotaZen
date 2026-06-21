@@ -3,6 +3,7 @@ import { Trash2, X } from 'lucide-react'
 import type { SelectedMenuItem } from '@/types/menu'
 import type { BookingType } from '@/types/booking'
 import { bookingTypeUsesMenuSelections } from '../utils/bookingTypeMenu'
+import { useMenuCategories } from '../hooks/useMenuCategories'
 import {
   customPresetStorageId,
   getPresetMenu,
@@ -71,6 +72,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({
   onMenuChange,
   onPresetMenuChange
 }) => {
+  const { data: menuCategories = [] } = useMenuCategories()
   const resolvedMenuBookingType: BookingType =
     menuFlowBookingType ??
     (bookingTypeUsesMenuSelections(booking?.booking_type) ? booking.booking_type : 'rinfresco_laurea')
@@ -87,6 +89,22 @@ export const MenuTab: React.FC<MenuTabProps> = ({
     })
     return grouped
   }, [menuSelection?.items])
+
+  const orderedGroupedItems = useMemo(() => {
+    const orderIndex = new Map(menuCategories.map((category, index) => [category.key, index]))
+
+    return Object.entries(groupedItems).sort(([categoryA], [categoryB]) => {
+      const indexA = orderIndex.get(categoryA)
+      const indexB = orderIndex.get(categoryB)
+
+      if (indexA === undefined && indexB === undefined) {
+        return categoryA.localeCompare(categoryB)
+      }
+      if (indexA === undefined) return 1
+      if (indexB === undefined) return -1
+      return indexA - indexB
+    })
+  }, [groupedItems, menuCategories])
 
   // Calculate totals
   const { totalPerPerson, totalBooking, itemCount, baseTotal } = useMemo(() => {
@@ -176,7 +194,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({
 
       {itemCount > 0 ? (
         <div className="space-y-3">
-          {Object.entries(groupedItems).map(([category, items]) => {
+          {orderedGroupedItems.map(([category, items]) => {
             const categoryTotal = items.reduce((sum, item) => sum + item.price, 0)
             return (
               <div
@@ -255,7 +273,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({
   // Menu expanded content (view mode)
   const menuViewContent = (
     <div className="space-y-4">
-      {Object.entries(groupedItems).map(([category, items]) => {
+      {orderedGroupedItems.map(([category, items]) => {
         return (
           <div key={category} className="space-y-2">
             <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">

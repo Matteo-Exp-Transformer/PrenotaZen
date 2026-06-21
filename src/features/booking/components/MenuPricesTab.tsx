@@ -13,7 +13,7 @@ import { Button, CollapsibleCard, Input, Textarea } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { DiscardChangesConfirmModal } from './settings/SettingsSaveUi'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
-import { Plus, Edit, Trash2, Save, X, Eye, EyeOff, QrCode, ImageIcon } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X, Eye, EyeOff, QrCode, ImageIcon, ChevronUp, ChevronDown } from 'lucide-react'
 import {
   useMenuItems,
   useCreateMenuItem,
@@ -27,6 +27,7 @@ import {
   useMenuCategories,
   useUpdateMenuCategory,
   useSetMenuCategoryAvailability,
+  useReorderMenuCategories,
 } from '../hooks/useMenuCategories'
 import { type MenuItem, type MenuItemInput } from '@/types/menu'
 import type { SelectedMenuItem } from '@/types/menu'
@@ -434,6 +435,7 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
   const deleteMutation = useDeleteMenuItem()
   const setItemAvailabilityMutation = useSetMenuItemAvailability()
   const setCategoryAvailabilityMutation = useSetMenuCategoryAvailability()
+  const reorderCategoriesMutation = useReorderMenuCategories()
 
   const { data: customStaffPresets = [] } = useRestaurantSetting('booking_custom_staff_presets')
   const { data: bookingPublicFormConfig } = useRestaurantSetting('booking_public_form_config')
@@ -792,6 +794,19 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
       id: categoryId,
       is_available: !currentlyAvailable,
     })
+  }
+
+  // Riordino categorie (ordine canonico magazzino) — frecce su/giù in panoramica.
+  const handleMoveCategory = (categoryKey: string, direction: 'up' | 'down') => {
+    const currentIndex = dbCategories.findIndex((c) => c.key === categoryKey)
+    if (currentIndex === -1) return
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= dbCategories.length) return
+
+    const reordered = [...dbCategories]
+    const [moved] = reordered.splice(currentIndex, 1)
+    reordered.splice(targetIndex, 0, moved)
+    reorderCategoriesMutation.mutate(reordered.map((c) => c.id))
   }
 
   const handleStartEdit = (item: MenuItem) => {
@@ -1682,11 +1697,13 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
           <div
             className={cn(MENU_INGREDIENT_OVERVIEW_GRID_CLASS, ingredientEditMode ? 'mt-8' : 'mt-6')}
           >
-            {categoryEntries.map(([categoryKey, categoryLabel]) => {
+            {categoryEntries.map(([categoryKey, categoryLabel], categoryIndex) => {
               const categoryItems = itemsByCategory[categoryKey] ?? []
               const itemCount = categoryItems.length
               const dbCategory = dbCategoryByKey.get(categoryKey)
               const categoryAvailable = dbCategory ? isMenuCategoryAvailable(dbCategory) : true
+              const canMoveUp = categoryIndex > 0
+              const canMoveDown = categoryIndex < categoryEntries.length - 1
               return (
                 <CollapsibleCard
                   key={categoryKey}
@@ -1703,16 +1720,48 @@ export const MenuPricesTab = forwardRef<MenuPricesTabHandle, MenuPricesTabProps>
                   titleClassName={cn(MENU_CATEGORY_LABEL_TITLE_CLASS, 'break-words')}
                   titleStyle={MENU_CATEGORY_LABEL_TITLE_STYLE}
                   actions={
-                    dbCategory ? (
-                      <MenuMagazzinoAvailabilityToggle
-                        available={categoryAvailable}
-                        disabled={setCategoryAvailabilityMutation.isPending}
-                        onToggle={() =>
-                          toggleCategoryAvailabilityById(dbCategory.id, categoryAvailable)
-                        }
-                        entityLabel={categoryLabel}
-                      />
-                    ) : undefined
+                    <div className="flex items-center gap-1">
+                      {dbCategory && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMoveCategory(categoryKey, 'up')
+                            }}
+                            disabled={!canMoveUp || reorderCategoriesMutation.isPending}
+                            aria-label={`Sposta ${categoryLabel} su`}
+                            title="Sposta su"
+                            className="is-clickable rounded-md p-1 text-(--color-text-muted) hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMoveCategory(categoryKey, 'down')
+                            }}
+                            disabled={!canMoveDown || reorderCategoriesMutation.isPending}
+                            aria-label={`Sposta ${categoryLabel} giù`}
+                            title="Sposta giù"
+                            className="is-clickable rounded-md p-1 text-(--color-text-muted) hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                      {dbCategory && (
+                        <MenuMagazzinoAvailabilityToggle
+                          available={categoryAvailable}
+                          disabled={setCategoryAvailabilityMutation.isPending}
+                          onToggle={() =>
+                            toggleCategoryAvailabilityById(dbCategory.id, categoryAvailable)
+                          }
+                          entityLabel={categoryLabel}
+                        />
+                      )}
+                    </div>
                   }
                 >
                   <div className="flex flex-col gap-2 px-1 pb-3 pt-0.5 sm:px-2">
