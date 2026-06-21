@@ -108,6 +108,21 @@ vi.mock('../MenuQrManager', () => ({
 
 import { MenuPricesTab } from '../MenuPricesTab'
 
+async function openIngredientCategoryInEditMode(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /Crea \/ Modifica Prodotto/i }))
+
+  const categoryToggle = screen
+    .getAllByRole('button', { name: /Pizze/i })
+    .find((element) => element.hasAttribute('aria-expanded'))
+  expect(categoryToggle).toBeDefined()
+
+  if (categoryToggle?.getAttribute('aria-expanded') !== 'true') {
+    await user.click(categoryToggle!)
+  }
+
+  return screen.findByRole('button', { name: /Modifica Pizza Margherita/i })
+}
+
 describe('MenuPricesTab — FIX 1 chiusura form dopo modifica ingrediente', () => {
   beforeEach(() => {
     cleanup()
@@ -120,14 +135,7 @@ describe('MenuPricesTab — FIX 1 chiusura form dopo modifica ingrediente', () =
     const user = userEvent.setup()
     render(<MenuPricesTab />)
 
-    await user.click(screen.getByRole('button', { name: /Crea \/ Modifica Prodotto/i }))
-
-    const categoryHeaders = screen.getAllByRole('button', { name: /Pizze/i })
-    const categoryToggle = categoryHeaders.find((el) => el.hasAttribute('aria-expanded'))
-    expect(categoryToggle).toBeDefined()
-    await user.click(categoryToggle!)
-
-    await user.click(screen.getByRole('button', { name: /Modifica Pizza Margherita/i }))
+    await user.click(await openIngredientCategoryInEditMode(user))
 
     expect(screen.getByText('Modifica Prodotto')).toBeInTheDocument()
     const nameInput = screen.getByPlaceholderText('Es. Pizza Margherita')
@@ -152,13 +160,7 @@ describe('MenuPricesTab — FIX 1 chiusura form dopo modifica ingrediente', () =
     const user = userEvent.setup()
     render(<MenuPricesTab />)
 
-    await user.click(screen.getByRole('button', { name: /Crea \/ Modifica Prodotto/i }))
-    const categoryToggle = screen
-      .getAllByRole('button', { name: /Pizze/i })
-      .find((el) => el.hasAttribute('aria-expanded'))!
-    await user.click(categoryToggle)
-
-    await user.click(screen.getByRole('button', { name: /Modifica Pizza Margherita/i }))
+    await user.click(await openIngredientCategoryInEditMode(user))
     fireEvent.change(screen.getByPlaceholderText('Es. Pizza Margherita'), {
       target: { value: 'Bozza non salvata' },
     })
