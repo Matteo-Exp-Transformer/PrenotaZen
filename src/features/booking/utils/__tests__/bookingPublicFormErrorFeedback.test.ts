@@ -9,6 +9,13 @@ import {
 import { BOOKING_CLIENT_TEXT_TOO_LONG_MESSAGE } from '../../constants/bookingPrenotaTextLimits'
 
 describe('mapCreateBookingError', () => {
+  it.each(['INVALID_ARRIVAL_STEP', 'CUTOFF_EXPIRED', 'INVALID_DURATION'])(
+    '%s → feedback sul campo Ora', (code) => {
+      const mapped = mapCreateBookingError('errore slot', code)
+      expect(mapped.errorKey).toBe('desired_time')
+      expect(mapped.toastMessage.length).toBeGreaterThan(10)
+    },
+  )
   it('SLOT_LIMIT → desired_time con copy azionabile', () => {
     const mapped = mapCreateBookingError('fascia piena', 'SLOT_LIMIT')
     expect(mapped.errorKey).toBe('desired_time')

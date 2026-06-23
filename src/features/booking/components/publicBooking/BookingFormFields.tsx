@@ -1,7 +1,7 @@
 import React from 'react'
 import type { BookingRequestInput } from '@/types/booking'
 import type { BusinessHours } from '@/lib/businessHours'
-import { isValidBookingDateTime, getDayOfWeek, formatHours } from '@/lib/businessHours'
+import { isValidBookingDateTime, getDayOfWeek, formatHours, buildClosedDayMessage } from '@/lib/businessHours'
 import { BookingPublicInsetField } from './BookingPublicInsetField'
 import {
   BookingPublicDatePickerField,
@@ -44,6 +44,7 @@ interface BookingFormFieldsProps {
   setErrors: (errors: Record<string, string>) => void
   /** Testo errore in bianco solo su sfondo full-page foto. */
   lightTextOnDarkBackground?: boolean
+  slotGroups?: Array<{ slotId: string; slotName: string; times: string[] }>
 }
 
 export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
@@ -61,6 +62,7 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
   onNumGuestsKeyPress,
   setErrors,
   lightTextOnDarkBackground = false,
+  slotGroups,
 }) => {
   const isDateToday = formData.desired_date === getTodayIso()
   // Ora minima selezionabile: solo se la data è oggi, blocca le ore passate
@@ -77,7 +79,7 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
     if (!isValidBookingDateTime(date, time, businessHours)) {
       const dayName = getDayOfWeek(date)
       const dayHours = businessHours[dayName]
-      if (!dayHours || dayHours.length === 0) return 'Il ristorante è chiuso in questo giorno'
+      if (!dayHours || dayHours.length === 0) return buildClosedDayMessage(date, businessHours)
       return `Orario non valido. Orari disponibili: ${formatHours(dayHours)}`
     }
     return null
@@ -85,6 +87,14 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
 
   const handleDateChange = (newDate: string) => {
     onDateChange(newDate)
+    // Giorno chiuso: avvisa subito (anche senza orario scelto) e proponi il primo giorno aperto.
+    if (newDate && businessHours && !isLoadingHours && !hoursError) {
+      const dayHours = businessHours[getDayOfWeek(newDate)]
+      if (!dayHours || dayHours.length === 0) {
+        setErrors({ ...errors, desired_date: buildClosedDayMessage(newDate, businessHours), desired_time: '' })
+        return
+      }
+    }
     const timeError = newDate && formData.desired_time
       ? validateDateTime(newDate, formData.desired_time)
       : null
@@ -154,6 +164,7 @@ export const BookingFormFields: React.FC<BookingFormFieldsProps> = ({
             showAttention={attentionFieldKey === 'desired_time'}
             onAttentionInteract={onClearAttention}
             minTime={minTimeToday}
+            slotGroups={slotGroups}
           />
           {errors.desired_time && (
             <div id="desired_time-error" className={publicFormDateTimeErrorClass(lightTextOnDarkBackground)}>

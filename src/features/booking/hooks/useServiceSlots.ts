@@ -4,11 +4,9 @@ import { useTenantContext } from '@/contexts/TenantContext'
 import { toast } from 'react-toastify'
 import { logger } from '@/lib/logger'
 import {
-  slotCrossesMidnight,
   type SlotConfig,
 } from '@/features/booking/utils/bookingTimeSlots'
 
-export { slotCrossesMidnight }
 export type { SlotConfig }
 
 export interface ServiceSlot {
@@ -24,6 +22,13 @@ export interface ServiceSlot {
   display_order: number
   // is_canonical è managed dal DB (migration 016) — non incluso nei payload insert/update
   is_canonical: boolean
+  slot_color: string | null
+  /** Durata minima prenotazione in fascia (minuti). NULL = nessun pavimento. Migration 057. */
+  min_duration: number | null
+  /** Buffer pulizia/turnover tra prenotazioni (minuti). NOT NULL DEFAULT 0. Migration 057. */
+  turnover_buffer_minutes: number
+  /** Step di arrivo per-fascia (minuti). NOT NULL DEFAULT 30. Migration 059. */
+  arrival_step_minutes: number
   created_at: string
   updated_at: string
 }
@@ -35,8 +40,23 @@ export function isServiceSlotClosed(slot: Pick<ServiceSlot, 'max_turns'>): boole
 
 type ServiceSlotInsert = Omit<
   ServiceSlot,
-  'id' | 'tenant_id' | 'created_at' | 'updated_at' | 'is_canonical' | 'max_turns_resume'
-> & { max_turns_resume?: number | null }
+  | 'id'
+  | 'tenant_id'
+  | 'created_at'
+  | 'updated_at'
+  | 'is_canonical'
+  | 'max_turns_resume'
+  | 'slot_color'
+  | 'min_duration'
+  | 'turnover_buffer_minutes'
+  | 'arrival_step_minutes'
+> & {
+  max_turns_resume?: number | null
+  slot_color?: string | null
+  min_duration?: number | null
+  turnover_buffer_minutes?: number
+  arrival_step_minutes?: number
+}
 type ServiceSlotUpdate = Partial<Omit<ServiceSlot, 'is_canonical'>> & {
   id: string
   /** Se true, non mostra il toast generico "Fascia oraria aggiornata". */
@@ -82,7 +102,15 @@ export function useCreateServiceSlot() {
         })
 
       if (error) throw error
-      return (data as ServiceSlot[])[0]
+      const created = (data as ServiceSlot[])[0]
+      if (input.arrival_step_minutes != null && input.arrival_step_minutes !== created.arrival_step_minutes) {
+        const { data: updated, error: updateError } = await supabase.rpc('update_service_slot', {
+          payload: { id: created.id, tenant_id: tenantId!, arrival_step_minutes: input.arrival_step_minutes },
+        })
+        if (updateError) throw updateError
+        return (updated as ServiceSlot[])[0]
+      }
+      return created
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [SERVICE_SLOTS_QUERY_KEY, tenantId] })
@@ -112,6 +140,7 @@ export function useUpdateServiceSlot() {
       if ('max_turns_resume' in patch) payload.max_turns_resume = patch.max_turns_resume ?? null
       if ('max_guests' in patch) payload.max_guests = patch.max_guests ?? null
       if (patch.display_order !== undefined) payload.display_order = patch.display_order
+      if (patch.arrival_step_minutes !== undefined) payload.arrival_step_minutes = patch.arrival_step_minutes
 
       const { data, error } = await supabase.rpc('update_service_slot', { payload })
 
@@ -180,4 +209,3 @@ export function useDigestSlotConfigs(): {
     error: query.error as Error | null,
   }
 }
-

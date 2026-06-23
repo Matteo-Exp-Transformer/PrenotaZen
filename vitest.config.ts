@@ -9,7 +9,16 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     // supabase/functions/** sono test Deno (import https://…), si eseguono con `deno test`, non Vitest.
-    exclude: ['node_modules', 'dist', 'e2e/**', '.claude/**', 'agenti-locali/**', 'supabase/functions/**'],
+    exclude: [
+      'node_modules',
+      'dist',
+      'e2e/**',
+      '.claude/**',
+      'agenti-locali/**',
+      'supabase/functions/**',
+      // Console super-admin: sotto-progetto isolato, ha la sua pipeline separata.
+      'console/**',
+    ],
     env: {
       VITE_SUPABASE_URL: 'https://test.supabase.co',
       VITE_SUPABASE_ANON_KEY: 'test-anon-key-xxxxxxxxxxxxxxxxxxxxxxxxxxx',

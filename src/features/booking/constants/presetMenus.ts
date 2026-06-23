@@ -67,6 +67,12 @@ export interface CustomStaffPreset {
   is_fixed_menu?: boolean
   /** Se `false`, il preset non compare nella pagina Prenota (default: visibile). */
   visible_on_booking?: boolean
+  /**
+   * Durata default della seduta in minuti (opzionale, gradino 2 della gerarchia S2).
+   * Assente = nessuna durata configurata = comportamento invariato.
+   * UI picker rimandato a S2/S3 — campo e parser presenti già da S1.
+   */
+  default_duration?: number
 }
 
 export function isStaffPresetFixedMenu(p: CustomStaffPreset): boolean {

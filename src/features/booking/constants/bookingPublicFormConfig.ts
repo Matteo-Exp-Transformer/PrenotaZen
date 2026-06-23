@@ -13,6 +13,7 @@ import {
   clampBookingTextOptional,
   normalizeBookingHeaderFontSizeForTarget,
 } from './bookingPrenotaTextLimits'
+import { clampBookingDuration, parseBookingDuration } from './bookingDurationLimits'
 
 export {
   BOOKING_CAROUSEL_SLIDE_TEXT_LIMITS,
@@ -367,6 +368,11 @@ export interface SubTab {
    */
   show_offer_details_in_summary?: boolean
   /**
+   * Durata della seduta in minuti (opzionale). Assente = nessuna durata configurata = comportamento invariato.
+   * Vedi `resolveBookingDuration()` (S2) per la gerarchia di risoluzione.
+   */
+  duration?: number
+  /**
    * Tracking personalizzazioni vs preset.
    * Vedi `bookingFormResolver.ts` per il comportamento «aggiorna solo se non personalizzato».
    */
@@ -478,6 +484,11 @@ export interface BookingMode {
   /** @deprecated Migrato a runtime in `sub_tabs` se vuoto. */
   sub_tabs_overrides?: SubTabOverride[]
   /**
+   * Durata default della tipologia in minuti (opzionale, gradino 3 della gerarchia S2).
+   * Assente = nessun default tipologia = comportamento invariato.
+   */
+  default_duration?: number
+  /**
    * Capacità esplicite della tipologia (Livello A). Assente → fallback per tipo (Livello C).
    * Vedi `utils/bookingCapabilities.ts`. Scritto solo dal pannello admin (Fase 3).
    */
@@ -559,6 +570,8 @@ export function parseSubTabFromUnknown(raw: unknown): SubTab | null {
   if (typeof o.price_per_person === 'number' && o.price_per_person >= 0) {
     price_per_person = o.price_per_person
   }
+
+  const duration = parseBookingDuration(o.duration)
 
   const description = typeof o.description === 'string' ? o.description.trim() : undefined
   const booking_badge_label =
@@ -649,6 +662,7 @@ export function parseSubTabFromUnknown(raw: unknown): SubTab | null {
     show_offer_details_in_summary:
       display === 'carousel' ? show_offer_details_in_summary : undefined,
     field_overrides,
+    duration,
   }
 
   return display === 'carousel' ? migrateLegacyCarouselSubTab(parsed) : parsed
@@ -801,6 +815,8 @@ export function normalizeBookingPublicFormConfig(
               ? clampBookingTextOptional(tab.courses_label, L.subTabCoursesLabel)
               : undefined,
           field_overrides: tab.field_overrides,
+          // duration: clamp al salvataggio; mai scrivere se assente/non valido
+          duration: clampBookingDuration(tab.duration),
         }
         if (display === 'carousel') {
           const normalizedCarousel = migrateLegacyCarouselSubTab({
@@ -835,11 +851,11 @@ export function normalizeBookingPublicFormConfig(
         }
       })
         .filter((tab): tab is SubTab => tab != null)
-      // capabilities (Livello A): preserva solo se presenti e valide; mai scrivere default
-      // (assente → fallback Livello C → comportamento invariato). LOCK Parser/normalizer accoppiati.
-      // `capabilities` raw escluso dallo spread per scartare valori malformati passati dall'admin.
-      const { capabilities: rawCapabilities, ...modeRest } = mode
+      // capabilities e default_duration raw esclusi dallo spread: vengono riscritti
+      // solo se validi, mai se assenti/malformati (LOCK Parser/normalizer accoppiati).
+      const { capabilities: rawCapabilities, default_duration: rawDefaultDuration, ...modeRest } = mode
       const capabilities = parseModeCapabilities(rawCapabilities)
+      const clampedModeDuration = clampBookingDuration(rawDefaultDuration)
       return {
         ...modeRest,
         label: clampBookingText(mode.label.trim(), L.modeLabel),
@@ -851,6 +867,8 @@ export function normalizeBookingPublicFormConfig(
         sub_tabs_presentation: normalizeSubTabsPresentation(mode.sub_tabs_presentation, subTabs),
         sub_tabs: subTabs,
         ...(capabilities ? { capabilities } : {}),
+        // default_duration: mai scrivere se assente/non valido
+        ...(clampedModeDuration != null ? { default_duration: clampedModeDuration } : {}),
       }
     }),
   }

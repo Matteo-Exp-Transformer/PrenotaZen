@@ -69,11 +69,70 @@ import {
   clampBookingText,
   getBookingHeaderFontSizeMax,
 } from '@/features/booking/constants/bookingPrenotaTextLimits'
+import {
+  BOOKING_DURATION_MIN,
+  BOOKING_DURATION_MAX,
+} from '@/features/booking/constants/bookingDurationLimits'
 import { scheduleScrollIntoCenter } from '@/features/booking/lib/scrollIntoCenter'
 
 const L = BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS
 
 const charCountClass = 'text-right text-[11px] text-slate-400 tabular-nums'
+
+const DURATION_QUICK_OPTIONS = [90, 120, 150, 180] as const
+
+function DurationPicker({
+  value,
+  onChange,
+}: {
+  value: number | undefined
+  onChange: (v: number | undefined) => void
+}) {
+  const isQuick = value == null || DURATION_QUICK_OPTIONS.includes(value as (typeof DURATION_QUICK_OPTIONS)[number])
+  const showCustom = value != null && !DURATION_QUICK_OPTIONS.includes(value as (typeof DURATION_QUICK_OPTIONS)[number])
+  const selectValue = value == null ? '' : isQuick ? String(value) : 'altro'
+
+  return (
+    <div className="space-y-2">
+      <select
+        value={selectValue}
+        onChange={(e) => {
+          const v = e.target.value
+          if (v === '') { onChange(undefined); return }
+          if (v === 'altro') { onChange(value != null && !DURATION_QUICK_OPTIONS.includes(value as (typeof DURATION_QUICK_OPTIONS)[number]) ? value : BOOKING_DURATION_MIN); return }
+          onChange(Number(v))
+        }}
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+      >
+        <option value="">Nessuna (opzionale)</option>
+        {DURATION_QUICK_OPTIONS.map((m) => (
+          <option key={m} value={String(m)}>{m} min</option>
+        ))}
+        <option value="altro">Altro…</option>
+      </select>
+      {showCustom && (
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={BOOKING_DURATION_MIN}
+            max={BOOKING_DURATION_MAX}
+            step={1}
+            value={value ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value
+              if (raw === '') { onChange(undefined); return }
+              const n = Math.trunc(Number(raw))
+              if (!Number.isFinite(n)) return
+              onChange(Math.min(BOOKING_DURATION_MAX, Math.max(BOOKING_DURATION_MIN, n)))
+            }}
+            className="w-28"
+          />
+          <span className="text-sm text-slate-500">min ({BOOKING_DURATION_MIN}–{BOOKING_DURATION_MAX})</span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function newSubTab(display: SubTab['display']): SubTab {
   return {
@@ -1198,6 +1257,16 @@ export const BookingFormConfigPanel = forwardRef<
           {renderPriceInput(!isFixedMenu, cardPriceInputValue)}
         </div>
       ) : null
+    const cardDurationSection =
+      tab.display === 'cards' ? (
+        <div className="mt-4 w-full min-w-0 space-y-1.5">
+          <Label className="block text-sm">Durata tavolo (opzionale)</Label>
+          <DurationPicker
+            value={tab.duration}
+            onChange={(v) => patchTab({ duration: v })}
+          />
+        </div>
+      ) : null
     const showOfferDetailsInSummary = tab.show_offer_details_in_summary !== false
     const carouselPriceSection =
       tab.display === 'carousel' ? (
@@ -1205,6 +1274,13 @@ export const BookingFormConfigPanel = forwardRef<
           <div className="space-y-1.5">
             <Label className="block text-sm">Prezzo a persona (opzionale)</Label>
             {renderPriceInput(false)}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="block text-sm">Durata tavolo (opzionale)</Label>
+            <DurationPicker
+              value={tab.duration}
+              onChange={(v) => patchTab({ duration: v })}
+            />
           </div>
           <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
             <div className="min-w-0">
@@ -1653,6 +1729,7 @@ export const BookingFormConfigPanel = forwardRef<
         )}
 
         {tab.display === 'cards' && cardPriceSection}
+        {tab.display === 'cards' && cardDurationSection}
 
         {isDraft ? (
           <div className="flex justify-end">
@@ -1921,6 +1998,17 @@ export const BookingFormConfigPanel = forwardRef<
                         value={mode.icon}
                         onChange={(icon: MenuQrCategoryIconKey) => updateMode(mode.id, { icon })}
                         ariaLabel={`Icona tipologia ${mode.label}`}
+                      />
+                    </div>
+
+                    <div className="w-full min-w-0 space-y-1.5">
+                      <Label className="block text-sm">Durata tavolo (opzionale)</Label>
+                      <p className="text-xs text-slate-500">
+                        Durata default per questa tipologia. Le card possono sovrascriverla.
+                      </p>
+                      <DurationPicker
+                        value={mode.default_duration}
+                        onChange={(v) => updateMode(mode.id, { default_duration: v })}
                       />
                     </div>
 

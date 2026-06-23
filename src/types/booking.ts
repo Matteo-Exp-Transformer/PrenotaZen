@@ -76,6 +76,11 @@ export interface BookingRequest {
   dietary_data_consent?: boolean
   dietary_off_platform_notice?: boolean
   dietary_data_consent_at?: string | null
+
+  /** Snapshot durata proposto dal client e ri-validato dall'Edge. */
+  duration_minutes?: number
+  duration_source?: string
+  duration_rule_version?: number
 }
 
 export interface BookingRequestInput {
@@ -106,6 +111,11 @@ export interface BookingRequestInput {
   dietary_data_consent?: boolean
   dietary_off_platform_notice?: boolean
   dietary_data_consent_at?: string | null
+
+  /** Snapshot durata proposto dal client e ri-validato dall'Edge. */
+  duration_minutes?: number
+  duration_source?: string
+  duration_rule_version?: number
 
   // Multi-tenant
   tenant_id?: string

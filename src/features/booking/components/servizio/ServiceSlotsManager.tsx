@@ -41,6 +41,7 @@ function serializeSlotDraft(input: {
   endTime: string
   maxTurnsStr: string
   maxGuestsStr: string
+  arrivalStepStr: string
   scope: OverrideScope
   customDays: Set<string>
 }): string {
@@ -50,6 +51,7 @@ function serializeSlotDraft(input: {
     endTime: input.endTime,
     maxTurnsStr: input.maxTurnsStr,
     maxGuestsStr: input.maxGuestsStr,
+    arrivalStepStr: input.arrivalStepStr,
     scope: input.scope,
     customDays: [...input.customDays].sort(),
   })
@@ -303,6 +305,7 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
   const [maxGuestsStr, setMaxGuestsStr] = useState(
     initial?.max_guests == null ? '' : String(initial.max_guests),
   )
+  const [arrivalStepStr, setArrivalStepStr] = useState(String(initial?.arrival_step_minutes ?? 30))
   const [validationError, setValidationError] = useState<string | null>(null)
   const [scope, setScope] = useState<OverrideScope>('forever')
   const [scopeMenuOpen, setScopeMenuOpen] = useState(false)
@@ -313,6 +316,7 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
   const baselineRef = useRef('')
   const formRef = useRef<HTMLFormElement>(null)
   const scopeMenuRef = useRef<HTMLDivElement>(null)
+  const customArrivalInputRef = useRef<HTMLInputElement>(null)
 
   const {
     registerUnsavedSource,
@@ -332,11 +336,13 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
         nextMaxTurns = String(initial.max_turns)
       }
       const nextMaxGuests = initial?.max_guests == null ? '' : String(initial.max_guests)
+      const nextArrivalStep = String(initial?.arrival_step_minutes ?? 30)
       setName(nextName)
       setStartTime(nextStart)
       setEndTime(nextEnd)
       setMaxTurnsStr(nextMaxTurns)
       setMaxGuestsStr(nextMaxGuests)
+      setArrivalStepStr(nextArrivalStep)
       setValidationError(null)
       setScope('forever')
       setScopeMenuOpen(false)
@@ -350,11 +356,12 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
         endTime: nextEnd,
         maxTurnsStr: nextMaxTurns,
         maxGuestsStr: nextMaxGuests,
+        arrivalStepStr: nextArrivalStep,
         scope: 'forever',
         customDays: new Set(),
       })
     }
-  }, [isOpen, initial?.id, initial?.name, initial?.start_time, initial?.end_time, initial?.max_turns, initial?.max_guests, initial?.max_turns_resume])
+  }, [isOpen, initial?.id, initial?.name, initial?.start_time, initial?.end_time, initial?.max_turns, initial?.max_guests, initial?.max_turns_resume, initial?.arrival_step_minutes])
 
   // Chiude il menu "Quando?" cliccando fuori.
   useEffect(() => {
@@ -382,10 +389,11 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
         endTime,
         maxTurnsStr,
         maxGuestsStr,
+        arrivalStepStr,
         scope,
         customDays,
       }) !== baselineRef.current,
-    [customDays, endTime, maxGuestsStr, maxTurnsStr, name, scope, startTime],
+    [arrivalStepStr, customDays, endTime, maxGuestsStr, maxTurnsStr, name, scope, startTime],
   )
 
   const confirmDiscardClose = useCallback(() => {
@@ -452,6 +460,8 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
       return 'I turni massimi devono essere un numero ≥ 1 (vuoto = illimitato).'
     if (maxGuestsStr !== '' && (isNaN(Number(maxGuestsStr)) || Number(maxGuestsStr) < 1))
       return 'I coperti massimi devono essere un numero ≥ 1 (vuoto = nessun limite).'
+    if (!/^\d+$/.test(arrivalStepStr) || Number(arrivalStepStr) < 5 || Number(arrivalStepStr) > 120)
+      return "L'intervallo di arrivo deve essere compreso tra 5 e 120 minuti."
     // Un override agisce solo su limiti turni/coperti di una fascia esistente.
     if (scope !== 'forever' && !isEdit)
       return 'La modifica a tempo si applica a una fascia esistente: crea prima la fascia, poi impostala con "Quando?".'
@@ -554,6 +564,7 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
       max_turns_resume: maxTurnsResume,
       max_guests: maxGuests,
       display_order: initial?.display_order ?? 0,
+      arrival_step_minutes: Number(arrivalStepStr),
     }
 
     const guestsChanged = payload.max_guests !== (initial?.max_guests ?? null)
@@ -652,6 +663,49 @@ const SlotModal: FC<SlotModalProps> = ({ isOpen, onClose, initial }) => {
           />
           <p className="text-xs text-(--color-text-muted)">
             Lascia vuoto = illimitato
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="slot-arrival-step" className="block text-sm font-medium text-primary-900">
+            Intervallo di arrivo
+          </label>
+          <div className={!['15', '30', '60'].includes(arrivalStepStr) ? 'grid grid-cols-[minmax(0,1fr)_7rem] gap-2' : ''}>
+            <select
+              id="slot-arrival-step"
+              value={['15', '30', '60'].includes(arrivalStepStr) ? arrivalStepStr : 'custom'}
+              onChange={(event) => {
+                if (event.target.value !== 'custom') {
+                  setArrivalStepStr(event.target.value)
+                } else {
+                  if (['15', '30', '60'].includes(arrivalStepStr)) setArrivalStepStr('45')
+                  setTimeout(() => customArrivalInputRef.current?.focus(), 0)
+                }
+              }}
+              disabled={isPending}
+              className="min-h-10 rounded-lg border border-(--color-border) bg-white px-3 text-sm"
+            >
+              <option value="15">15 minuti</option>
+              <option value="30">30 minuti</option>
+              <option value="60">60 minuti</option>
+              <option value="custom">Altro</option>
+            </select>
+            {!['15', '30', '60'].includes(arrivalStepStr) && (
+              <Input
+                ref={customArrivalInputRef}
+                aria-label="Intervallo personalizzato in minuti"
+                type="number"
+                min={5}
+                max={120}
+                step={1}
+                value={arrivalStepStr}
+                onChange={(event) => setArrivalStepStr(event.target.value)}
+                disabled={isPending}
+              />
+            )}
+          </div>
+          <p className="text-xs text-(--color-text-muted)">
+            Ogni quanto il cliente può scegliere un orario, da 5 a 120 minuti.
           </p>
         </div>
 

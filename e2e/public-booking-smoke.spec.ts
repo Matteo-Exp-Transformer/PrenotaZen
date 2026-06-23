@@ -133,9 +133,9 @@ test.use({ viewport: { width: 1280, height: 900 } })
 
 function visibleSubmitForViewport(page: Page) {
   const viewport = page.viewportSize()
-  const isDesktop = (viewport?.width ?? 1280) >= 1256
+  const isWideDesktop = (viewport?.width ?? 1280) >= 1600
 
-  return isDesktop
+  return isWideDesktop
     ? page.locator('#booking-request-form button.booking-cross-shine-btn[type="submit"]:visible')
     : page.locator('button[type="submit"][form="booking-request-form"]:visible')
 }
@@ -178,7 +178,7 @@ test.describe('Pagina Prenota smoke', () => {
     const firstField = page.locator('#client_name-control')
     await expect(firstField).toHaveAttribute('aria-invalid', 'true')
     await expect(page.locator('#client_name')).toHaveClass(/booking-public-field-attention/)
-    await expect(page.getByText('Nome obbligatorio')).toBeVisible()
+    await expect(page.locator('#client_name-error')).toHaveText('Nome obbligatorio')
   })
 
   test('link privacy ritorna a /prenota/:slug', async ({ page }) => {
@@ -287,13 +287,26 @@ test.describe('Pagina Prenota smoke', () => {
       const desktopSubmit = page.locator('#booking-request-form button.booking-cross-shine-btn[type="submit"]:visible')
       const summarySubmit = page.locator('button[type="submit"][form="booking-request-form"]:visible')
 
-      if (viewport.width >= 1256) {
+      if (viewport.width >= 1600) {
         await expect(desktopSubmit).toHaveCount(1)
         await expect(summarySubmit).toHaveCount(0)
       } else {
         await expect(summarySubmit).toHaveCount(1)
         await expect(desktopSubmit).toHaveCount(0)
       }
+
+      await page.locator('#desired_time-control').click()
+      const timeDialog = page.getByRole('dialog', { name: /scegli l'orario/i })
+      await expect(timeDialog).toBeVisible()
+      const availableTimes = timeDialog.getByRole('button', { name: /^\d{2}:\d{2}$/ })
+      await expect(availableTimes.first()).toBeVisible()
+      const dialogBox = await timeDialog.boundingBox()
+      expect(dialogBox).not.toBeNull()
+      expect(dialogBox!.x).toBeGreaterThanOrEqual(0)
+      expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(viewport.width + 1)
+      const chosenTime = await availableTimes.first().textContent()
+      await availableTimes.first().click()
+      await expect(page.locator('#desired_time-control')).toContainText(chosenTime ?? '')
     })
   }
 })

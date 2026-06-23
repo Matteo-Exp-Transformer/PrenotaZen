@@ -26,13 +26,16 @@ const slotsState = vi.hoisted(() => ({
     created_at: string
     updated_at: string
     max_turns_resume?: number | null
+    arrival_step_minutes: number
+    min_duration: number | null
+    turnover_buffer_minutes: number
   }>,
 }))
 
 // ── Mock hook fasce ───────────────────────────────────────────────────────────
 vi.mock('@/features/booking/hooks/useServiceSlots', () => ({
   useServiceSlots: () => ({ data: slotsState.slots, isLoading: false, error: null }),
-  useUpdateServiceSlot: () => ({ mutateAsync: updateSlotSpy, isPending: false }),
+  useUpdateServiceSlot: () => ({ mutateAsync: updateSlotSpy, mutate: updateSlotSpy, isPending: false }),
   useCreateServiceSlot: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteServiceSlot: () => ({ mutate: vi.fn(), isPending: false }),
   isServiceSlotClosed: (slot: { max_turns: number | null }) => slot.max_turns === 0,
@@ -87,6 +90,9 @@ function makeSlot(id: string, name: string, displayOrder: number) {
     is_canonical: true,
     created_at: '',
     updated_at: '',
+    arrival_step_minutes: 30,
+    min_duration: null,
+    turnover_buffer_minutes: 0,
   }
 }
 
@@ -117,6 +123,18 @@ describe('ServiceSlotsManager Pro — riordino manuale fasce', () => {
     expect(screen.getByRole('button', { name: /sposta giù fascia pranzo/i })).not.toBeDisabled()
     expect(screen.getByRole('button', { name: /sposta su fascia cena/i })).not.toBeDisabled()
     expect(screen.getByRole('button', { name: /sposta giù fascia cena/i })).toBeDisabled()
+  })
+
+  it('modifica fascia mostra Intervallo di arrivo con valore preset; casella numerica nascosta su valore standard', async () => {
+    const user = userEvent.setup()
+    renderManager()
+    await user.click(await screen.findByRole('button', { name: /modifica pranzo/i }))
+    expect(screen.getByLabelText('Intervallo di arrivo')).toHaveValue('30')
+    // Valore standard (30): la casella numerica è nascosta — appare solo su "Altro"
+    expect(screen.queryByLabelText('Intervallo personalizzato in minuti')).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '15 minuti' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '60 minuti' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Altro' })).toBeInTheDocument()
   })
 
   it('con un solo slot entrambe le frecce sono disabilitate', async () => {

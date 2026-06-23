@@ -302,6 +302,7 @@ export function BookingPublicTimePickerField({
   showAttention = false,
   onAttentionInteract,
   minTime: _minTime,
+  slotGroups,
 }: {
   id: string
   label: string
@@ -313,6 +314,7 @@ export function BookingPublicTimePickerField({
   onAttentionInteract?: () => void
   /** Ora minima selezionabile "HH:MM" — usata per bloccare ore passate quando la data è oggi */
   minTime?: string
+  slotGroups?: Array<{ slotId: string; slotName: string; times: string[] }>
 }) {
   const [open, setOpen] = useState(false)
 
@@ -361,21 +363,39 @@ export function BookingPublicTimePickerField({
       </div>
 
       <PickerPanel open={open} title="Scegli l'orario" onClose={() => setOpen(false)} alignRight>
-        <TimePicker24h
-          id={`${id}-picker`}
-          value={value || ''}
-          onChange={onChange}
-          required={required}
-          bookingForm
-          className="min-h-[3.75rem] rounded-xl border border-slate-200 px-3 py-2"
-        />
-        <button
-          type="button"
-          className="mt-3 w-full rounded-xl bg-warm-orange px-4 py-3 text-sm font-bold text-white shadow-sm"
-          onClick={() => setOpen(false)}
-        >
-          Conferma orario
-        </button>
+        {slotGroups ? (
+          <div className="max-h-[55dvh] space-y-4 overflow-y-auto pr-1">
+            {slotGroups.map((group) => (
+              <fieldset key={group.slotId} className="space-y-2">
+                <legend className="text-sm font-bold text-warm-wood">{group.slotName}</legend>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {group.times.map((time) => (
+                    <button key={time} type="button" aria-pressed={value === time}
+                      className={cn('rounded-xl border px-2 py-2.5 text-sm font-bold',
+                        value === time ? 'border-warm-orange bg-warm-orange text-white' : 'border-slate-200 bg-white text-warm-wood')}
+                      onClick={() => { onChange(time); setOpen(false) }}>
+                      {time}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+            {slotGroups.every((group) => group.times.length === 0) && (
+              <p className="rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-900" role="status">
+                Nessun orario disponibile per questa data. Prova un altro giorno.
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <TimePicker24h id={`${id}-picker`} value={value || ''} onChange={onChange}
+              required={required} bookingForm
+              className="min-h-[3.75rem] rounded-xl border border-slate-200 px-3 py-2" />
+            <button type="button"
+              className="mt-3 w-full rounded-xl bg-warm-orange px-4 py-3 text-sm font-bold text-white shadow-sm"
+              onClick={() => setOpen(false)}>Conferma orario</button>
+          </>
+        )}
       </PickerPanel>
     </div>
   )

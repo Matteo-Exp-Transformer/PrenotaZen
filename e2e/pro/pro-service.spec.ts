@@ -44,6 +44,28 @@ async function loginAsProAdmin(page: Page) {
 }
 
 test.describe('Admin Pro — Servizio', () => {
+  test('Intervallo di arrivo resta raggiungibile nei tre viewport', async ({ page }) => {
+    await loginAsProAdmin(page)
+    await sidebarNav(page).getByRole('button', { name: /servizio/i }).click()
+    await expect(page.getByRole('heading', { name: /^Fasce orarie$/i })).toBeVisible({ timeout: 10000 })
+
+    for (const viewport of [
+      { width: 375, height: 812 },
+      { width: 834, height: 1194 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport)
+      await page.getByRole('button', { name: /^Modifica /i }).first().click()
+      const field = page.getByLabel('Intervallo di arrivo')
+      await expect(field).toBeVisible()
+      await expect(field).toHaveValue(/15|30|60|custom/)
+      const box = await field.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1)
+      await page.getByRole('button', { name: /^Annulla$/i }).click()
+    }
+  })
+
   test('smoke Servizio dalla sidebar e ritorno alla dashboard', async ({ page }) => {
     const errors = collectBrowserErrors(page)
 

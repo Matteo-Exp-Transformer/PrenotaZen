@@ -18,7 +18,6 @@ export interface RestaurantTable {
   position_x: number
   position_y: number
   shape: 'round' | 'square' | 'rect'
-  rotation: number
   created_at: string
   updated_at: string
 }
@@ -31,7 +30,6 @@ export interface TableInput {
   position_x?: number
   position_y?: number
   shape?: 'round' | 'square' | 'rect'
-  rotation?: number
 }
 
 export function useTables() {

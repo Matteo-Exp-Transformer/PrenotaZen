@@ -42,6 +42,7 @@ interface AcceptBookingInput {
   desiredTime?: string
   numGuests?: number
   internalNotes?: string
+  durationSnapshot?: Pick<BookingRequest, 'duration_minutes' | 'duration_source' | 'duration_rule_version'>
 }
 
 interface RejectBookingInput {
@@ -68,6 +69,7 @@ interface UpdateBookingInput {
   menu?: string
   placement?: string | null
   adminNotes?: string | null
+  durationSnapshot?: Pick<BookingRequest, 'duration_minutes' | 'duration_source' | 'duration_rule_version'>
 }
 
 // Mutation per accettare una prenotazione
@@ -81,7 +83,6 @@ export const useAcceptBooking = () => {
       // Se il chiamante non lo passa, lo deriviamo da confirmedStart (che è ancora nostro,
       // scritto con createBookingDateTime con offset +00:00 = cifre = orario locale).
       const resolvedDesiredTime = input.desiredTime ?? extractTimeFromISO(input.confirmedStart)
-
       const updateData: TablesUpdate<'booking_requests'> = {
         status: 'accepted',
         confirmed_start: input.confirmedStart,
@@ -89,6 +90,7 @@ export const useAcceptBooking = () => {
         num_guests: input.numGuests,
         updated_at: new Date().toISOString(),
         desired_time: resolvedDesiredTime || null,
+        ...(input.durationSnapshot?.duration_minutes != null ? input.durationSnapshot : {}),
       }
 
       const { data, error } = await supabase
@@ -204,12 +206,13 @@ export const useUpdateBooking = () => {
 
   return useMutation({
     mutationFn: async (input: UpdateBookingInput) => {
-      
       const updateData: TablesUpdate<'booking_requests'> = {
         updated_at: new Date().toISOString(),
         confirmed_start: input.confirmedStart,
         confirmed_end: input.confirmedEnd,
         num_guests: input.numGuests,
+        desired_time: input.desiredTime ?? extractTimeFromISO(input.confirmedStart) ?? null,
+        ...(input.durationSnapshot?.duration_minutes != null ? input.durationSnapshot : {}),
       }
 
       // Update client information if provided
@@ -230,11 +233,6 @@ export const useUpdateBooking = () => {
       // Update booking type if provided
       if (input.booking_type !== undefined) {
         updateData.booking_type = input.booking_type
-      }
-
-      // Update desired_time if provided
-      if (input.desiredTime !== undefined) {
-        updateData.desired_time = input.desiredTime || null
       }
 
       // Update special requests if provided

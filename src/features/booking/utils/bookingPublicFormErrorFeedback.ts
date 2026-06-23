@@ -104,6 +104,24 @@ export function mapCreateBookingError(
         toastMessage:
           'Orario fuori servizio: scegli un orario disponibile.',
       }
+    case 'INVALID_ARRIVAL_STEP':
+      return {
+        errorKey: 'desired_time',
+        inlineMessage: 'Questo orario non è più disponibile. Scegline uno dalla lista aggiornata.',
+        toastMessage: 'Orario non disponibile: scegli nuovamente dalla lista.',
+      }
+    case 'CUTOFF_EXPIRED':
+      return {
+        errorKey: 'desired_time',
+        inlineMessage: 'È troppo tardi per prenotare a questo orario. Scegline uno successivo.',
+        toastMessage: 'Scegli un orario successivo oppure un altro giorno.',
+      }
+    case 'INVALID_DURATION':
+      return {
+        errorKey: 'desired_time',
+        inlineMessage: 'La durata dell’esperienza non entra più in questa fascia. Scegli un altro orario.',
+        toastMessage: 'Questa esperienza richiede un altro orario.',
+      }
     default:
       break
   }

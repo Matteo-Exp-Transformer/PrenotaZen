@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { BusinessHourSlot, BusinessHours } from '@/lib/businessHours'
 import {
+  buildClosedDayMessage,
+  findNearestOpenDay,
   getDefaultBusinessHours,
   hasAnyBusinessHoursConfigured,
   isValidBookingDateTime,
@@ -108,6 +110,62 @@ describe('isValidBookingDateTime', () => {
     expect(isValidBookingDateTime('2026-06-15', '15:00', lunchOnly)).toBe(true)
     expect(isValidBookingDateTime('2026-06-15', '11:30', lunchOnly)).toBe(false)
     expect(isValidBookingDateTime('2026-06-15', '15:30', lunchOnly)).toBe(false)
+  })
+})
+
+describe('findNearestOpenDay', () => {
+  // Aperto solo il lunedì (2026-06-15 è lunedì).
+  const mondayOnly: BusinessHours = {
+    monday: [{ open: '12:00', close: '15:00' }],
+    tuesday: null,
+    wednesday: null,
+    thursday: null,
+    friday: null,
+    saturday: null,
+    sunday: null,
+  }
+
+  it('da un giorno chiuso trova il primo lunedì successivo', () => {
+    // 2026-06-16 è martedì (chiuso) → prossimo aperto = lunedì 2026-06-22.
+    expect(findNearestOpenDay('2026-06-16', mondayOnly)).toBe('2026-06-22')
+  })
+
+  it('parte sempre dal giorno SUCCESSIVO (non ritorna il giorno stesso)', () => {
+    // 2026-06-15 è lunedì (aperto) ma cerca in avanti → lunedì dopo.
+    expect(findNearestOpenDay('2026-06-15', mondayOnly)).toBe('2026-06-22')
+  })
+
+  it('null se nessun giorno è aperto', () => {
+    expect(findNearestOpenDay('2026-06-16', getDefaultBusinessHours())).toBeNull()
+  })
+
+  it('rispetta la finestra maxDays', () => {
+    expect(findNearestOpenDay('2026-06-16', mondayOnly, 3)).toBeNull()
+  })
+})
+
+describe('buildClosedDayMessage', () => {
+  const mondayOnly: BusinessHours = {
+    monday: [{ open: '12:00', close: '15:00' }],
+    tuesday: null,
+    wednesday: null,
+    thursday: null,
+    friday: null,
+    saturday: null,
+    sunday: null,
+  }
+
+  it('propone il primo giorno aperto vicino', () => {
+    const msg = buildClosedDayMessage('2026-06-16', mondayOnly)
+    expect(msg).toContain('Il ristorante è chiuso in questo giorno')
+    expect(msg).toContain('Il primo giorno disponibile è')
+    expect(msg.toLowerCase()).toContain('lunedì')
+  })
+
+  it('senza giorni aperti resta il messaggio base senza suggerimento', () => {
+    expect(buildClosedDayMessage('2026-06-16', getDefaultBusinessHours())).toBe(
+      'Il ristorante è chiuso in questo giorno.',
+    )
   })
 })
 

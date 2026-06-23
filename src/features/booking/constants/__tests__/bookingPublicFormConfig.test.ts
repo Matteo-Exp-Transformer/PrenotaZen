@@ -779,7 +779,7 @@ describe('compilable_category_keys — parse / serialize / round-trip (LOCK Pars
     expect(parsed!.booking_modes[0].sub_tabs[0].compilable_category_keys).toEqual(['antipasti', 'primi'])
   })
 
-  it('round-trip: parseFromDb legacy senza il campo → campo assente', () => {
+  it('round-trip: parseFromDb legacy senza il campo → campo assente (compilable)', () => {
     const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
       page_title: 'Prenota',
       page_description: 'Desc',
@@ -803,5 +803,220 @@ describe('compilable_category_keys — parse / serialize / round-trip (LOCK Pars
     })
     expect(parsed).not.toBeNull()
     expect(parsed!.booking_modes[0].sub_tabs[0].compilable_category_keys).toBeUndefined()
+  })
+})
+
+// @admin-blindatura: settings-form-config
+describe('duration — parse / clamp / round-trip (LOCK Parser/normalizer accoppiati)', () => {
+  function makeConfig(subTabExtra: Record<string, unknown> = {}, modeExtra: Record<string, unknown> = {}): BookingPublicFormConfig {
+    return {
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      header_styles: parseBookingHeaderStylesFromUnknown({}),
+      booking_modes: [{
+        id: 'm1',
+        booking_type: 'tavolo',
+        enabled: true,
+        label: 'Tavolo',
+        description: 'D',
+        icon: 'fork_knife',
+        sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{
+          id: 's1',
+          display: 'cards',
+          label: 'Menu base',
+          ...subTabExtra,
+        }],
+        ...modeExtra,
+      }],
+    }
+  }
+
+  it('parseSubTabFromUnknown: duration valida (120) → preservata', () => {
+    const tab = parseSubTabFromUnknown({ id: 't1', label: 'M', display: 'cards', duration: 120 })
+    expect(tab!.duration).toBe(120)
+  })
+
+  it('parseSubTabFromUnknown: duration assente → undefined', () => {
+    const tab = parseSubTabFromUnknown({ id: 't1', label: 'M', display: 'cards' })
+    expect(tab!.duration).toBeUndefined()
+  })
+
+  it('parseSubTabFromUnknown: duration sotto MIN (29) → undefined', () => {
+    const tab = parseSubTabFromUnknown({ id: 't1', label: 'M', display: 'cards', duration: 29 })
+    expect(tab!.duration).toBeUndefined()
+  })
+
+  it('parseSubTabFromUnknown: duration sopra MAX (361) → undefined', () => {
+    const tab = parseSubTabFromUnknown({ id: 't1', label: 'M', display: 'cards', duration: 361 })
+    expect(tab!.duration).toBeUndefined()
+  })
+
+  it('parseSubTabFromUnknown: duration al limite MIN (30) → preservata', () => {
+    const tab = parseSubTabFromUnknown({ id: 't1', label: 'M', display: 'cards', duration: 30 })
+    expect(tab!.duration).toBe(30)
+  })
+
+  it('parseSubTabFromUnknown: duration al limite MAX (360) → preservata', () => {
+    const tab = parseSubTabFromUnknown({ id: 't1', label: 'M', display: 'cards', duration: 360 })
+    expect(tab!.duration).toBe(360)
+  })
+
+  it('parseSubTabFromUnknown: duration su carosello → preservata', () => {
+    const tab = parseSubTabFromUnknown({
+      id: 'car1', label: 'Offerta', display: 'carousel',
+      carousel_items: [{ image_url: 'https://example.com/a.jpg' }],
+      duration: 150,
+    })
+    expect(tab!.duration).toBe(150)
+  })
+
+  it('normalize: duration valida → preservata', () => {
+    const normalized = normalizeBookingPublicFormConfig(makeConfig({ duration: 120 }))
+    expect(normalized.booking_modes[0].sub_tabs[0].duration).toBe(120)
+  })
+
+  it('normalize: duration assente → undefined (comportamento invariato)', () => {
+    const normalized = normalizeBookingPublicFormConfig(makeConfig())
+    expect(normalized.booking_modes[0].sub_tabs[0].duration).toBeUndefined()
+  })
+
+  it('normalize: duration fuori range → undefined (non scrivere valore non valido)', () => {
+    const normalized = normalizeBookingPublicFormConfig(makeConfig({ duration: 500 as unknown as number }))
+    expect(normalized.booking_modes[0].sub_tabs[0].duration).toBeUndefined()
+  })
+
+  it('normalize: default_duration mode valida → preservata', () => {
+    const normalized = normalizeBookingPublicFormConfig(makeConfig({}, { default_duration: 90 }))
+    expect(normalized.booking_modes[0].default_duration).toBe(90)
+  })
+
+  it('normalize: default_duration mode assente → undefined', () => {
+    const normalized = normalizeBookingPublicFormConfig(makeConfig())
+    expect(normalized.booking_modes[0].default_duration).toBeUndefined()
+  })
+
+  it('normalize: default_duration mode fuori range → undefined', () => {
+    const normalized = normalizeBookingPublicFormConfig(makeConfig({}, { default_duration: 400 as unknown as number }))
+    expect(normalized.booking_modes[0].default_duration).toBeUndefined()
+  })
+
+  it('round-trip parseFromDb: duration card valida → preservata', () => {
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [{
+        id: 'm1', booking_type: 'tavolo', enabled: true, label: 'Tavolo',
+        description: 'D', icon: 'fork_knife', sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{ id: 's1', display: 'cards', label: 'Menu', duration: 120 }],
+      }],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].sub_tabs[0].duration).toBe(120)
+  })
+
+  it('round-trip parseFromDb: duration carosello valida → preservata', () => {
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [{
+        id: 'm1', booking_type: 'tavolo', enabled: true, label: 'Tavolo',
+        description: 'D', icon: 'fork_knife', sub_tabs_enabled: true,
+        sub_tabs_presentation: 'carousel',
+        sub_tabs: [{
+          id: 'car1', display: 'carousel', label: 'Offerta', duration: 180,
+          carousel_items: [{ image_url: 'https://example.com/a.jpg' }],
+        }],
+      }],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].sub_tabs[0].duration).toBe(180)
+  })
+
+  it('round-trip parseFromDb: default_duration mode valida → preservata', () => {
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [{
+        id: 'm1', booking_type: 'tavolo', enabled: true, label: 'Tavolo',
+        description: 'D', icon: 'fork_knife', sub_tabs_enabled: true,
+        sub_tabs_presentation: null, sub_tabs: [], default_duration: 150,
+      }],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].default_duration).toBe(150)
+  })
+
+  it('round-trip parseFromDb: legacy senza duration → campo assente', () => {
+    const parsed = restaurantSettingRegistry.booking_public_form_config.parseFromDb({
+      page_title: 'Prenota',
+      page_description: 'Desc',
+      booking_modes: [{
+        id: 'm1', booking_type: 'tavolo', enabled: true, label: 'Tavolo',
+        description: 'D', icon: 'fork_knife', sub_tabs_enabled: true,
+        sub_tabs_presentation: 'cards',
+        sub_tabs: [{ id: 's1', display: 'cards', label: 'Menu' }],
+      }],
+    })
+    expect(parsed).not.toBeNull()
+    expect(parsed!.booking_modes[0].sub_tabs[0].duration).toBeUndefined()
+    expect(parsed!.booking_modes[0].default_duration).toBeUndefined()
+  })
+})
+
+describe('CustomStaffPreset.default_duration — Zod schema + parser registry', () => {
+  // UUID v4 validi (Zod v4 richiede versione 1-8 nel 3° gruppo, variante 8-b nel 4° gruppo)
+  const UUID1 = 'a0000001-0000-4000-8000-000000000001'
+  const UUID2 = 'a0000002-0000-4000-8000-000000000002'
+  const UUID3 = 'a0000003-0000-4000-8000-000000000003'
+  const UUID4 = 'a0000004-0000-4000-8000-000000000004'
+
+  it('parseFromDb: preset con default_duration valida (120) → preservata', () => {
+    const result = restaurantSettingRegistry.booking_custom_staff_presets.parseFromDb([{
+      id: UUID1,
+      name: 'Preset test',
+      item_ids: [],
+      booking_types: ['rinfresco_laurea'],
+      default_duration: 120,
+    }])
+    expect(result).toHaveLength(1)
+    expect(result[0].default_duration).toBe(120)
+  })
+
+  it('parseFromDb: preset senza default_duration → campo assente', () => {
+    const result = restaurantSettingRegistry.booking_custom_staff_presets.parseFromDb([{
+      id: UUID2,
+      name: 'Preset test',
+      item_ids: [],
+      booking_types: ['rinfresco_laurea'],
+    }])
+    expect(result).toHaveLength(1)
+    expect(result[0].default_duration).toBeUndefined()
+  })
+
+  it('parseFromDb: preset con default_duration fuori range (400) → scartato da Zod, preset escluso', () => {
+    const result = restaurantSettingRegistry.booking_custom_staff_presets.parseFromDb([{
+      id: UUID3,
+      name: 'Preset con durata invalida',
+      item_ids: [],
+      booking_types: ['rinfresco_laurea'],
+      default_duration: 400,
+    }])
+    // Zod max(360) scarta il preset intero (safeParse fallisce → [])
+    expect(result).toHaveLength(0)
+  })
+
+  it('parseFromDb: preset con default_duration al MIN (30) → preservata', () => {
+    const result = restaurantSettingRegistry.booking_custom_staff_presets.parseFromDb([{
+      id: UUID4,
+      name: 'Preset min duration',
+      item_ids: [],
+      booking_types: ['rinfresco_laurea'],
+      default_duration: 30,
+    }])
+    expect(result).toHaveLength(1)
+    expect(result[0].default_duration).toBe(30)
   })
 })

@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { adminBlueCtaSurfaceClass } from '@/lib/adminBlueCtaClass'
 import { useUnsavedChangesGuard } from '@/contexts/UnsavedChangesContext'
+import { durationSnapshotFromConfirmedRange } from '../utils/bookingDurationSnapshot'
 
 const BOOKING_DETAILS_BLOCKING_SOURCE_ID = 'booking-details-modal'
 
@@ -582,6 +583,13 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const performSave = () => {
     const confirmedStart = createBookingDateTime(formData.date, formData.startTime, true)
     const confirmedEnd = createBookingDateTime(formData.date, formData.endTime, false, formData.startTime)
+    const durationSnapshot = booking.duration_minutes != null
+      ? {
+          duration_minutes: booking.duration_minutes,
+          duration_source: booking.duration_source,
+          duration_rule_version: booking.duration_rule_version,
+        }
+      : durationSnapshotFromConfirmedRange(confirmedStart, confirmedEnd)
 
     let menuTotalPerPerson = undefined
     let menuTotalBooking = undefined
@@ -615,6 +623,7 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           : undefined,
         placement: formData.placement?.trim() === '' ? null : (formData.placement || null),
         adminNotes: formData.adminNotes?.trim() === '' ? null : (formData.adminNotes || null),
+        durationSnapshot,
       },
       {
         onSuccess: () => {

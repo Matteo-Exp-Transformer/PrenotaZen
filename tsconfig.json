@@ -20,5 +20,6 @@
     }
   },
   "include": ["src"],
+  "exclude": ["console"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

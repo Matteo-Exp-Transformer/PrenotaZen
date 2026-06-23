@@ -41,6 +41,8 @@ module.exports = {
     'e2e/**',
     '**/__tests__/**',
     'agenti-locali/**',
+    // Console super-admin: sotto-progetto isolato con il proprio ESLint.
+    'console/**',
   ],
   overrides: [
     {

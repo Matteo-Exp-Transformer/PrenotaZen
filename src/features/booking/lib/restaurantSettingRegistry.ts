@@ -42,6 +42,11 @@ import {
   BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS,
   clampBookingText,
 } from '@/features/booking/constants/bookingPrenotaTextLimits'
+import {
+  BOOKING_DURATION_MIN,
+  BOOKING_DURATION_MAX,
+  parseBookingDuration,
+} from '@/features/booking/constants/bookingDurationLimits'
 
 const DEFAULT_BOOKING_WINDOW_DAYS = 60
 
@@ -78,6 +83,12 @@ export const RESTAURANT_SETTING_KEYS_V1 = [
   'booking_time_slots_enabled',
   /** Configurazione UI pagina pubblica /prenota: titolo, descrizione, modalità di prenotazione visibili. */
   'booking_public_form_config',
+  /** S3/D20 — anticipo minimo (minuti) per prenotare (default 60). Console-tunable. */
+  'cutoff_minutes',
+  /** S3/D16 — pavimento tardivo: minuti minimi di ordine garantito (default 45). Console-tunable. */
+  'min_order_time_minutes',
+  /** S3/D16 — toggle tardivo con avviso (default false). Console-tunable solo. */
+  'late_arrival_allowed',
 ] as const
 
 export type RestaurantSettingKeyV1 = (typeof RESTAURANT_SETTING_KEYS_V1)[number]
@@ -227,6 +238,7 @@ const customStaffPresetRowSchema = z.object({
   price_per_person: z.number().min(0).max(10000).optional(),
   is_fixed_menu: z.boolean().optional(),
   visible_on_booking: z.boolean().optional(),
+  default_duration: z.number().int().min(BOOKING_DURATION_MIN).max(BOOKING_DURATION_MAX).optional(),
 })
 
 const bookingCustomStaffPresetsSchema = z.array(customStaffPresetRowSchema).max(40)
@@ -242,16 +254,20 @@ function parseBookingStaffPresetsVisibleFromDb(raw: unknown): boolean {
 function parseBookingCustomStaffPresetsFromDb(raw: unknown): CustomStaffPreset[] {
   const parsed = bookingCustomStaffPresetsSchema.safeParse(raw)
   if (!parsed.success) return []
-  return parsed.data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    item_ids: row.item_ids,
-    booking_types: normalizeStaffPresetBookingTypes(row.booking_types),
-    ...(row.description?.trim() ? { description: row.description.trim() } : {}),
-    ...(row.price_per_person != null && row.price_per_person > 0 ? { price_per_person: row.price_per_person } : {}),
-    ...(row.is_fixed_menu === false ? { is_fixed_menu: false as const } : {}),
-    ...(row.visible_on_booking === false ? { visible_on_booking: false as const } : {}),
-  }))
+  return parsed.data.map((row) => {
+    const parsedDuration = row.default_duration != null ? parseBookingDuration(row.default_duration) : undefined
+    return {
+      id: row.id,
+      name: row.name,
+      item_ids: row.item_ids,
+      booking_types: normalizeStaffPresetBookingTypes(row.booking_types),
+      ...(row.description?.trim() ? { description: row.description.trim() } : {}),
+      ...(row.price_per_person != null && row.price_per_person > 0 ? { price_per_person: row.price_per_person } : {}),
+      ...(row.is_fixed_menu === false ? { is_fixed_menu: false as const } : {}),
+      ...(row.visible_on_booking === false ? { visible_on_booking: false as const } : {}),
+      ...(parsedDuration != null ? { default_duration: parsedDuration } : {}),
+    }
+  })
 }
 
 const bookingTypeForPromoSchema = z.enum(['tavolo', 'rinfresco_laurea', 'menu_prezzo_fisso'])
@@ -344,6 +360,12 @@ export type RestaurantSettingValueMap = {
   booking_time_slots_enabled: boolean
   /** Configurazione UI pagina pubblica /prenota: titolo, descrizione e modalità di prenotazione. */
   booking_public_form_config: BookingPublicFormConfig | null
+  /** Anticipo minimo prenotazione in minuti (default 60, D20). Console-tunable. */
+  cutoff_minutes: number
+  /** Pavimento tardivo in minuti (default 45, D16). Console-tunable. */
+  min_order_time_minutes: number
+  /** Toggle tardivo con avviso (default false, D16). Console-tunable solo. */
+  late_arrival_allowed: boolean
 }
 
 export interface RestaurantSettingRegistryEntry<K extends RestaurantSettingKeyV1> {
@@ -673,6 +695,11 @@ export const restaurantSettingRegistry: {
               const capabilities = parseModeCapabilities(mode.capabilities)
               return capabilities ? { capabilities } : {}
             })(),
+            // default_duration: parse difensivo — il normalizer applica il clamp finale
+            ...((() => {
+              const d = parseBookingDuration(mode.default_duration)
+              return d != null ? { default_duration: d } : {}
+            })()),
           }
         }),
       })
@@ -686,5 +713,48 @@ export const restaurantSettingRegistry: {
       }
       return null
     },
+  },
+  cutoff_minutes: {
+    key: 'cutoff_minutes',
+    parseFromDb: (raw) => {
+      if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) return raw
+      if (typeof raw === 'string') {
+        const n = parseInt(raw, 10)
+        if (!Number.isNaN(n) && n >= 0) return n
+      }
+      return 60
+    },
+    serializeToDb: (value) => value as Json,
+    validate: (value) => {
+      const n = Number(value)
+      if (!Number.isInteger(n) || n < 0 || n > 1440) return 'Deve essere un intero tra 0 e 1440 minuti'
+      return null
+    },
+  },
+  min_order_time_minutes: {
+    key: 'min_order_time_minutes',
+    parseFromDb: (raw) => {
+      if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1) return raw
+      if (typeof raw === 'string') {
+        const n = parseInt(raw, 10)
+        if (!Number.isNaN(n) && n >= 1) return n
+      }
+      return 45
+    },
+    serializeToDb: (value) => value as Json,
+    validate: (value) => {
+      const n = Number(value)
+      if (!Number.isInteger(n) || n < 1 || n > 1440) return 'Deve essere un intero tra 1 e 1440 minuti'
+      return null
+    },
+  },
+  late_arrival_allowed: {
+    key: 'late_arrival_allowed',
+    parseFromDb: (raw) => {
+      if (raw === true || raw === 'true') return true
+      return false
+    },
+    serializeToDb: (value) => value as Json,
+    validate: (value) => (typeof value === 'boolean' ? null : 'Valore non valido'),
   },
 }

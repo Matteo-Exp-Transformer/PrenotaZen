@@ -96,4 +96,90 @@ export function isTimeInsideSlot(time: string, slotStart: string, slotEnd: strin
   return t >= start && t <= end
 }
 
+// ─── S3: Intervalli di arrivo ─────────────────────────────────────────────────
 
+export interface ArrivalSlotConfig {
+  slot_start: string
+  slot_end: string
+  arrival_step_minutes: number
+  /** Durata card/tipologia risolta — usata per filtro "ultimo arrivo utile" */
+  card_duration_minutes?: number
+  /** Pavimento fascia (min_duration) — fallback se card non ha durata */
+  slot_min_duration?: number
+  /** Anticipo minimo dalla ora corrente (default 60 min, D20) */
+  cutoff_minutes?: number
+  /** Toggle tardivo (default false, D16) */
+  late_arrival_allowed?: boolean
+  /** Pavimento tardivo: min di ordine garantito (default 45, D16) */
+  min_order_time_minutes?: number
+}
+
+export interface ArrivalTime {
+  time: string
+  /** false → slot da nascondere (cutoff scaduto o durata insufficiente) */
+  isValid: boolean
+}
+
+/**
+ * Genera gli slot di arrivo step-aligned per una fascia.
+ * Pura e deterministica: zero import Supabase, testabile in isolamento (S3/D18).
+ *
+ * @param nowMinutes  Minuti dalla mezzanotte dell'ora corrente (per cutoff oggi).
+ * @param isToday     true se la data scelta è oggi (attiva il filtro cutoff).
+ */
+export function deriveArrivalTimes(
+  config: ArrivalSlotConfig,
+  nowMinutes: number,
+  isToday: boolean,
+): ArrivalTime[] {
+  const {
+    slot_start,
+    slot_end,
+    arrival_step_minutes: step,
+    card_duration_minutes,
+    slot_min_duration,
+    cutoff_minutes = 60,
+    late_arrival_allowed = false,
+    min_order_time_minutes = 45,
+  } = config
+
+  const hhmm = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/
+  if (!hhmm.test(slot_start) || !hhmm.test(slot_end)) return []
+  if (!Number.isInteger(step) || step < 5 || step > 120) return []
+  if (!Number.isFinite(nowMinutes) || !Number.isFinite(cutoff_minutes)) return []
+  if (card_duration_minutes != null && (!Number.isFinite(card_duration_minutes) || card_duration_minutes < 0)) return []
+  if (slot_min_duration != null && (!Number.isFinite(slot_min_duration) || slot_min_duration < 0)) return []
+  if (!Number.isFinite(min_order_time_minutes) || min_order_time_minutes < 0) return []
+
+  const startMin = parseHmToMinutes(slot_start)
+  let endMin = parseHmToMinutes(slot_end)
+
+  // Overnight: end <= start → aggiunge 24h per confronti lineari
+  if (endMin <= startMin) endMin += 24 * 60
+
+  const effectiveDuration = card_duration_minutes ?? slot_min_duration ?? 0
+
+  const times: ArrivalTime[] = []
+  let current = startMin
+
+  while (current < endMin) {
+    const displayMin = current % (24 * 60)
+    const h = Math.floor(displayMin / 60)
+    const m = displayMin % 60
+    const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+
+    // Cutoff: solo oggi, l'orario deve essere almeno cutoff_minutes nel futuro
+    const cutoffOk = !isToday || current >= nowMinutes + cutoff_minutes
+
+    // Durata: il cliente deve avere abbastanza tempo nel slot
+    // Con tardivo ON: basta che arrivi entro (slot_end - min_order_time)
+    const durationOk = late_arrival_allowed
+      ? current + min_order_time_minutes <= endMin
+      : current + effectiveDuration <= endMin
+
+    times.push({ time, isValid: cutoffOk && durationOk })
+    current += step
+  }
+
+  return times
+}

@@ -13,7 +13,7 @@ import {
   normalizeDietaryRestrictionsForSubmit,
 } from '../utils/dietaryRestrictionsText'
 import { useBusinessHours } from '@/hooks/useBusinessHours'
-import { isValidBookingDateTime, getDayOfWeek, formatHours } from '@/lib/businessHours'
+import { isValidBookingDateTime, getDayOfWeek, formatHours, buildClosedDayMessage } from '@/lib/businessHours'
 import { toast } from 'react-toastify'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
@@ -70,6 +70,8 @@ import {
   mapCreateBookingError,
 } from '../utils/bookingPublicFormErrorFeedback'
 import { useFormValidationAttention } from '../hooks/useFormValidationAttention'
+import { useArrivalSlots } from '../hooks/useArrivalSlots'
+import { resolveBookingDuration } from '../lib/resolveBookingDuration'
 
 interface BookingRequestFormProps {
   onSubmit?: () => void
@@ -88,6 +90,30 @@ interface BookingRequestFormProps {
   onIsDisabledChange?: (disabled: boolean) => void
   /** Testo errore/privacy/riepilogo in bianco solo su sfondo full-page (no striscia). */
   publicFormLightTextOnDarkBackground?: boolean
+}
+
+interface ArrivalSlotsState {
+  hasSlots: boolean
+  isLoading: boolean
+  groups: Array<{ slotId: string; slotName: string; times: string[] }>
+}
+
+function ArrivalSlotsBridge({ tenantSlug, date, durationMinutes, numGuests, onChange }: {
+  tenantSlug: string
+  date: string | null
+  durationMinutes?: number
+  numGuests: number
+  onChange: (state: ArrivalSlotsState) => void
+}) {
+  const result = useArrivalSlots({ tenantSlug, date, cardDurationMinutes: durationMinutes, numGuests })
+  const groups = useMemo(() => result.slots.map((slot) => ({
+    slotId: slot.slot_id,
+    slotName: slot.slot_name,
+    times: slot.times.filter((time) => time.isValid).map((time) => time.time),
+  })), [result.slots])
+  useEffect(() => onChange({ hasSlots: result.hasSlots, isLoading: result.isLoading, groups }),
+    [groups, onChange, result.hasSlots, result.isLoading])
+  return null
 }
 
 const BOOKING_CAROUSEL_SLIDE_WIDTH_CLASS =
@@ -434,6 +460,28 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
   const activeSubTabLinkedPreset = activeSubTab?.preset_id
     ? customStaffPresets.find((preset) => preset.id === activeSubTab.preset_id) ?? null
     : null
+  const resolvedPublicDuration = useMemo(() => resolveBookingDuration({
+    card_duration: activeSubTab?.duration,
+    preset_default_duration: activeSubTabLinkedPreset?.default_duration,
+    booking_mode_default_duration: activeMode?.default_duration,
+  }), [activeMode?.default_duration, activeSubTab?.duration, activeSubTabLinkedPreset?.default_duration])
+  const [arrivalSlots, setArrivalSlots] = useState<ArrivalSlotsState>({
+    hasSlots: false,
+    isLoading: false,
+    groups: [],
+  })
+  const handleArrivalSlotsChange = useCallback((next: ArrivalSlotsState) => {
+    setArrivalSlots((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
+  }, [])
+
+  useEffect(() => {
+    if (!arrivalSlots.hasSlots || arrivalSlots.isLoading || !formData.desired_time) return
+    const remainsValid = arrivalSlots.groups.some((group) => group.times.includes(formData.desired_time!))
+    if (!remainsValid) {
+      setFormData((previous) => ({ ...previous, desired_time: '' }))
+      setErrors((previous) => ({ ...previous, desired_time: 'Scegli un nuovo orario disponibile' }))
+    }
+  }, [arrivalSlots.groups, arrivalSlots.hasSlots, arrivalSlots.isLoading, formData.desired_time])
 
   const activeSubTabUsesFixedPricing = getSubTabPricePerPerson(activeSubTab) != null
   const showIngredientPrices = getSubTabPricePerPerson(activeSubTab) == null
@@ -623,6 +671,11 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     mutate(
       {
         ...formData,
+        ...(resolvedPublicDuration ? {
+          duration_minutes: resolvedPublicDuration.duration_minutes,
+          duration_source: resolvedPublicDuration.source,
+          duration_rule_version: resolvedPublicDuration.rule_version,
+        } : {}),
         special_requests: specialRequests,
         dietary_restrictions: normalizeDietaryRestrictionsForSubmit(formData.dietary_restrictions),
         tenantSlug,
@@ -774,17 +827,19 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     })
   }
 
-  // Una sola card con preset: seleziona automaticamente così la griglia ingredienti è subito disponibile.
+  // Una sola card: seleziona automaticamente così il cliente non deve cliccarla.
+  // La risoluzione preset resta condizionata a preset_id + linkedPreset.
   useEffect(() => {
     if (activeMode?.sub_tabs_presentation !== 'cards') return
     if (activeSubTabId) return
     if (activeModeSubTabs.length !== 1) return
     const only = activeModeSubTabs[0]
-    if (only.display !== 'cards' || !only.preset_id) return
-    const linkedPreset = customStaffPresets.find((preset) => preset.id === only.preset_id)
-    if (!linkedPreset) return
+    if (only.display !== 'cards') return
 
     setActiveSubTabId(only.id)
+    if (!only.preset_id) return
+    const linkedPreset = customStaffPresets.find((preset) => preset.id === only.preset_id)
+    if (!linkedPreset) return
     const presetType = customPresetStorageId(linkedPreset.id)
     setSelectedPreset(presetType)
 
@@ -986,7 +1041,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
         const dayHours = businessHours[dayName]
 
         if (!dayHours || dayHours.length === 0) {
-          newErrors.desired_date = 'Il ristorante è chiuso in questo giorno'
+          newErrors.desired_date = buildClosedDayMessage(formData.desired_date, businessHours)
           isValid = false
           if (!firstErrorKey) firstErrorKey = 'desired_date'
         } else {
@@ -1024,8 +1079,10 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
     }
 
     // Menù personalizzabile: almeno un piatto scelto (prezzo fisso sottotab: fuori scope).
+    // Il guard scatta solo quando esiste davvero una griglia piatti selezionabile
+    // (preset_id + preset risolto): card manuali mostrano solo titolo/descrizione, nessun obbligo.
     if (
-      showMenuSelectionSection &&
+      activeSubTab?.preset_id && activeSubTabLinkedPreset &&
       !activeSubTabUsesFixedPricing &&
       (!formData.menu_selection || !formData.menu_selection.items || formData.menu_selection.items.length === 0)
     ) {
@@ -1167,6 +1224,15 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
 
   return (
     <>
+    {tenantSlug ? (
+      <ArrivalSlotsBridge
+        tenantSlug={tenantSlug}
+        date={formData.desired_date || null}
+        durationMinutes={resolvedPublicDuration?.duration_minutes}
+        numGuests={formData.num_guests || 1}
+        onChange={handleArrivalSlotsChange}
+      />
+    ) : null}
     <form
       id="booking-request-form"
       noValidate
@@ -1231,7 +1297,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
             className={cn('mt-3', BOOKING_PUBLIC_CONTENT_WIDTH)}
           />
         )}
-        {activeModeSubTabs.length > 0 && activeMode?.sub_tabs_presentation !== 'carousel' && (
+        {activeModeSubTabs.length > 1 && activeMode?.sub_tabs_presentation !== 'carousel' && (
           <BookingSubTabCards
             subTabs={activeModeSubTabs}
             activeSubTabId={activeSubTabId}
@@ -1378,6 +1444,7 @@ export const BookingRequestForm: React.FC<BookingRequestFormProps> = ({
           hoursError={hoursError}
           frostedInputCn={frostedInputCn}
           attentionFieldKey={attentionFieldKey}
+          slotGroups={arrivalSlots.hasSlots ? arrivalSlots.groups : undefined}
           onClearAttention={clearAttentionField}
           onFieldChange={(field, value) => {
             setFormData({ ...formData, [field]: value })

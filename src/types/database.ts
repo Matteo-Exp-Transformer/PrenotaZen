@@ -101,6 +101,9 @@ export type Database = {
           dietary_data_consent_at: string | null
           dietary_off_platform_notice: boolean
           dietary_restrictions: Json | null
+          duration_minutes: number | null
+          duration_rule_version: number | null
+          duration_source: string | null
           event_type: string | null
           id: string
           marketing_consent: boolean
@@ -139,6 +142,9 @@ export type Database = {
           dietary_data_consent_at?: string | null
           dietary_off_platform_notice?: boolean
           dietary_restrictions?: Json | null
+          duration_minutes?: number | null
+          duration_rule_version?: number | null
+          duration_source?: string | null
           event_type?: string | null
           id?: string
           marketing_consent?: boolean
@@ -177,6 +183,9 @@ export type Database = {
           dietary_data_consent_at?: string | null
           dietary_off_platform_notice?: boolean
           dietary_restrictions?: Json | null
+          duration_minutes?: number | null
+          duration_rule_version?: number | null
+          duration_source?: string | null
           event_type?: string | null
           id?: string
           marketing_consent?: boolean
@@ -284,6 +293,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      console_allowed_emails: {
+        Row: {
+          created_at: string | null
+          email: string
+          note: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          note?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          note?: string | null
+        }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -1076,6 +1103,7 @@ export type Database = {
       }
       service_slots: {
         Row: {
+          arrival_step_minutes: number
           created_at: string
           display_order: number
           end_time: string
@@ -1084,13 +1112,16 @@ export type Database = {
           max_guests: number | null
           max_turns: number | null
           max_turns_resume: number | null
+          min_duration: number | null
           name: string
           slot_color: string | null
           start_time: string
           tenant_id: string
+          turnover_buffer_minutes: number
           updated_at: string
         }
         Insert: {
+          arrival_step_minutes?: number
           created_at?: string
           display_order?: number
           end_time: string
@@ -1099,13 +1130,16 @@ export type Database = {
           max_guests?: number | null
           max_turns?: number | null
           max_turns_resume?: number | null
+          min_duration?: number | null
           name: string
           slot_color?: string | null
           start_time: string
           tenant_id: string
+          turnover_buffer_minutes?: number
           updated_at?: string
         }
         Update: {
+          arrival_step_minutes?: number
           created_at?: string
           display_order?: number
           end_time?: string
@@ -1114,10 +1148,12 @@ export type Database = {
           max_guests?: number | null
           max_turns?: number | null
           max_turns_resume?: number | null
+          min_duration?: number | null
           name?: string
           slot_color?: string | null
           start_time?: string
           tenant_id?: string
+          turnover_buffer_minutes?: number
           updated_at?: string
         }
         Relationships: [
@@ -1390,6 +1426,35 @@ export type Database = {
       }
       cleanup_rate_limits: { Args: never; Returns: undefined }
       current_admin_tenant_id: { Args: never; Returns: string }
+      get_available_arrival_times: {
+        Args: {
+          p_card_duration?: number
+          p_date: string
+          p_num_guests?: number
+          p_slug: string
+        }
+        Returns: {
+          available_times: string[]
+          slot_id: string
+          slot_name: string
+        }[]
+      }
+      get_public_slot_config: {
+        Args: { p_slug: string }
+        Returns: {
+          arrival_step_minutes: number
+          cutoff_minutes: number
+          end_time: string
+          late_arrival_allowed: boolean
+          min_duration: number
+          min_order_time_minutes: number
+          slot_id: string
+          slot_limit_enabled: boolean
+          slot_name: string
+          start_time: string
+          timezone: string
+        }[]
+      }
       get_tenant_features: { Args: { p_tenant_id: string }; Returns: string[] }
       insert_service_slot: {
         Args: {
@@ -1402,6 +1467,7 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: {
+          arrival_step_minutes: number
           created_at: string
           display_order: number
           end_time: string
@@ -1410,10 +1476,12 @@ export type Database = {
           max_guests: number | null
           max_turns: number | null
           max_turns_resume: number | null
+          min_duration: number | null
           name: string
           slot_color: string | null
           start_time: string
           tenant_id: string
+          turnover_buffer_minutes: number
           updated_at: string
         }[]
         SetofOptions: {
@@ -1442,6 +1510,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      is_console_user: { Args: never; Returns: boolean }
       normalize_booking_carousel_slide_item: {
         Args: { item: Json }
         Returns: Json
@@ -1453,6 +1522,7 @@ export type Database = {
       update_service_slot: {
         Args: { payload: Json }
         Returns: {
+          arrival_step_minutes: number
           created_at: string
           display_order: number
           end_time: string
@@ -1461,10 +1531,12 @@ export type Database = {
           max_guests: number | null
           max_turns: number | null
           max_turns_resume: number | null
+          min_duration: number | null
           name: string
           slot_color: string | null
           start_time: string
           tenant_id: string
+          turnover_buffer_minutes: number
           updated_at: string
         }[]
         SetofOptions: {

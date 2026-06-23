@@ -7,6 +7,7 @@ import { createBookingDateTime, calculateEndTimeFromStart } from '../utils/dateU
 import { buildFeatures } from '@/config/features'
 import { logger } from '@/lib/logger'
 import type { Json, TablesInsert } from '@/types/database'
+import { durationSnapshotFromConfirmedRange } from '../utils/bookingDurationSnapshot'
 
 // Hook for creating booking requests directly as ACCEPTED (admin only)
 export const useCreateAdminBooking = () => {
@@ -30,6 +31,7 @@ export const useCreateAdminBooking = () => {
       
       const confirmedStart = createBookingDateTime(data.desired_date, startTime, true)
       const confirmedEnd = createBookingDateTime(data.desired_date, endTime, false, startTime)
+      const durationSnapshot = durationSnapshotFromConfirmedRange(confirmedStart, confirmedEnd)
       
       const insertData: TablesInsert<'booking_requests'> = {
         tenant_id: tenantId,
@@ -57,7 +59,8 @@ export const useCreateAdminBooking = () => {
         booking_source: 'admin',
         status: 'accepted' as const,
         confirmed_start: confirmedStart,
-        confirmed_end: confirmedEnd
+        confirmed_end: confirmedEnd,
+        ...durationSnapshot,
       }
 
 

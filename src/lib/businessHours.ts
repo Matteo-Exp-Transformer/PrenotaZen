@@ -74,6 +74,51 @@ export function isValidBookingDateTime(
 }
 
 /**
+ * Primo giorno APERTO a partire dal giorno successivo a `fromDateISO`.
+ * Cerca solo in avanti (le date passate non sono prenotabili). Ritorna l'ISO
+ * YYYY-MM-DD del primo giorno con fasce configurate, o null entro `maxDays`.
+ */
+export function findNearestOpenDay(
+  fromDateISO: string,
+  hours: BusinessHours,
+  maxDays = 365,
+): string | null {
+  const [y, m, d] = fromDateISO.split('-').map(Number)
+  if (!y || !m || !d) return null
+  const base = new Date(y, m - 1, d)
+  for (let i = 1; i <= maxDays; i++) {
+    const probe = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i)
+    const iso = `${probe.getFullYear()}-${String(probe.getMonth() + 1).padStart(2, '0')}-${String(
+      probe.getDate(),
+    ).padStart(2, '0')}`
+    const dayHours = hours[getDayOfWeek(iso)]
+    if (dayHours && dayHours.length > 0) return iso
+  }
+  return null
+}
+
+/** YYYY-MM-DD → «lunedì 29 giugno» (locale, senza shift UTC). */
+function formatNearestOpenDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+/**
+ * Messaggio "giorno chiuso" che propone il primo giorno aperto vicino, se esiste.
+ * Mostrato sotto il campo data della Pagina Prenota.
+ */
+export function buildClosedDayMessage(dateISO: string, hours: BusinessHours): string {
+  const base = 'Il ristorante è chiuso in questo giorno'
+  const nearest = findNearestOpenDay(dateISO, hours)
+  if (!nearest) return `${base}.`
+  return `${base}. Il primo giorno disponibile è ${formatNearestOpenDay(nearest)}.`
+}
+
+/**
  * Format business hours for display
  * Example: "11:00 - 00:00" or "11:00 - 01:00"
  */

@@ -21,6 +21,24 @@ import {
 } from '../utils/dateUtils'
 import { logger } from '@/lib/logger'
 import { useFeatures } from '@/hooks/useFeatures'
+import { durationSnapshotFromConfirmedRange } from '../utils/bookingDurationSnapshot'
+
+type DurationSnapshotPayload = Pick<BookingRequest, 'duration_minutes' | 'duration_source' | 'duration_rule_version'>
+
+function preservedOrDerivedDurationSnapshot(
+  booking: BookingRequest,
+  confirmedStart: string,
+  confirmedEnd: string,
+) {
+  if (booking.duration_minutes != null) {
+    return {
+      duration_minutes: booking.duration_minutes,
+      duration_source: booking.duration_source,
+      duration_rule_version: booking.duration_rule_version,
+    }
+  }
+  return durationSnapshotFromConfirmedRange(confirmedStart, confirmedEnd)
+}
 
 export const PendingRequestsTab: React.FC = () => {
   const { data: pendingBookings, isLoading, error, refetch } = usePendingBookings()
@@ -50,6 +68,7 @@ export const PendingRequestsTab: React.FC = () => {
   const [pendingAcceptData, setPendingAcceptData] = useState<{
     bookingId: string; confirmedStart: string; confirmedEnd: string;
     desiredTime: string; numGuests: number
+    durationSnapshot?: DurationSnapshotPayload
   } | null>(null)
 
   const [showPastStartWarning, setShowPastStartWarning] = useState(false)
@@ -128,6 +147,7 @@ export const PendingRequestsTab: React.FC = () => {
     confirmedEnd: string
     desiredTime: string
     numGuests: number
+    durationSnapshot?: DurationSnapshotPayload
   }) => {
     if (acceptMutation.isPending) return
     acceptMutation.mutate(
@@ -137,6 +157,7 @@ export const PendingRequestsTab: React.FC = () => {
         confirmedEnd: payload.confirmedEnd,
         desiredTime: payload.desiredTime,
         numGuests: payload.numGuests,
+        durationSnapshot: payload.durationSnapshot,
       },
       {
         onSuccess: async () => {
@@ -163,6 +184,7 @@ export const PendingRequestsTab: React.FC = () => {
         confirmedEnd,
         desiredTime: startTimeFormatted,
         numGuests: booking.num_guests,
+        durationSnapshot: preservedOrDerivedDurationSnapshot(booking, confirmedStart, confirmedEnd),
       })
       setOverbookingSlotInfo(exceededInfo)
       setShowOverbookingConfirm(true)
@@ -175,6 +197,7 @@ export const PendingRequestsTab: React.FC = () => {
       confirmedEnd,
       desiredTime: startTimeFormatted,
       numGuests: booking.num_guests,
+      durationSnapshot: preservedOrDerivedDurationSnapshot(booking, confirmedStart, confirmedEnd),
     })
   }
 
@@ -378,4 +401,3 @@ export const PendingRequestsTab: React.FC = () => {
     </div>
   )
 }
-

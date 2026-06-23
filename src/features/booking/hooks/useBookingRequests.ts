@@ -6,6 +6,7 @@ import { useTenantContext } from '@/contexts/TenantContext'
 import { logger } from '@/lib/logger'
 import { CreateBookingRequestError } from '../utils/bookingPublicFormErrorFeedback'
 import type { TablesUpdate } from '@/types/database'
+import { extractTimeFromISO } from '../utils/dateUtils'
 
 // Lock globale per prevenire chiamate multiple simultanee alla mutation
 // Usa un lock atomico con ID univoco per prevenire race conditions
@@ -112,6 +113,9 @@ export const useCreateBookingRequest = () => {
             dietary_data_consent: data.dietary_data_consent === true,
             dietary_off_platform_notice: data.dietary_off_platform_notice === true,
             dietary_data_consent_at: data.dietary_data_consent_at ?? null,
+            duration_minutes: data.duration_minutes ?? null,
+            duration_source: data.duration_source ?? null,
+            duration_rule_version: data.duration_rule_version ?? null,
           })
         })
 
@@ -210,6 +214,7 @@ export const useUpdateBookingStatus = () => {
 
       if (confirmed_start) updateData.confirmed_start = confirmed_start
       if (confirmed_end) updateData.confirmed_end = confirmed_end
+      if (confirmed_start) updateData.desired_time = extractTimeFromISO(confirmed_start) || null
       if (rejection_reason) updateData.rejection_reason = rejection_reason
 
       const { data, error } = await supabase
@@ -234,4 +239,3 @@ export const useUpdateBookingStatus = () => {
     }
   })
 }
-

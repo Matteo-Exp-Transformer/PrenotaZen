@@ -190,7 +190,7 @@ describe('BookingRequestForm — card categoria ingredienti (§5 card categoria 
     ])
     renderForm(config)
 
-    fireEvent.click(screen.getByTestId('booking-sub-tab-card-card-menu-festa'))
+    // Con una sola card la strip non è renderizzata: la card è auto-selezionata (FIX 3).
     const categoryButtons = await screen.findAllByRole('button', { name: /Antipasti/i })
     fireEvent.click(categoryButtons[0])
 
