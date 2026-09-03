@@ -12,7 +12,7 @@ const item = (id: string, category: string): MenuItem =>
   }) as MenuItem
 
 describe('computeImportFromPreset', () => {
-  it('precompila le categorie che contengono item del preset e nasconde gli altri item della stessa categoria', () => {
+  it('precompila le categorie che contengono item del preset e lascia visibili tutti gli ingredienti di quelle categorie', () => {
     const result = computeImportFromPreset(
       ['a1', 'p2', 'missing'],
       ['antipasti', 'primi', 'dolci'],
@@ -25,7 +25,7 @@ describe('computeImportFromPreset', () => {
 
     expect(result).toEqual({
       categoryFilter: ['antipasti', 'primi'],
-      hiddenItemIds: ['a2', 'p1'],
+      hiddenItemIds: [],
     })
   })
 

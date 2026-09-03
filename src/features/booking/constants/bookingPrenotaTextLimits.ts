@@ -38,13 +38,15 @@ export const BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS = {
 } as const
 
 /**
- * Tab Menu compose (Pagina Prenota) — cap anti-rottura mobile (prova FU-030 Fase 1).
- * Allineati a sottotab card: label/nome 24, descrizione 79.
+ * Tab Menu compose (Pagina Prenota + Menu QR lista piatti).
+ * Categoria resta allineata alle sottotab (24/79). Nome/descrizione piatto
+ * sono più lunghi (42/110): Matteo accetta il rischio visivo mobile.
  */
 export const BOOKING_MENU_COMPOSE_TEXT_LIMITS = {
   categoryLabel: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabLabel,
-  itemName: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabLabel,
-  itemDescription: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabDescription,
+  categoryDescription: BOOKING_PRENOTA_RESTAURANT_TEXT_LIMITS.subTabDescription,
+  itemName: 42,
+  itemDescription: 110,
 } as const
 
 export const BOOKING_HEADER_FONT_SIZE_MIN = 8

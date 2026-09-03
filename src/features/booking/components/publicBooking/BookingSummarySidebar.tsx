@@ -257,7 +257,7 @@ export const BookingSummarySidebar: React.FC<BookingSummarySidebarProps> = ({
                 const displayItemName = clampBookingText(item.name, COMPOSE_L.itemName)
                 return (
                   <li key={item.id} className="flex items-start justify-between gap-2">
-                    <span className="text-sm text-warm-wood font-medium leading-tight min-w-0">
+                    <span className="min-w-0 wrap-break-word text-sm font-medium leading-tight text-warm-wood">
                       {displayCatLabel ? (
                         <>
                           <span className="text-warm-wood-dark/55">{displayCatLabel}: </span>

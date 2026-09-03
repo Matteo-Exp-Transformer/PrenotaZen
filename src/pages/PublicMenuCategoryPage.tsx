@@ -9,12 +9,32 @@ import { usePublicMenuQrcodeCategories } from '@/features/booking/hooks/useMenuQ
 import { isCategoryInQrFilter, applyQrItemSortOverride } from '@/features/booking/utils/menuQrAppearance'
 import { categoryHeaderBackgroundStyle } from '@/features/public-menu/categoryHeaderBackgroundStyle'
 import { getMenuTheme } from '@/features/public-menu/menuThemes'
-import { PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS } from '@/features/public-menu/publicMenuLayout'
+import { MenuNavTabs } from '@/features/public-menu/MenuNavTabs'
+import { usePublicMenuCategories } from '@/features/public-menu/usePublicMenuCategories'
+import {
+  PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS,
+  PUBLIC_MENU_CATEGORY_MAIN_BOTTOM_PAD_CLASS,
+} from '@/features/public-menu/publicMenuLayout'
 import type { MenuItem } from '@/types/menu'
 import {
   filterMenuItemsForPublicQr,
   isMenuCategoryAvailable,
 } from '@/features/booking/constants/menuMagazzinoLimits'
+import {
+  BOOKING_MENU_COMPOSE_TEXT_LIMITS,
+  clampBookingText,
+} from '@/features/booking/constants/bookingPrenotaTextLimits'
+
+const COMPOSE_L = BOOKING_MENU_COMPOSE_TEXT_LIMITS
+
+function composeItemDisplay(item: MenuItem) {
+  return {
+    name: clampBookingText(item.name, COMPOSE_L.itemName),
+    description: item.description?.trim()
+      ? clampBookingText(item.description, COMPOSE_L.itemDescription)
+      : undefined,
+  }
+}
 
 /** Fascia header categoria — crop piccolo del PNG tema QR. Asset ottimizzati scroll: FU-021. */
 const CATEGORY_HEADER_BAND_PX = 56
@@ -71,35 +91,41 @@ function usePublicCategoryMeta(tenantId: string | null, categoryKey: string | un
 }
 
 function ItemCardWithPhoto({ item }: { item: MenuItem }) {
+  const { name, description } = composeItemDisplay(item)
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
       <img
         src={item.image_url!}
-        alt={item.name}
+        alt={name}
         loading="lazy"
         className="h-44 w-full object-cover"
       />
       <div className="px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-base font-semibold text-gray-900 leading-snug">{item.name}</span>
+        <div className="flex items-start justify-between gap-2">
+          <span className="min-w-0 wrap-break-word text-base font-semibold leading-snug text-gray-900">
+            {name}
+          </span>
           <span className="shrink-0 text-base font-bold text-stone-700">€{item.price.toFixed(2)}</span>
         </div>
-        {item.description?.trim() && (
-          <p className="mt-1 text-sm text-gray-500 leading-snug">{item.description}</p>
-        )}
+        {description ? (
+          <p className="mt-1 min-w-0 wrap-break-word text-sm leading-snug text-gray-500">
+            {description}
+          </p>
+        ) : null}
       </div>
     </div>
   )
 }
 
 function ItemCardText({ item }: { item: MenuItem }) {
+  const { name, description } = composeItemDisplay(item)
   return (
     <div className="flex items-start justify-between gap-3 rounded-2xl bg-white px-4 py-4 shadow-sm">
       <div className="min-w-0">
-        <p className="text-base font-semibold text-gray-900 leading-snug">{item.name}</p>
-        {item.description?.trim() && (
-          <p className="mt-0.5 text-sm text-gray-500 leading-snug">{item.description}</p>
-        )}
+        <p className="wrap-break-word text-base font-semibold leading-snug text-gray-900">{name}</p>
+        {description ? (
+          <p className="mt-0.5 wrap-break-word text-sm leading-snug text-gray-500">{description}</p>
+        ) : null}
       </div>
       <span className="shrink-0 text-base font-bold text-stone-700">€{item.price.toFixed(2)}</span>
     </div>
@@ -120,9 +146,17 @@ export function PublicMenuCategoryPage() {
     shortCode ?? null,
   )
   const { data: qrCatOverrides = [] } = usePublicMenuQrcodeCategories(qr?.id ?? null)
+  const { data: navCategories = [] } = usePublicMenuCategories(
+    tenantReady && qr ? tenantId : null,
+    qr?.category_filter ?? null,
+  )
   const categoryOverride = useMemo(
     () => qrCatOverrides.find((o) => o.category_key === categoryKey),
     [qrCatOverrides, categoryKey],
+  )
+  const overridesByKey = useMemo(
+    () => Object.fromEntries(qrCatOverrides.map((o) => [o.category_key, o])),
+    [qrCatOverrides],
   )
 
   const categoryInQrFilter =
@@ -216,7 +250,7 @@ export function PublicMenuCategoryPage() {
           </div>
         )}
 
-        <main className="flex flex-col gap-3 px-4 py-6">
+        <main className={`flex flex-col gap-3 px-4 py-6 ${PUBLIC_MENU_CATEGORY_MAIN_BOTTOM_PAD_CLASS}`}>
         {loading && (
           <div className="py-16 text-center text-sm text-gray-500">Caricamento...</div>
         )}
@@ -256,6 +290,18 @@ export function PublicMenuCategoryPage() {
             ),
           )}
         </main>
+
+        {tenantSlug && shortCode && navCategories.length > 0 && (
+          <MenuNavTabs
+            categories={navCategories}
+            slug={tenantSlug}
+            shortCode={shortCode}
+            accentColor={theme.accentColor}
+            tabBarStickyRgb={theme.tabBarStickyRgb}
+            overridesByKey={overridesByKey}
+            activeCategoryKey={categoryKey}
+          />
+        )}
       </div>
     </div>
   )

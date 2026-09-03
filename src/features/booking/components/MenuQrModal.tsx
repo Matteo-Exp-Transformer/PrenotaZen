@@ -48,19 +48,15 @@ export function computeImportFromPreset(
 ): { categoryFilter: string[]; hiddenItemIds: string[] } {
   const presetSet = new Set(presetItemIds)
   const categoryFilter: string[] = []
-  const hiddenItemIds: string[] = []
 
   for (const key of allCategoryKeys) {
     const items = itemsByCategory[key] ?? []
     const hasPresetItem = items.some((i) => presetSet.has(i.id))
     if (!hasPresetItem) continue
     categoryFilter.push(key)
-    for (const item of items) {
-      if (!presetSet.has(item.id)) hiddenItemIds.push(item.id)
-    }
   }
 
-  return { categoryFilter, hiddenItemIds }
+  return { categoryFilter, hiddenItemIds: [] }
 }
 
 function normalizeThemeKey(key: string | undefined | null): MenuThemeKey {

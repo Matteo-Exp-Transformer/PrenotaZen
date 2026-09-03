@@ -105,7 +105,7 @@ test.describe('Menu QR pubblico — flusso cliente', () => {
     }
   })
 
-  test('visual: carosello, tema, ordine categorie e footer data/ora', async ({ page }) => {
+  test('visual: carosello, tema, ordine categorie e pill in pagina categoria', async ({ page }) => {
     test.setTimeout(120000)
 
     const errors: string[] = []
@@ -205,13 +205,25 @@ test.describe('Menu QR pubblico — flusso cliente', () => {
       await expect(categoryCards.nth(0)).toContainText(secondCategoryLabel)
       await expect(categoryCards.nth(1)).toContainText(firstCategoryLabel)
 
-      const today = new Intl.DateTimeFormat('it-IT', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      }).format(new Date())
-      await expect(page.getByText(today, { exact: true })).toBeVisible()
-      await expect(page.getByText(/^\d{2}:\d{2}$/).last()).toBeVisible()
+      await expect(page.getByRole('navigation', { name: 'Categorie del menù' })).toHaveCount(0)
+
+      await categoryCards.nth(0).click()
+      await expect(page).toHaveURL(
+        new RegExp(`/menu/${tenantSlug}/qr/${shortCode}/c/${secondCategoryKey}$`),
+      )
+
+      const categoryNav = page.getByRole('navigation', { name: 'Categorie del menù' })
+      await expect(categoryNav).toBeVisible({ timeout: 15000 })
+      await expect(categoryNav.getByRole('link', { name: secondCategoryLabel })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+
+      await categoryNav.getByRole('link', { name: firstCategoryLabel }).click()
+      await expect(page).toHaveURL(
+        new RegExp(`/menu/${tenantSlug}/qr/${shortCode}/c/${firstCategoryKey}$`),
+      )
+      await expect(page.getByRole('navigation', { name: 'Categorie del menù' })).toBeVisible()
 
       expect(errors, 'errori console/browser').toEqual([])
     } finally {

@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { useTenantContext } from '@/contexts/TenantContext'
-import { supabasePublic } from '@/lib/supabasePublic'
 import { usePublicMenuQr, usePublicDefaultMenuQr } from '@/features/booking/hooks/useMenuQrCodes'
 import { usePublicMenuQrcodeCategories } from '@/features/booking/hooks/useMenuQrcodeCategories'
 import { categoryCardNoPhotoBackgroundStyle } from '@/features/public-menu/categoryHeaderBackgroundStyle'
 import { getMenuTheme, type MenuTheme } from '@/features/public-menu/menuThemes'
 import { MenuQrCategoryIconGlyph } from '@/features/public-menu/MenuQrCategoryIconGlyph'
+import { usePublicMenuCategories } from '@/features/public-menu/usePublicMenuCategories'
 import type { MenuCategoryRecord } from '@/features/booking/hooks/useMenuCategories'
-import type { MenuQrCode, CarouselItem, MenuQrcodeCategoryOverride } from '@/types/menu'
-import { orderMenuCategoriesByFilter } from '@/features/booking/utils/menuQrAppearance'
-import { filterMenuCategoriesForPublic } from '@/features/booking/constants/menuMagazzinoLimits'
+import type { MenuQrCode, CarouselItem } from '@/types/menu'
 import { usePublicMenuViewport } from '@/hooks/usePublicMenuViewport'
 import { useRestaurantName } from '@/hooks/useRestaurantName'
 import { PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS } from '@/features/public-menu/publicMenuLayout'
@@ -28,35 +25,6 @@ function useTenantBySlug(slug: string | undefined) {
   const tenantReady = !!slug && !isLoading && !!tenantId && tenantSlug === slug
 
   return { tenantId, organizationName, isLoading, tenantReady }
-}
-
-function usePublicCategories(tenantId: string | null, categoryFilter: string[] | null) {
-  return useQuery({
-    queryKey: ['public-menu-categories', tenantId, categoryFilter],
-    queryFn: async () => {
-      // [] esplicito = nessuna card categoria in homepage
-      if (categoryFilter !== null && categoryFilter.length === 0) {
-        return []
-      }
-
-      let query = supabasePublic
-        .from('menu_categories')
-        .select('id, key, label, description, sort_order, is_available')
-        .eq('tenant_id', tenantId!)
-        .order('sort_order', { ascending: true })
-        .order('label', { ascending: true })
-
-      if (categoryFilter !== null && categoryFilter.length > 0) {
-        query = query.in('key', categoryFilter)
-      }
-
-      const { data, error } = await query
-      if (error) throw error
-      const rows = filterMenuCategoriesForPublic((data ?? []) as MenuCategoryRecord[])
-      return orderMenuCategoriesByFilter(rows, categoryFilter)
-    },
-    enabled: !!tenantId,
-  })
 }
 
 /**
@@ -225,170 +193,6 @@ function MenuCarousel({
   )
 }
 
-/** Pixel di scroll dopo il lock sticky per raggiungere opacità piena sulla barra tab. */
-const TAB_BAR_FADE_SCROLL_PX = 56
-const TAB_BAR_SCROLL_STEP_PX = 220
-
-type MenuNavTabItem = {
-  key: string
-  label: string
-  href: string
-  iconKey?: string | null
-  categoryKey: string
-}
-
-// ── Tab navigazione sticky ────────────────────────────────────────────────────
-
-function MenuNavTabs({
-  categories,
-  slug,
-  shortCode,
-  accentColor,
-  tabBarStickyRgb,
-  overridesByKey,
-}: {
-  categories: MenuCategoryRecord[]
-  slug: string
-  shortCode: string
-  accentColor: string
-  tabBarStickyRgb: string
-  overridesByKey: Record<string, MenuQrcodeCategoryOverride>
-}) {
-  const sentinelRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [bgOpacity, setBgOpacity] = useState(0)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
-
-  const items: MenuNavTabItem[] = categories.map((c) => {
-    const ov = overridesByKey[c.key]
-    return {
-      key: c.key,
-      label: c.label,
-      href: `/menu/${slug}/qr/${shortCode}/c/${c.key}`,
-      iconKey: ov?.icon,
-      categoryKey: c.key,
-    }
-  })
-
-  const updateScrollHints = () => {
-    const el = scrollRef.current
-    if (!el) return
-    const { scrollLeft, scrollWidth, clientWidth } = el
-    setCanScrollLeft(scrollLeft > 4)
-    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4)
-  }
-
-  useEffect(() => {
-    const updateOpacity = () => {
-      const sentinel = sentinelRef.current
-      if (!sentinel) return
-      const bottom = sentinel.getBoundingClientRect().bottom
-      if (bottom > 0) {
-        setBgOpacity(0)
-        return
-      }
-      const progress = Math.min(1, -bottom / TAB_BAR_FADE_SCROLL_PX)
-      setBgOpacity(progress)
-    }
-
-    updateOpacity()
-    window.addEventListener('scroll', updateOpacity, { passive: true })
-    window.addEventListener('resize', updateOpacity)
-    return () => {
-      window.removeEventListener('scroll', updateOpacity)
-      window.removeEventListener('resize', updateOpacity)
-    }
-  }, [])
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    updateScrollHints()
-    el.addEventListener('scroll', updateScrollHints, { passive: true })
-    const ro = new ResizeObserver(updateScrollHints)
-    ro.observe(el)
-    return () => {
-      el.removeEventListener('scroll', updateScrollHints)
-      ro.disconnect()
-    }
-  }, [items.length])
-
-  if (items.length === 0) return null
-
-  const blurPx = Math.round(bgOpacity * 10)
-  const barBg = `rgba(${tabBarStickyRgb}, ${bgOpacity * 0.97})`
-  const arrowBg = `rgba(${tabBarStickyRgb}, ${Math.max(bgOpacity * 0.97, 0.72)})`
-  const pillBg = `rgba(${tabBarStickyRgb}, 0.92)`
-
-  const scrollTabs = (delta: number) => {
-    scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' })
-  }
-
-  return (
-    <>
-      <div ref={sentinelRef} className="h-px w-full shrink-0" aria-hidden />
-      <div
-        className="sticky top-0 z-10 relative"
-        style={{
-          backgroundColor: barBg,
-          backdropFilter: blurPx > 0 ? `blur(${blurPx}px)` : 'none',
-          WebkitBackdropFilter: blurPx > 0 ? `blur(${blurPx}px)` : 'none',
-          transition: 'background-color 0.12s ease-out, backdrop-filter 0.12s ease-out',
-        }}
-      >
-        {canScrollLeft && (
-          <button
-            type="button"
-            aria-label="Scorri categorie indietro"
-            className="absolute left-0 top-0 bottom-0 z-20 hidden min-[700px]:flex w-10 items-center justify-center rounded-r-md shadow-sm"
-            style={{ backgroundColor: arrowBg, color: accentColor }}
-            onClick={() => scrollTabs(-TAB_BAR_SCROLL_STEP_PX)}
-          >
-            <ChevronLeft size={22} strokeWidth={1.75} />
-          </button>
-        )}
-        <div
-          ref={scrollRef}
-          className="flex gap-2 overflow-x-auto scrollbar-hide py-3 px-4 min-[700px]:px-11"
-        >
-          {items.map((item) => (
-              <Link
-                key={item.key}
-                to={item.href}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium leading-none transition-colors"
-                style={{
-                  borderColor: accentColor,
-                  color: accentColor,
-                  backgroundColor: pillBg,
-                }}
-              >
-                <MenuQrCategoryIconGlyph
-                  iconKey={item.iconKey}
-                  categoryKey={item.categoryKey}
-                  size={16}
-                  className="shrink-0"
-                />
-                <span className="whitespace-nowrap">{item.label}</span>
-              </Link>
-            ))}
-        </div>
-        {canScrollRight && (
-          <button
-            type="button"
-            aria-label="Scorri categorie avanti"
-            className="absolute right-0 top-0 bottom-0 z-20 hidden min-[700px]:flex w-10 items-center justify-center rounded-l-md shadow-sm"
-            style={{ backgroundColor: arrowBg, color: accentColor }}
-            onClick={() => scrollTabs(TAB_BAR_SCROLL_STEP_PX)}
-          >
-            <ChevronRight size={22} strokeWidth={1.75} />
-          </button>
-        )}
-      </div>
-    </>
-  )
-}
-
 // ── Card categoria — stesso layout ovunque; descrizione nella fascia header 70%; altezza allineata se mix foto ──
 // Griglia: 1 col <520 · 2 col ≥520
 
@@ -482,31 +286,6 @@ function CategoryCard({
   )
 }
 
-// ── Footer data/ora ───────────────────────────────────────────────────────────
-
-function MenuFooterCard() {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [])
-
-  const dateStr = new Intl.DateTimeFormat('it-IT', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  }).format(now)
-  const timeStr = new Intl.DateTimeFormat('it-IT', {
-    hour: '2-digit', minute: '2-digit',
-  }).format(now)
-
-  return (
-    <div className="mx-4 mb-6 rounded-2xl bg-white px-4 py-3 shadow-sm flex items-center justify-between gap-2">
-      <span className="text-sm text-gray-500 capitalize">{dateStr}</span>
-      <span className="text-sm font-semibold text-gray-800">{timeStr}</span>
-    </div>
-  )
-}
-
 // ── Contenuto QR risolto ──────────────────────────────────────────────────────
 
 function MenuContent({
@@ -520,7 +299,7 @@ function MenuContent({
   shortCode: string
   organizationName: string
 }) {
-  const { data: categories = [], isLoading: catLoading } = usePublicCategories(
+  const { data: categories = [], isLoading: catLoading } = usePublicMenuCategories(
     qr.tenant_id,
     qr.category_filter,
   )
@@ -533,7 +312,6 @@ function MenuContent({
   const theme = getMenuTheme(qr.theme_key)
   const pageBgStyle = useMenuPageBackgroundStyle(theme)
 
-  // Mappa override per category_key
   const overridesByKey = Object.fromEntries(qrCatOverrides.map((o) => [o.category_key, o]))
   const hasAnyCategoryPhoto = categories.some((cat) => Boolean(categoryImages[cat.key]))
 
@@ -552,7 +330,6 @@ function MenuContent({
     >
       {/* FU-025: sfondo tema full viewport; contenuto congelato a larghezza tablet, centrato oltre 1024px */}
       <div className={PUBLIC_MENU_CONTENT_MAX_WIDTH_CLASS}>
-      {/* Hero: sfondo bodyImage repeat-y sul wrapper che scrolla col contenuto */}
       <header className="relative shrink-0 px-4 pt-8 pb-4">
         <div className="relative flex flex-col items-center gap-2 text-center">
           <h1
@@ -571,49 +348,34 @@ function MenuContent({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col">
-        <MenuNavTabs
-          categories={categories}
-          slug={slug}
-          shortCode={shortCode}
-          accentColor={theme.accentColor}
-          tabBarStickyRgb={theme.tabBarStickyRgb}
-          overridesByKey={overridesByKey}
-        />
-
-        {categories.length > 0 ? (
-          <main className="flex-1 px-4 pt-4">
-            <div className="grid grid-cols-1 items-stretch gap-1.5 min-[520px]:grid-cols-2 min-[520px]:gap-2 min-[1025px]:gap-3">
-              {categories.map((cat) => {
-                const ov = overridesByKey[cat.key]
-                return (
-                  <CategoryCard
-                    key={cat.key}
-                    category={cat}
-                    href={`/menu/${slug}/qr/${shortCode}/c/${cat.key}`}
-                    imageUrl={categoryImages[cat.key]}
-                    qrTitle={ov?.title}
-                    qrDescription={ov?.description}
-                    iconKey={ov?.icon}
-                    theme={theme}
-                    matchPhotoTileHeight={hasAnyCategoryPhoto}
-                  />
-                )
-              })}
-            </div>
-          </main>
-        ) : (
-          <main className="flex-1 px-4 py-6">
-            <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-gray-500 shadow-sm">
-              Menu in preparazione
-            </p>
-          </main>
-        )}
-
-        <div className="mt-auto pt-2">
-          <MenuFooterCard />
-        </div>
-      </div>
+      {categories.length > 0 ? (
+        <main className="flex-1 px-4 pt-4 pb-8">
+          <div className="grid grid-cols-1 items-stretch gap-1.5 min-[520px]:grid-cols-2 min-[520px]:gap-2 min-[1025px]:gap-3">
+            {categories.map((cat) => {
+              const ov = overridesByKey[cat.key]
+              return (
+                <CategoryCard
+                  key={cat.key}
+                  category={cat}
+                  href={`/menu/${slug}/qr/${shortCode}/c/${cat.key}`}
+                  imageUrl={categoryImages[cat.key]}
+                  qrTitle={ov?.title}
+                  qrDescription={ov?.description}
+                  iconKey={ov?.icon}
+                  theme={theme}
+                  matchPhotoTileHeight={hasAnyCategoryPhoto}
+                />
+              )
+            })}
+          </div>
+        </main>
+      ) : (
+        <main className="flex-1 px-4 py-6">
+          <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-gray-500 shadow-sm">
+            Menu in preparazione
+          </p>
+        </main>
+      )}
       </div>
     </div>
   )

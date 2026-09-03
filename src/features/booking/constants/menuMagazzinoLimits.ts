@@ -1,7 +1,5 @@
-/** Limiti duri tab Menu (M3 Fase 1) — valgono solo sui nuovi inserimenti (retroattività §9). */
+/** Limiti duri tab Menu — valgono solo sui nuovi inserimenti (retroattività §9). */
 export const MENU_MAGAZZINO_HARD_LIMITS = {
-  categories: 7,
-  productsPerCategory: 12,
   staffPresets: 6,
   qrCodes: 6,
 } as const
@@ -17,20 +15,12 @@ export function getMenuMagazzinoSavePropagationMessage(qrMenuEnabled: boolean): 
   return `Salvando aggiorni subito ${targets}. ${MENU_MAGAZZINO_SAVE_PROPAGATION_SNAPSHOT_SUFFIX}`
 }
 
-export function canAddMenuCategory(currentCount: number): boolean {
-  return currentCount < MENU_MAGAZZINO_HARD_LIMITS.categories
+export function canAddMenuCategory(_currentCount: number): boolean {
+  return true
 }
 
-export function getMenuCategoryLimitMessage(): string {
-  return `Hai raggiunto il massimo di ${MENU_MAGAZZINO_HARD_LIMITS.categories} categorie`
-}
-
-export function canAddMenuProductToCategory(currentCount: number): boolean {
-  return currentCount < MENU_MAGAZZINO_HARD_LIMITS.productsPerCategory
-}
-
-export function getMenuProductPerCategoryLimitMessage(): string {
-  return `Hai raggiunto il massimo di ${MENU_MAGAZZINO_HARD_LIMITS.productsPerCategory} prodotti per categoria`
+export function canAddMenuProductToCategory(_currentCount: number): boolean {
+  return true
 }
 
 export function canAddStaffPreset(currentCount: number): boolean {
