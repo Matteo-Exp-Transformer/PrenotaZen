@@ -33,36 +33,15 @@ export function validateMenuQrSettings(input: {
     }
   }
 
-  // 2 — Carosello
-  if (carouselItems.length === 0) {
+  // 2 — Carosello: serve almeno una FOTO. I testi della slide (etichetta, titolo,
+  // descrizione) sono FACOLTATIVI dal 03-09-26 (decisione Matteo): la pagina pubblica
+  // salta i campi vuoti invece di mostrare fallback. Non reintrodurre il requisito
+  // "etichetta + titolo compilati". Vedi docs/Menu-QR-Skill/MENU_QR_SKILL.md §3-§4.
+  const slidesWithPhoto = carouselItems.filter((item) => !!item.image_url)
+  if (slidesWithPhoto.length === 0) {
     return {
       ok: false,
-      message:
-        'Il carosello è obbligatorio: aggiungi almeno una foto con etichetta e titolo compilati.',
-    }
-  }
-
-  for (const item of carouselItems) {
-    const hasAny =
-      !!item.image_url || !!item.eyebrow?.trim() || !!item.title?.trim() || !!item.description?.trim()
-    const isComplete = !!item.image_url && !!item.eyebrow?.trim() && !!item.title?.trim()
-    if (hasAny && !isComplete) {
-      return {
-        ok: false,
-        message:
-          'Ogni foto del carosello deve avere etichetta e titolo compilati, oppure rimuovi la slide incompleta.',
-      }
-    }
-  }
-
-  const completeSlides = carouselItems.filter(
-    (item) => item.image_url && item.eyebrow?.trim() && item.title?.trim(),
-  )
-  if (completeSlides.length === 0) {
-    return {
-      ok: false,
-      message:
-        'Il carosello è obbligatorio: aggiungi almeno una foto con etichetta e titolo compilati.',
+      message: 'Il carosello è obbligatorio: aggiungi almeno una foto.',
     }
   }
 

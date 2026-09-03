@@ -131,7 +131,10 @@ export function MenuQrCarouselSection({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-gray-500">
+          Etichetta, titolo e descrizione sono facoltativi: lascia vuoto ciò che non vuoi mostrare.
+        </p>
         <input
           ref={fileRef}
           type="file"

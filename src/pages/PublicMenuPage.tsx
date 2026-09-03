@@ -120,6 +120,10 @@ function MenuCarousel({
           {items.map((item, i) => {
             const title = item.title ?? item.label
             const eyebrow = item.eyebrow?.trim()
+            const description = item.description?.trim()
+            // Testi slide facoltativi (03-09-26): senza nessun testo il gradiente scuro non ha
+            // niente da rendere leggibile, quindi si mostra la foto pulita.
+            const hasOverlayText = !!(eyebrow || title || description)
             return (
               <div
                 key={i}
@@ -133,13 +137,15 @@ function MenuCarousel({
                   loading={i === 0 ? 'eager' : 'lazy'}
                   draggable={false}
                 />
-                {/* Gradiente overlay 40% sinistro per testo */}
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: 'linear-gradient(to right, rgba(0,0,0,0.55) 0%, transparent 50%)',
-                  }}
-                />
+                {/* Gradiente overlay 40% sinistro per testo — solo se c'è testo da leggere */}
+                {hasOverlayText ? (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(to right, rgba(0,0,0,0.55) 0%, transparent 50%)',
+                    }}
+                  />
+                ) : null}
                 {/* Testo su sinistra */}
                 <div className="absolute inset-y-0 left-0 flex w-1/2 flex-col justify-end px-4 pb-4">
                   {eyebrow ? (
@@ -150,8 +156,8 @@ function MenuCarousel({
                   {title && (
                     <p className="mt-0.5 text-base font-bold leading-snug text-white">{title}</p>
                   )}
-                  {item.description && (
-                    <p className="mt-0.5 text-xs leading-snug text-white/80">{item.description}</p>
+                  {description && (
+                    <p className="mt-0.5 text-xs leading-snug text-white/80">{description}</p>
                   )}
                 </div>
               </div>
